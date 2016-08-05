@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/HazyResearch/snorkel.svg?branch=master)](https://travis-ci.org/HazyResearch/snorkel)
 
+# THIS IS A STABLE BRANCH FOR TACL EXPERIMENTS _ONLY_!
+
 ## Acknowledgements
 <img src="figs/darpa.JPG" width="80" height="80" />
 Sponsored in part by DARPA as part of the [SIMPLEX](http://www.darpa.mil/program/simplifying-complexity-in-scientific-discovery) program under contract number N66001-15-C-4043.
