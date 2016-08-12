@@ -78,6 +78,11 @@ class TrainingSet(object):
                 self.dev_labels     = dev_labels
                 self.L_dev          = self._apply_lfs(dev_candidates)
             d['accuracy'] = Series(data=LF_accuracies(self.L_dev, self.dev_labels), index=self.lf_names)
+            # counts
+            n = sparse_abs(self.L_dev).sum(axis=0)
+            n = np.ravel(n).astype(np.int32)
+            d["n"] = Series(data=n, index=self.lf_names)
+            
         return DataFrame(data=d, index=self.lf_names)
 
 
