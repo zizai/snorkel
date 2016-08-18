@@ -221,6 +221,7 @@ class PipelinedLearner(Learner):
         """Train model: **as default, use "joint" approach**"""
         print "Training LF model..."
         training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+        self.training_marginals = training_marginals
         print "Training model..."
         self.train_model(training_marginals, w0=feat_w0, **model_hyperparams)
 
