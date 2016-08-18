@@ -3,6 +3,7 @@ from collections import defaultdict
 import numpy as np
 import scipy.sparse as sparse
 import itertools
+from pandas import DataFrame
 
 # Feature modules
 sys.path.append(os.path.join(os.environ['SNORKELHOME'], 'treedlib'))
@@ -79,6 +80,11 @@ class Featurizer(object):
             feats.append(f)
         return feats
 
+    def top_features(self, w, n_max=100):
+        """Return a DataFrame of highest (abs)-weighted features"""
+        idxs = np.argsort(np.abs(w))[::-1][:n_max]
+        d = {'j': idxs, 'w': [w[i] for i in idxs]}
+        return DataFrame(data=d, index=[self.feat_inv_index[i] for i in idxs])
 
 class NgramFeaturizer(Featurizer):
     """Feature for relations (of arity >= 1) defined over Ngram objects."""

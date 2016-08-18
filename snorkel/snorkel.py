@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 from features import Featurizer
-from learning import LogReg, odds_to_prob
+from learning import LogReg, odds_to_prob, SciKitLR
 from lstm import *
 from learning_utils import test_scores, calibration_plots, training_set_summary_stats, sparse_abs, LF_coverage, \
     LF_overlaps, LF_conflicts, LF_accuracies
@@ -202,7 +202,8 @@ class PipelinedLearner(Learner):
     def train_lf_model(self, w0=1.0, **model_hyperparams):
         """Train the first _generative_ model of the LFs"""
         w0 = w0*np.ones(self.m)
-        self.training_model = LogReg()
+        self.training_model =  LogReg() #SciKitLR() 
+        
         self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
         # Compute marginal probabilities over the candidates from this model of the training set
