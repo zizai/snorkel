@@ -197,7 +197,7 @@ class LogRegSimple(NoiseAwareModel):
 
                 # Print
                 if step % 100 == 0:
-                    print "\tLoss = {:.6f}\tGradient magnitude = {:.6f}".format(L, np.linalg.norm(g0, ord=2))
+                    print "\tLoss = {:.6f}\tGradient magnitude = {:.6f}".format(0.0, np.linalg.norm(g0, ord=2))
 
                 # Backtracking line search
                 # TODO
