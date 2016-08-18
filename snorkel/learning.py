@@ -138,7 +138,17 @@ class LogRegSimple(NoiseAwareModel):
         self.w         = None
         self.bias_term = bias_term
 
-    def train(self, X, training_marginals, method='GD', n_iter=1000, w0=None, rate=0.001, mu=1e-6, alpha=0.5, rate_decay=0.999, hard_thresh=False):
+    def _loss(self, X, w, m_t, mu, alpha):
+        """
+        Our noise-aware loss function (ignoring regularization term):
+        L(w) = sum_{x,y} E[ log( 1 + exp(-x^Twy) ) ]
+             = sum_{x,y} P(y=1) log( 1 + exp(-x^Tw) ) + P(y=-1) log( 1 + exp(x^Tw) )
+        """
+        z = X.dot(w)
+        return m_t.dot(np.log(1 + np.exp(-z))) + (1 - m_t).dot(np.log(1 + np.exp(z))) \
+                + mu * (alpha*np.linalg.norm(w, ord=1) + (1-alpha)*np.linalg.norm(w, ord=2))
+
+    def train(self, X, training_marginals, method='GD', n_iter=1000, w0=None, rate=0.001, backtracking=False, beta=0.8, mu=1e-6, alpha=0.5, rate_decay=0.999, hard_thresh=False):
 
         # First, we remove the rows (candidates) that have no LF coverage
         covered            = np.where(np.abs(training_marginals - 0.5) > 1e-3)[0]
@@ -148,16 +158,16 @@ class LogRegSimple(NoiseAwareModel):
         # Option to try hard thresholding
         if hard_thresh:
             training_marginals = np.array([1.0 if x > 0.5 else 0.0 for x in training_marginals])
-        m_t, m_f           = training_marginals, 1-training_marginals
+        m_t, m_f = training_marginals, 1-training_marginals
     
         # Set up stuff
-        N, M   = X.shape
+        N, M = X.shape
         print "="*80
         print "Training marginals (!= 0.5):\t%s" % N
         print "Features:\t\t\t%s" % M
         print "="*80
-        Xt     = X.transpose()
-        w0     = w0 if w0 is not None else np.zeros(M)
+        Xt = X.transpose()
+        w0 = w0 if w0 is not None else np.zeros(M)
 
         # Initialize training
         w = w0.copy()
@@ -165,7 +175,6 @@ class LogRegSimple(NoiseAwareModel):
 
         # Scipy optimize
         if method == 'L-BFGS':
-            # NOTE: Way too slow?
             print "Using L-BFGS-B..."
             func = lambda w : m_t.dot(np.log(odds_to_prob(X.dot(w)))) + m_f.dot(np.log(odds_to_prob(-X.dot(w))))
             self.res = minimize(func, w0, method='L-BFGS-B', options={'disp':True, 'iprint':10})
@@ -173,37 +182,40 @@ class LogRegSimple(NoiseAwareModel):
 
         # Gradient descent
         elif method == 'GD':
-            print "Using gradient descent with backtracking line search..."
+            print "Using gradient descent..."
             for step in range(n_iter):
                 if step % 100 == 0:
                     print "\tLearning epoch = {}\tStep size = {}".format(step, rate)
 
                 # Compute the gradient step
                 """
-                Let z(x) = exp(x) / (1 + exp(x)) = 1 / (1 + exp(-x)) = odds_to_prob(x)
-                
-                We compute the gradient of the noise aware loss function (ignoring the regularization term here):
-                \grad_w L(w) 
-                = \grad_w \left( \sum_{i=1}^N P(y_i=1)*\log(1 + \exp(-X_i^Tw)) + P(y_i=-1)*\log(1 + \exp(X_i^Tw))
-                = \sum_{i=1}^N P(y_i=-1)*z(X_i^Tw)X_i - P(y_i=1)*x(-X_i^Tw)X_i
+                Let g(x) = exp(x) / (1 + exp(x)) = 1 / (1 + exp(-x)) = odds_to_prob(x)
+
+                Our noise-aware loss function (ignoring regularization term):
+                L(w) = sum_{x,y} E[ log( 1 + exp(-x^Twy) ) ]
+                     = sum_{x,y} P(y=1) log( 1 + exp(-x^Tw) ) + P(y=-1) log( 1 + exp(x^Tw) )
+
+                The gradient is thus:
+                grad_w = sum_{x,y} P(y=-1) g(x^Tw) x - P(y=1) g(-x^Tw) x
                 """
-                t = odds_to_prob(X.dot(w))
+                z = X.dot(w)
+                t = odds_to_prob(z)
                 g0 = Xt.dot(np.multiply(t, m_f)) - Xt.dot(np.multiply(1-t, m_t))
 
                 # Compute the loss
-                # TODO: Finish this
-                #L = -(m_t.dot(np.log(t)) + m_f.dot(np.log(1-t))) \
-                #        + alpha*np.linalg.norm(w, ord=1) + (1-alpha)*np.linalg.norm(w, ord=2)
-
-                # Print
+                L = self._loss(X, w, m_t, mu, alpha)
                 if step % 100 == 0:
-                    print "\tLoss = {:.6f}\tGradient magnitude = {:.6f}".format(0.0, np.linalg.norm(g0, ord=2))
-
-                # Backtracking line search
-                # TODO
+                    print "\tLoss = {:.6f}\tGradient magnitude = {:.6f}".format(L, np.linalg.norm(g0, ord=2))
 
                 # Momentum term
                 g = 0.95*g0 + 0.05*g
+
+                # Backtracking line search
+                if backtracking:
+                    while self._loss(X, w - rate*g, m_t, mu, alpha) > L - 0.5*rate*np.linalg.norm(w, ord=2)**2:
+                        rate *= beta
+                else:
+                    rate *= rate_decay
 
                 # Update weights
                 w -= rate * g
@@ -212,16 +224,9 @@ class LogRegSimple(NoiseAwareModel):
                 w_bias    = w[-1]
                 soft      = np.abs(w) - rate * alpha * mu
                 ridge_pen = (1 + (1-alpha) * rate * mu)
-
-                #          \ell_1 penalty by soft thresholding        |  \ell_2 penalty
                 w = (np.sign(w)*np.select([soft>0], [soft], default=0)) / ridge_pen
-
-                # Don't regularize the bias term
                 if self.bias_term:
                     w[-1] = w_bias
-
-                # Rate decay
-                rate *= rate_decay
 
             # Return learned weights
             self.w = w
