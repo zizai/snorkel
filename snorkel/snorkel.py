@@ -217,11 +217,27 @@ class PipelinedLearner(Learner):
         self.w       = self.model.train(self.X_train, training_marginals=training_marginals, \
                         w0=w0, **model_hyperparams)
 
-    def train(self, feat_w0=0.0, lf_w0=1.0, **model_hyperparams):
+    def train(self, feat_w0=0.0, lf_w0=1.0, class_balance=False, **model_hyperparams):
         """Train model: **as default, use "joint" approach**"""
         print "Training LF model..."
         training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
         self.training_marginals = training_marginals
+
+        # Find the larger class, then subsample, setting the ones we want to drop to 0.5
+        if class_balance:
+            pos = np.where(training_marginals > 0.5)[0]
+            np  = len(pos)
+            neg = np.where(training_marginals < 0.5)[0]
+            nn  = len(neg)
+            print "Number of positive:", pp
+            print "Number of negative:", nn
+            majority = neg if nn > pp else pos
+
+            # Just set the non-subsampled members to 0.5, so they will be filtered out
+            for i in majority:
+                if random() > pp/float(nn):
+                    training_marginals[i] = 0.5
+
         print "Training model..."
         self.train_model(training_marginals, w0=feat_w0, **model_hyperparams)
 
