@@ -30,6 +30,7 @@ class LSTMModel(object):
     self.marginals = None
     self.load_emb = None
     self.emb_path = None
+    self.load_word_dict = None
 
   def ortho_weight(self):
     u, s, v = np.linalg.svd(np.random.randn(self.lstm_settings['dim'], self.lstm_settings['dim']))
@@ -369,9 +370,11 @@ class LSTMModel(object):
     self.verbose = kwargs.get('verbose', True)
     self.load_emb = kwargs.get('load_emb', False)
     self.emb_path = kwargs.get('emb_path', None)
-
+    self.load_word_dict = kwargs.get('load_word_dict', None)
     self.get_word_dict(contain_mention=self.contain_mention, word_window_length=self.word_window_length, \
                        ignore_case=self.ignore_case)
+    if self.load_word_dict is not None:
+        self.word_dict = self.load_word_dict
     self.lstm_X = self.map_word_to_id(self.training_set, contain_mention=self.contain_mention, \
                                       word_window_length=self.word_window_length, ignore_case=self.ignore_case)
     self.lstm(dim=self.dim, batch_size=self.batch_size, learning_rate=self.learning_rate, epoch=self.epoch, \
