@@ -12,6 +12,116 @@ from tree_structs import corenlp_to_xmltree, XMLTree
 from utils import get_as_dict
 from entity_features import *
 
+import string
+import fuzzy
+import pyphen
+#pyphen.language_fallback('nl_NL_variant1')
+morphology = pyphen.Pyphen(lang="en_Latn_US") #pyphen.Pyphen(lang='en_US')
+
+soundex = fuzzy.Soundex(4)
+
+
+def letter_ratio(c,idxs,bins=20):
+    s = c.get_attrib_span("words")
+    punc = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~0123456789'
+    c = float(sum([1 for ch in s if ch in punc]))
+    w = (1.0 - (c/float(len(s)))) * 100
+    w = int(w)
+    return "LETTER_RATIO_[{}]".format( int(w/float(bins)) )
+    
+    
+def vowel_ratio(c,idxs,bins=20):
+    s = c.get_attrib_span("words")
+    punc = 'aeiou'
+    c = float(sum([1 for ch in s if ch in punc]))
+    w = ((c/float(len(s)))) * 100
+    w = int(w)
+    #return int(w/float(bins))
+    return "VOWEL_RATIO_[{}]".format( int(w/float(bins)) )
+
+
+
+def word_soundex(c,idxs):
+    s = c.get_attrib_span("words")
+    tokens = s.split()
+    for i in range(0,len(tokens)):
+        seq = map(soundex,tokens[0:i+1])
+        yield "SOUNDEX_SEQ_[{}]".format(" ".join(seq))
+
+
+
+def affex_norm(affex):
+    affex = affex.lower() 
+    if affex.isdigit():
+        affex = "D"
+    elif affex in string.punctuation:
+        affex = "P"
+    return affex
+
+def affexes(c,idxs):
+    s = c.get_attrib_span("words")
+    tokens = s.split()
+    
+    seq = morphology.inserted(tokens[0])
+    t = seq.split("-")
+    yield "PREFIX_FW_[{}]".format(affex_norm(t[0]))
+    if len(t) > 1:
+        yield "SUFFIX_FW_[{}]".format(affex_norm(t[-1]))
+          
+    if len(tokens) > 1:
+        seq = morphology.inserted(tokens[-1])
+        t = seq.split("-")
+        yield "PREFIX_LW_[{}]".format(affex_norm(t[0]))
+        if len(t) > 1:
+            yield "SUFFIX_LW_[{}]".format(affex_norm(t[-1]))
+        
+        
+   
+def affexes2(c,idxs):
+    s = c.get_attrib_span("words")
+    ftr = morphology.inserted(s)
+    t = ftr.split("-")
+    yield "PREFIX_[{}]".format(t[0].lower())
+    if len(t) > 1:
+        yield "SUFFIX_[{}]".format(t[-1].lower())
+
+
+def word_shape(c,idxs):
+    s = c.get_attrib_span("words")
+    
+    if len(s) >= 100:
+        yield 'LONG'
+    length = len(s)
+    shape = []
+    last = ""
+    shape_char = ""
+    seq = 0
+    for c in s:
+        if c.isalpha():
+            if c.isupper():
+                shape_char = "X"
+            else:
+                shape_char = "x"
+        elif c.isdigit():
+            shape_char = "d"
+        else:
+            shape_char = c
+        if shape_char == last:
+            seq += 1
+        else:
+            seq = 0
+            last = shape_char
+        if seq < 4:
+            shape.append(shape_char)
+    
+    yield "[{}]".format(''.join(shape))
+
+
+def generate_mention_feats(get_feats, prefix, candidates):
+    for i,c in enumerate(candidates):
+        for ftr in get_feats(c):
+            yield i, prefix + ftr
+
 
 class Featurizer(object):
     """
@@ -110,7 +220,28 @@ class NgramFeaturizer(Featurizer):
             get_feats = compile_entity_feature_generator()
             feature_generators.append(self._generate_context_feats( \
                 lambda c : get_feats(c.sentence['xmltree'].root, range(c.word_start, c.word_end+1)), 'TDL_', candidates))
-
+            
+            # word shape features
+            feature_generators.append( generate_mention_feats( \
+                lambda c: word_shape(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+            
+            # soundex
+            feature_generators.append( generate_mention_feats( \
+                lambda c: word_soundex(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+            
+            # affexes
+            feature_generators.append( generate_mention_feats( \
+                lambda c: affexes(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+            
+            # letter ratio
+            #feature_generators.append( generate_mention_feats( \
+            #    lambda c: letter_ratio(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+            
+            # vowel ratio
+            #feature_generators.append( generate_mention_feats( \
+            #    lambda c: vowel_ratio(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+            
+            
         if self.arity == 2:
             raise NotImplementedError("Featurizer needs to be implemented for binary relations!")
         return feature_generators

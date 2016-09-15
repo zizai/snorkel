@@ -14,7 +14,7 @@ from lstm import *
 from learning_utils import test_scores, calibration_plots, training_set_summary_stats, sparse_abs, LF_coverage, \
     LF_overlaps, LF_conflicts, LF_accuracies
 from pandas import Series, DataFrame
-
+from random import random
 
 class TrainingSet(object):
     """
@@ -217,16 +217,16 @@ class PipelinedLearner(Learner):
         self.w       = self.model.train(self.X_train, training_marginals=training_marginals, \
                         w0=w0, **model_hyperparams)
 
-    def train(self, feat_w0=0.0, lf_w0=1.0, class_balance=False, **model_hyperparams):
+    def train(self, feat_w0=0.0, lf_w0=5.0, class_balance=False, **model_hyperparams):
         """Train model: **as default, use "joint" approach**"""
-        print "Training LF model..."
+        print "Training LF model... {}".format(lf_w0)
         training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
         self.training_marginals = training_marginals
 
         # Find the larger class, then subsample, setting the ones we want to drop to 0.5
         if class_balance:
             pos = np.where(training_marginals > 0.5)[0]
-            np  = len(pos)
+            pp  = len(pos)
             neg = np.where(training_marginals < 0.5)[0]
             nn  = len(neg)
             print "Number of positive:", pp
