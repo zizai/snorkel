@@ -16,6 +16,52 @@ from learning_utils import test_scores, calibration_plots, training_set_summary_
 from pandas import Series, DataFrame
 from random import random
 
+import math
+import numpy as np
+from multiprocessing import Process, Queue
+
+def mp_apply_lfs(lfs, candidates, nprocs):
+    '''MP + labeling functions
+    http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/
+    '''
+    print "Using {} processes...".format(nprocs)
+    
+    def worker(idxs, out_queue):
+        outdict = {}
+        for i in idxs:
+            outdict[i] = [lfs[i](c) for c in candidates]
+        out_queue.put(outdict)
+
+    out_queue = Queue()
+    chunksize = int(math.ceil(len(lfs) / float(nprocs)))
+    procs = []
+
+    nums = range(0,len(lfs))
+    for i in range(nprocs):
+        p = Process(
+                target=worker,
+                args=(nums[chunksize * i:chunksize * (i + 1)],
+                      out_queue))
+        procs.append(p)
+        p.start()
+
+    # Collect all results 
+    resultdict = {}
+    for i in range(nprocs):
+        resultdict.update(out_queue.get())
+
+    for p in procs:
+        p.join()
+
+    X = sparse.lil_matrix((len(candidates), len(lfs)))
+    for j in resultdict:
+        for i,v in enumerate(resultdict[j]):
+            if v != 0:
+                X[i,j] = v
+
+    return X.tocsr()
+
+
 class TrainingSet(object):
     """
     Wrapper data object which applies the LFs to the candidates comprising the training set,
@@ -26,7 +72,8 @@ class TrainingSet(object):
         - A set of labeling functions (LFs) which are functions f : Candidate -> {-1,0,1}
         - A Featurizer object, which is applied to the Candidate objects to generate features
     """
-    def __init__(self, training_candidates, lfs, featurizer=None):
+    def __init__(self, training_candidates, lfs, featurizer=None, num_procs=6):
+        self.num_procs  = num_procs
         self.training_candidates = training_candidates
         self.featurizer          = featurizer
         self.lfs                 = lfs
@@ -35,6 +82,7 @@ class TrainingSet(object):
         self.dev_candidates      = None
         self.dev_labels          = None
         self.L_dev               = None
+        
         self.summary_stats()
 
     def transform(self, candidates, fit=False):
@@ -49,11 +97,14 @@ class TrainingSet(object):
 
     def _apply_lfs(self, candidates):
         """Apply the labeling functions to the candidates to populate X"""
-        X = sparse.lil_matrix((len(candidates), len(self.lfs)))
-        for i,c in enumerate(candidates):
-            for j,lf in enumerate(self.lfs):
-                X[i,j] = lf(c)
-        return X.tocsr()
+        if self.num_procs > 1:
+            return mp_apply_lfs(self.lfs, candidates, self.num_procs)
+        else:
+            X = sparse.lil_matrix((len(candidates), len(self.lfs)))
+            for i,c in enumerate(candidates):
+                for j,lf in enumerate(self.lfs):
+                    X[i,j] = lf(c)
+            return X.tocsr()
 
     def summary_stats(self, return_vals=False, verbose=True):
         """Print out basic stats about the LFs wrt the training candidates"""
