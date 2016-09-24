@@ -20,17 +20,19 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 
+'''
+# distribute by LF
 def mp_apply_lfs(lfs, candidates, nprocs):
-    '''MP + labeling functions
-    http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/
-    '''
+    
     print "Using {} processes...".format(nprocs)
     
-    def worker(idxs, out_queue):
+    def worker(pid, idxs, out_queue):
+        print "LF process {} {} functions".format(pid, len(idxs))
         outdict = {}
         for i in idxs:
             outdict[i] = [lfs[i](c) for c in candidates]
         out_queue.put(outdict)
+        print "Process {} done...".format(pid)
 
     out_queue = Queue()
     chunksize = int(math.ceil(len(lfs) / float(nprocs)))
@@ -40,7 +42,7 @@ def mp_apply_lfs(lfs, candidates, nprocs):
     for i in range(nprocs):
         p = Process(
                 target=worker,
-                args=(nums[chunksize * i:chunksize * (i + 1)],
+                args=(id,nums[chunksize * i:chunksize * (i + 1)],
                       out_queue))
         procs.append(p)
         p.start()
@@ -53,6 +55,7 @@ def mp_apply_lfs(lfs, candidates, nprocs):
     for p in procs:
         p.join()
 
+    print "Building sparse LF matrix"
     X = sparse.lil_matrix((len(candidates), len(lfs)))
     for j in resultdict:
         for i,v in enumerate(resultdict[j]):
@@ -60,6 +63,52 @@ def mp_apply_lfs(lfs, candidates, nprocs):
                 X[i,j] = v
 
     return X.tocsr()
+'''
+
+
+def mp_apply_lfs(lfs, candidates, nprocs):
+    
+    print "Using {} processes...".format(nprocs)
+    
+    def worker(pid, idxs, out_queue):
+        print "LF process {} {} items".format(pid, len(idxs))
+        outdict = {}
+        for i in idxs:
+            outdict[i] = [lf(candidates[i]) for lf in lfs]
+        out_queue.put(outdict)
+        print "Process {} done...".format(pid)
+
+    out_queue = Queue()
+    chunksize = int(math.ceil(len(candidates) / float(nprocs)))
+    procs = []
+
+    nums = range(0,len(candidates))
+    for i in range(nprocs):
+        p = Process(
+                target=worker,
+                args=(id,nums[chunksize * i:chunksize * (i + 1)],
+                      out_queue))
+        procs.append(p)
+        p.start()
+
+    # Collect all results 
+    resultdict = {}
+    for i in range(nprocs):
+        resultdict.update(out_queue.get())
+
+    for p in procs:
+        p.join()
+
+    print "Building sparse LF matrix"
+    X = sparse.lil_matrix((len(candidates), len(lfs)))
+    print X.shape
+    for i in sorted(resultdict):
+        for j,v in enumerate(resultdict[i]):
+            if v != 0:
+                X[i,j] = v
+
+    return X.tocsr()
+
 
 
 class TrainingSet(object):
@@ -91,7 +140,7 @@ class TrainingSet(object):
         L = self._apply_lfs(candidates)
         F = None
         if self.featurizer is not None:
-            print "Featurizing..."
+            print "Featurizing... (fit/trans)", type(self.featurizer)
             F = self.featurizer.fit_transform(candidates) if fit else self.featurizer.transform(candidates)
         return L, F
 
