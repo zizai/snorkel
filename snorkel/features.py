@@ -81,7 +81,6 @@ def affexes(c,idxs):
             yield "SUFFIX_LW_[{}]".format(affex_norm(t[-1]))
         
         
-   
 def affexes2(c,idxs):
     s = c.get_attrib_span("words")
     ftr = morphology.inserted(s)
@@ -227,13 +226,16 @@ class FeaturizerMP(object):
         self.feat_inv_index = None
     
     @staticmethod
-    def featurizer_worker(candidates,queue): 
-        feature_generators = FeaturizerMP.apply(candidates)
-        f_index = defaultdict(list)
-        for i,f in itertools.chain(*feature_generators):
-            f_index[f].append(i)
-        queue.put(f_index)
-    
+    def featurizer_worker(pid,idxs,candidates,queue): 
+        print "\tFeaturizer process_id={} {} items".format(pid, len(idxs))
+        block = [candidates[i] for i in idxs]
+        feature_generators = FeaturizerMP.apply(block)
+        ftr_index = defaultdict(list)
+        for i,ftr in itertools.chain(*feature_generators):
+            ftr_index[ftr].append(idxs[i])
+            
+        outdict = {pid:ftr_index}
+        queue.put(outdict)
     
     @staticmethod
     def generate_feats(get_feats, prefix, candidates):
@@ -260,7 +262,7 @@ class FeaturizerMP(object):
 
     @staticmethod
     def apply(candidates):
-        print "apply ftrs"
+        
         feature_generators = []
         
         # Add DDLIB entity features
@@ -301,10 +303,10 @@ class FeaturizerMP(object):
         return DataFrame(data=d, index=[self.feat_inv_index[i] for i in idxs])
     
     def fit(self,candidates):
-        print "Fit"
+        
         self.feat_index = {}
         self.feat_inv_index = {}
-        FeaturizerMP.preprocess(candidates)
+        candidates = FeaturizerMP.preprocess(candidates)
         
         if self.num_procs > 1:    
             
@@ -312,40 +314,43 @@ class FeaturizerMP(object):
             chunksize = int(math.ceil(len(candidates) / float(self.num_procs)))
             procs = []
 
+            nums = range(0,len(candidates))
             for i in range(self.num_procs):
                 p = Process(
                             target=FeaturizerMP.featurizer_worker,
-                            args=(candidates[chunksize * i:chunksize * (i + 1)],
+                            args=(i, nums[chunksize * i:chunksize * (i + 1)],
+                                  candidates,
                                   out_queue))
                 procs.append(p)
                 p.start()
 
-            f_index = {}
+            resultdict = {}
             for i in range(self.num_procs):
-                tmp = out_queue.get()
-                for ftr in tmp:
-                    if ftr in f_index:
-                        f_index[ftr].append(tmp[ftr])
-                    else:
-                        f_index[ftr] = tmp[ftr]
-                        
+                r = out_queue.get()
+                resultdict.update(r)
+             
             for p in procs:
                 p.join()
+        
+            # merge feature    
+            f_index = defaultdict(list)
+            for i in resultdict: 
+                for ftr in resultdict[i]:
+                    f_index[ftr] += resultdict[i][ftr]
         
         else:
             feature_generators = FeaturizerMP.apply(candidates)
             f_index = defaultdict(list)
             for i,f in itertools.chain(*feature_generators):
                 f_index[f].append(i)
-                
-        for j,f in enumerate(f_index.keys()):
+        
+        for j,f in enumerate(sorted(f_index.keys())):
             self.feat_index[f] = j
             self.feat_inv_index[j] = f
         
         self.f_index = f_index
         
     def fit_transform(self, candidates):
-        print "Fit-Transform..."
         self.fit(candidates)
         return self.transform(candidates)
     
@@ -353,9 +358,9 @@ class FeaturizerMP(object):
         if not self.f_index:
             raise Exception('model is not fit')
         
-        print "Transform..."
         F = sparse.lil_matrix((len(candidates), len(self.f_index.keys())))
-        for j,f in enumerate(self.f_index.keys()):
+        for f in sorted(self.f_index.keys()):
+            j = self.feat_index[f]
             for i in self.f_index[f]:
                 F[i,j] = 1
         return F
@@ -420,7 +425,7 @@ class Featurizer(object):
         self.feat_index     = {}
         self.feat_inv_index = {}
         F                   = sparse.lil_matrix((len(candidates), len(f_index.keys())))
-        for j,f in enumerate(f_index.keys()):
+        for j,f in enumerate(sorted(f_index.keys())):
             self.feat_index[f] = j
             self.feat_inv_index[j] = f
             for i in f_index[f]:
