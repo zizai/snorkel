@@ -374,6 +374,7 @@ class CRFSpanLearner(PipelinedLearner):
                 self.span_bag_group_by_sent = span_bag_group_by_sent
                 for k, v in span_bag_group_by_sent.iteritems():
                     words = v[0][0][0].sentence['words']
+                    poses = v[0][0][0].sentence['poses']
                     samples = []
                     for span_bag in v:
                         samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
@@ -388,7 +389,7 @@ class CRFSpanLearner(PipelinedLearner):
                                 else:
                                     tags[x] = 'I-' + tag.strip()
                         for idx, w in enumerate(words):
-                            fp.write(w + ' ' + tags[idx] + '\n')
+                            fp.write(w + ' ' + poses[idx] + ' ' + tags[idx] + '\n')
                         fp.write('\n')
         elif format == 'pkl':
                 span_bag_group_by_sent = {}
