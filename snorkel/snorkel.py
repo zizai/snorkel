@@ -400,7 +400,9 @@ class CRFSpanLearner(PipelinedLearner):
                 self.span_bag_group_by_sent = span_bag_group_by_sent
                 output_pkl = dict()
                 for k, v in span_bag_group_by_sent.iteritems():
-                    cand = v[0][0][0]
+                    sent_id = v[0][0][0].sent_id
+                    cand = v[0][0][0].sentence
+                    cand['xmltree'] = None
                     sent_tags = []
                     words = v[0][0][0].sentence['words']
                     samples = []
@@ -417,7 +419,7 @@ class CRFSpanLearner(PipelinedLearner):
                                 else:
                                     tags[x] = 'I-' + tag.strip()
                         sent_tags.append(tags)
-                    output_pkl[cand.sent_id] = sent_tags
+                    output_pkl[sent_id] = {'sent': cand, 'tags': sent_tags}
                 pickle.dump(output_pkl, open(filename, "w"))
         else:
             print >> sys.stderr, "Unknown output format."
