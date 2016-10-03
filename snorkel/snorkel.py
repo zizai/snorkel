@@ -366,20 +366,28 @@ class CRFSpanLearner(PipelinedLearner):
             print >> sys.stderr, "Unknown output format."
             return
         with codecs.open(filename,"w","utf-8") as fp:
+            span_bag_group_by_sent = {}
             for span_bag in self.span_bags:
-                samples = np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag])
-                words = span_bag[0][0].sentence['words']
-                for sample in samples:
-                    c = span_bag[sample][0]
-                    if c is not None:
-                        for idx, w in enumerate(words):
-                            if idx == min(c.idxs):
-                                fp.write(w + ' B-' + tag.strip() + '\n')
-                            elif idx in c.idxs:
-                                fp.write(w + ' I-' + tag.strip() + '\n')
+                sent_id = span_bag[0][0].sent_id
+                if sent_id not in span_bag_group_by_sent:
+                    span_bag_group_by_sent[sent_id] = []
+                span_bag_group_by_sent[sent_id].append(span_bag)
+            self.span_bag_group_by_sent = span_bag_group_by_sent
+            for k, v in span_bag_group_by_sent.iteritems():
+                words = v[0][0][0].sentence['words']
+                samples = []
+                for span_bag in v:
+                    samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
+                for i in range(num_sample):
+                    tags = ['O'] * len(words)
+                    for idx, span_bag in enumerate(v):
+                        c = span_bag[samples[idx][i]][0]
+                        if c is None: continue
+                        for x in c.idxs:
+                            if x == min(c.idxs):
+                                tags[x] = 'B-' + tag.strip()
                             else:
-                                fp.write(w + ' O' + '\n')
-                    else:
-                        for idx, w in enumerate(words):
-                            fp.write(w + ' O' + '\n')
+                                tags[x] = 'I-' + tag.strip()
+                    for idx, w in enumerate(words):
+                        fp.write(w + ' ' + tags[idx] + '\n')
                     fp.write('\n')
