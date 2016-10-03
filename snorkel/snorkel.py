@@ -20,6 +20,7 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 
+import codecs
 
 def mp_apply_lfs(lfs, candidates, nprocs):
     '''http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/'''
@@ -320,3 +321,73 @@ class RepresentationLearner(PipelinedLearner):
 
     def predictions(self):
         return self.model.predict(self.test_candidates)
+
+class CRFSpanLearner(PipelinedLearner):
+    """
+    Implements the _pipelined_ approach for an end model that also learns a representation
+    """
+    def train(self, lf_w0=5.0, **model_hyperparams):
+        """Train model: **as default, use "joint" approach**"""
+        print "Training LF model... {}".format(lf_w0)
+        training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+        self.training_marginals = training_marginals
+
+    def generate_span_bag(self, **model_hyperparams):
+        self.train(**model_hyperparams)
+
+        # Group candidates based on sentence id
+        candidate_group = dict()
+        for c, p in zip(self.training_set.training_candidates, self.training_marginals):
+            if c.sent_id not in candidate_group:
+                candidate_group[c.sent_id] = []
+            candidate_group[c.sent_id].append((c, p))
+
+        span_bags = []
+        for k, v in candidate_group.iteritems():
+            v.sort(key=lambda x: x[0].word_start, reverse=False)
+            span_bag = []
+            word_end = -1
+            for i in v:
+                if word_end != -1 and i[0].word_start > word_end:
+                    # N/A class
+                    span_bag.append((None, 1. - max(c[1] for c in span_bag)))
+                    # normalize probability
+                    s = sum(c[1] for c in span_bag)
+                    span_bags.append([(c, p / s) for c, p in span_bag])
+                    span_bag = []
+                    word_end = -1
+                else:
+                    span_bag.append(i)
+                    word_end = i[0].word_end
+        self.span_bags = span_bags
+
+    def print_to_file(self, tag = '', num_sample = 10, filename = 'conll_format_data.txt', format = 'conll'):
+        if format != 'conll':
+            print >> sys.stderr, "Unknown output format."
+            return
+        with codecs.open(filename,"w","utf-8") as fp:
+            span_bag_group_by_sent = {}
+            for span_bag in self.span_bags:
+                sent_id = span_bag[0][0].sent_id
+                if sent_id not in span_bag_group_by_sent:
+                    span_bag_group_by_sent[sent_id] = []
+                span_bag_group_by_sent[sent_id].append(span_bag)
+            self.span_bag_group_by_sent = span_bag_group_by_sent
+            for k, v in span_bag_group_by_sent.iteritems():
+                words = v[0][0][0].sentence['words']
+                samples = []
+                for span_bag in v:
+                    samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
+                for i in range(num_sample):
+                    tags = ['O'] * len(words)
+                    for idx, span_bag in enumerate(v):
+                        c = span_bag[samples[idx][i]][0]
+                        if c is None: continue
+                        for x in c.idxs:
+                            if x == min(c.idxs):
+                                tags[x] = 'B-' + tag.strip()
+                            else:
+                                tags[x] = 'I-' + tag.strip()
+                    for idx, w in enumerate(words):
+                        fp.write(w + ' ' + tags[idx] + '\n')
+                    fp.write('\n')
