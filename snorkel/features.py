@@ -5,6 +5,7 @@ import scipy.sparse as sparse
 import itertools
 from pandas import DataFrame
 import re
+import time
 # Feature modules
 sys.path.append(os.path.join(os.environ['SNORKELHOME'], 'treedlib'))
 from treedlib import compile_relation_feature_generator
@@ -91,7 +92,11 @@ def affexes2(c,idxs):
 
 
 def word_seq_affixes(c,idxs):
+    # morphology assumptions different for acronyms/abbreviations
     s = c.get_attrib_span("words")
+    #if re.search("^[0-9A-Z-]{2,8}[a-z]{0,1}$",s):
+    #    return
+    
     tokens = s.split()
     for t in tokens:
         m = morphology.inserted(t).split("-")
@@ -100,15 +105,19 @@ def word_seq_affixes(c,idxs):
         else:
             yield u"MORPHEME_PREFIX_[{}]".format(affex_norm(m[0]))
             yield u"MORPHEME_SUFFIX_[{}]".format(affex_norm(m[-1]))
+            if len(m) > 2:
+                root = "".join(m[1:-1])
+                yield u"MORPHEME_ROOT_[{}]".format(affex_norm(root))
                 
 
 def word_shape_seq(c,idxs):
     words = c.get_attrib_span("words")
-    yield "[{}]".format(word_shape(words)) 
+    yield u"[{}]".format(word_shape(words)) 
+    
     tokens = words.split()
     if len(tokens) > 1:
         for w in tokens:
-            yield "SEQ_[{}]".format(word_shape(w))
+            yield u"SEQ_[{}]".format(word_shape(w))
     
 
 def word_shape(s):
@@ -167,11 +176,16 @@ def word_seq(c,idxs):
     for i in range(len(words)):
         left = rw if i == 0 else words[i-1]
         right = lw if i == len(words) - 1 else words[i+1]
-        yield u"W_LEMMA_L_[{}]".format(left)
-        yield u"W_LEMMA_R_[{}]".format(right)
+        yield u"LEMMA_L_[{}]".format(left)
+        yield u"LEMMA_R_[{}]".format(right)
    
    
 def morpheme_seq(c,idxs,ngr=2):
+    # abbrevations don't have meaningful morphological units
+    #s = c.get_attrib_span("words")
+    #if re.search("^[0-9A-Z-]{2,8}[a-z]{0,1}$",s):
+    #    return
+    
     s = c.get_attrib_span("lemmas")
     tokens = s.split()
     
@@ -187,27 +201,35 @@ def morpheme_seq(c,idxs,ngr=2):
                 v += u"" if j+2 == len(seq) else u"-"
                 yield tmpl.format(v)
 
-'''
-WORD_L_[acid]
-WORD_R_[alpha]
 
-MORPHEME_SEQ_[an-ti-]
-MORPHEME_SEQ_[-al-ly]
-MORPHEME_SEQ_[-in-flamm-]
+import codecs
 
-WORD_SHAPE_[DXX]
-WORD_SHAPE_SEQ_[XX-d]
+def binary_mention_features(c,idxs):
+    s = c.get_attrib_span("words")
+    
+    if s.isupper():
+        yield u"ALL_UPPERCASE"
 
-WORD_PREFIX_[an]
-WORD_SUFFIX_[ly]
+    if re.search("[0-9]+",s):
+        yield u"CONTAINS_DIGITS"
 
-SOUNDEX_[AD32]
-
-ALL_UPPERCASE
-PARANTHETICAL
-LEFT_OF_PARANTHETICAL
-'''
-#PARANTHETICAL_DEFINED
+    if re.search("[.:;'/()\[\]-]+",s):
+        yield u"CONTAINS_PUNCTUATION"
+        
+    lw = left_window(c,window=1)
+    rw = right_window(c,window=1)
+    lw = u"_" if not lw else lw[0]
+    rw = u"_" if not rw else rw[0]
+    
+    if lw in ["-lrb-","(",'-LRB-'] and rw in ["-rrb-",")","-RRB-"]:
+        yield u"PARANTHETICAL"
+    
+    ##lw = left_window(c,window=8)
+    #lw = " ".join(lw).lower()
+    #lw = lw.replace("-lrb-","(").replace("-rrb-",")")
+    #if re.search("[(]\s*.+?\s*[)]",lw):
+    #    yield u"RIGHT_OF_PARANTHETICAL"
+        
 
 
 
@@ -233,7 +255,7 @@ class FeaturizerMP(object):
         ftr_index = defaultdict(list)
         for i,ftr in itertools.chain(*feature_generators):
             ftr_index[ftr].append(idxs[i])
-            
+        #queue.put(ftr_index)
         outdict = {pid:ftr_index}
         queue.put(outdict)
     
@@ -293,7 +315,11 @@ class FeaturizerMP(object):
         # mention word linear chain
         feature_generators.append( FeaturizerMP.generate_feats( \
             lambda c: word_seq(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
-            
+       
+        # binary mention features
+        feature_generators.append( FeaturizerMP.generate_feats( \
+            lambda c: binary_mention_features(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
+             
         return feature_generators
 
     def top_features(self, w, n_max=100):
@@ -326,9 +352,15 @@ class FeaturizerMP(object):
 
             resultdict = {}
             for i in range(self.num_procs):
-                r = out_queue.get()
-                resultdict.update(r)
-             
+                resultdict.update(out_queue.get())
+            
+            # merge feature    
+            #f_index = defaultdict(list)
+            #for i in range(self.num_procs):
+            #    block = out_queue.get()
+            #    for ftr in block:
+            #        f_index[ftr].extend(block[ftr])
+            
             for p in procs:
                 p.join()
         
@@ -336,7 +368,7 @@ class FeaturizerMP(object):
             f_index = defaultdict(list)
             for i in resultdict: 
                 for ftr in resultdict[i]:
-                    f_index[ftr] += resultdict[i][ftr]
+                    f_index[ftr].extend(resultdict[i][ftr])
         
         else:
             feature_generators = FeaturizerMP.apply(candidates)
@@ -363,6 +395,7 @@ class FeaturizerMP(object):
             j = self.feat_index[f]
             for i in self.f_index[f]:
                 F[i,j] = 1
+        
         return F
         
         
@@ -492,8 +525,11 @@ class NgramFeaturizer(Featurizer):
             # mention word linear chain
             feature_generators.append( generate_mention_feats( \
                 lambda c: word_seq(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )
-            
-            
+
+            # mention word linear chain
+            feature_generators.append( generate_mention_feats( \
+                lambda c: binary_mention_features(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )            
+ 
         if self.arity == 2:
             raise NotImplementedError("Featurizer needs to be implemented for binary relations!")
         return feature_generators

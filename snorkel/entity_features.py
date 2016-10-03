@@ -31,9 +31,6 @@ def get_ddlib_feats(sent, idxs):
   """
   Minimalist port of generic mention features from ddlib
   """
-#  for mention_feat in _get_mention_features(sent, idxs):
-#    yield mention_feat
-
   for seq_feat in _get_seq_features(sent, idxs):
     yield seq_feat
   
@@ -43,7 +40,6 @@ def get_ddlib_feats(sent, idxs):
   if sent.sentence['words'][idxs[0]][0].isupper():
       yield "STARTS_WITH_CAPTIAL"
 
-#  yield "LENGTH_{}".format(len(idxs))
 
 def _get_mention_features(sent, idxs):
   for i in idxs:
@@ -81,6 +77,7 @@ def _get_mention_features(sent, idxs):
     yield "CHARACTER_N_GRAM_[" + mention[i:i+2] + "]"
   for i in range(len(mention) - 2):
     yield "CHARACTER_N_GRAM_[" + mention[i:i+3] + "]"
+
 
 def _get_seq_features(sent, idxs):
   yield "WORD_SEQ_[" + " ".join(sent.sentence['words'][i] for i in idxs) + "]"
