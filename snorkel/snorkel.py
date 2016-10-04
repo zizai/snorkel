@@ -363,19 +363,15 @@ class CRFSpanLearner(PipelinedLearner):
             word_end = -1
             for i in v:
                 if word_end != -1 and i[0].word_start > word_end:
-                    span_bag = self.make_single_bag(span_bag, thresh)
-                    if span_bag != None:
-                        span_bags.append(span_bag)
+                    span_bags.append(self.make_single_bag(span_bag, thresh))
                     span_bag = []
                     word_end = -1
                 else:
                     span_bag.append(i)
                     word_end = i[0].word_end
             if span_bag != []:
-                span_bag = self.make_single_bag(span_bag, thresh)
-                if span_bag != None:
-                    span_bags.append(span_bag)
-        self.span_bags = span_bags
+                span_bags.append(self.make_single_bag(span_bag, thresh))
+        self.span_bags = [_ for _ in span_bags if _ is not None]
 
     def print_to_file(self, tag = '', num_sample = 10, filename = 'conll_format_data.txt', format = 'conll'):
         if format == 'conll':
