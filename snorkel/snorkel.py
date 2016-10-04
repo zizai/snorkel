@@ -159,7 +159,7 @@ class Learner(object):
         self.F_train         = self.training_set.F
         self.X_train         = None
         self.n_train, self.m = self.L_train.shape
-        self.f               = self.F_train.shape[1]
+        self.f               = self.F_train.shape[1] if self.F_train is not None else None
 
         # Cache the transformed test set as well
         self.test_candidates = None
@@ -333,9 +333,22 @@ class CRFSpanLearner(PipelinedLearner):
         training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
         self.training_marginals = training_marginals
 
-    def generate_span_bag(self, **model_hyperparams):
-        self.train(**model_hyperparams)
+    def make_single_bag(self, span_bag, thresh):
+        span_bag.append((None, 0.))
+        # normalize probability
+        # New sampling approach
+        for z in range(len(span_bag)):
+            span_bag[z] = (span_bag[z][0], span_bag[z][1] if span_bag[z][1] > thresh else 0.)
+        s = sum(c[1] for c in span_bag)
+        if s > 0.1:
+            span_bag = [(c, p / s) for c, p in span_bag]
+        else:
+            span_bag = None
+        return span_bag
 
+
+    def generate_span_bag(self, thresh=0.0, **model_hyperparams):
+        self.train(**model_hyperparams)
         # Group candidates based on sentence id
         candidate_group = dict()
         for c, p in zip(self.training_set.training_candidates, self.training_marginals):
@@ -350,16 +363,18 @@ class CRFSpanLearner(PipelinedLearner):
             word_end = -1
             for i in v:
                 if word_end != -1 and i[0].word_start > word_end:
-                    # N/A class
-                    span_bag.append((None, 1. - max(c[1] for c in span_bag)))
-                    # normalize probability
-                    s = sum(c[1] for c in span_bag)
-                    span_bags.append([(c, p / s) for c, p in span_bag])
+                    span_bag = self.make_single_bag(span_bag, thresh)
+                    if span_bag != None:
+                        span_bags.append(span_bag)
                     span_bag = []
                     word_end = -1
                 else:
                     span_bag.append(i)
                     word_end = i[0].word_end
+            if span_bag != []:
+                span_bag = self.make_single_bag(span_bag, thresh)
+                if span_bag != None:
+                    span_bags.append(span_bag)
         self.span_bags = span_bags
 
     def print_to_file(self, tag = '', num_sample = 10, filename = 'conll_format_data.txt', format = 'conll'):
