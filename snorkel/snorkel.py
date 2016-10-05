@@ -346,12 +346,22 @@ class CRFSpanLearner(PipelinedLearner):
             span_bag = None
         return span_bag
 
+    def get_all_sentence(self):
+        sentences={}
+        for c in self.training_set.training_candidates:
+            if c.sent_id not in sentences:
+                sentence = c.sentence
+                sentence['xmltree'] = None
+                sentences[c.sent_id] = sentence
+        self.sentences = sentences
 
     def generate_span_bag(self, thresh=0.0, **model_hyperparams):
         self.train(**model_hyperparams)
+        self.get_all_sentence()
         # Group candidates based on sentence id
         candidate_group = dict()
         for c, p in zip(self.training_set.training_candidates, self.training_marginals):
+#            if p < thresh: continue
             if c.sent_id not in candidate_group:
                 candidate_group[c.sent_id] = []
             candidate_group[c.sent_id].append((c, p))
@@ -364,11 +374,11 @@ class CRFSpanLearner(PipelinedLearner):
             for i in v:
                 if word_end != -1 and i[0].word_start > word_end:
                     span_bags.append(self.make_single_bag(span_bag, thresh))
-                    span_bag = []
-                    word_end = -1
+                    span_bag = [i]
+                    word_end = i[0].word_end
                 else:
                     span_bag.append(i)
-                    word_end = i[0].word_end
+                    word_end = max(word_end, i[0].word_end)
             if span_bag != []:
                 span_bags.append(self.make_single_bag(span_bag, thresh))
         self.span_bags = [_ for _ in span_bags if _ is not None]
@@ -383,9 +393,11 @@ class CRFSpanLearner(PipelinedLearner):
                         span_bag_group_by_sent[sent_id] = []
                     span_bag_group_by_sent[sent_id].append(span_bag)
                 self.span_bag_group_by_sent = span_bag_group_by_sent
+                sent_ids = []
                 for k, v in span_bag_group_by_sent.iteritems():
                     words = v[0][0][0].sentence['words']
                     poses = v[0][0][0].sentence['poses']
+                    sent_ids.append(k)
                     samples = []
                     for span_bag in v:
                         samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
@@ -402,6 +414,13 @@ class CRFSpanLearner(PipelinedLearner):
                         for idx, w in enumerate(words):
                             fp.write(w + ' ' + poses[idx] + ' ' + tags[idx] + '\n')
                         fp.write('\n')
+                # sample sentence without tags
+                for k, v in self.sentences.iteritems():
+                    if k not in sent_ids:
+                        for i in range(num_sample):
+                            for idx in range(len(v['words'])):
+                                fp.write(v['words'][idx] + ' ' + v['poses'][idx] + ' O\n')
+                            fp.write('\n')
         elif format == 'pkl':
                 span_bag_group_by_sent = {}
                 for span_bag in self.span_bags:
@@ -411,9 +430,11 @@ class CRFSpanLearner(PipelinedLearner):
                     span_bag_group_by_sent[sent_id].append(span_bag)
                 self.span_bag_group_by_sent = span_bag_group_by_sent
                 output_pkl = dict()
+                sent_ids = []
                 for k, v in span_bag_group_by_sent.iteritems():
                     sent_id = v[0][0][0].sent_id
                     cand = v[0][0][0].sentence
+                    sent_ids.append(k)
                     cand['xmltree'] = None
                     sent_tags = []
                     words = v[0][0][0].sentence['words']
@@ -432,6 +453,11 @@ class CRFSpanLearner(PipelinedLearner):
                                     tags[x] = 'I-' + tag.strip()
                         sent_tags.append(tags)
                     output_pkl[sent_id] = {'sent': cand, 'tags': sent_tags}
+                # sample sentence without tags
+                for k, v in self.sentences.iteritems():
+                    if k not in sent_ids:
+                        sent_tags = [['O'] * len(v['poses']) for i in range(num_sample)]
+                        output_pkl[k] = {'sent': v, 'tags': sent_tags}
                 pickle.dump(output_pkl, open(filename, "w"))
         else:
             print >> sys.stderr, "Unknown output format."
