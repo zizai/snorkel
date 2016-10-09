@@ -209,9 +209,12 @@ class Learner(object):
 
     def feature_weights(self):
         return self.model.w[self.m:self.m+self.f]
-        
+
     def predictions(self, thresh=0.5):
         return self.model.predict(self.X_test, thresh=thresh)
+
+    def marginals(self):
+        return self.model.marginals(self.X_test)
 
     def test_mv(self, test_candidates, gold_labels, display=True, return_vals=False):
         """Test *unweighted* majority vote of *just the LFs*"""
