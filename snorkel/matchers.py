@@ -245,6 +245,33 @@ class NumberMatcher(Matcher):
         except:
             return False
 
+class KgramMatcher(Matcher):
+    """Matches all K or less grams"""
+    def init(self):
+        try:
+            self.k = self.opts['k']
+        except KeyError:
+            raise Exception("Please supply a gram length k.")
+    def _f(self, c):
+        if len(c.idxs) <= self.k:
+            return True
+        else:
+            return False
+
+class WhitespaceKgramMatcher(Matcher):
+    """Matches all K or less grams"""
+    def init(self):
+        try:
+            self.k = self.opts['k']
+        except KeyError:
+            raise Exception("Please supply a gram length k.")
+    def _f(self, c):
+        tokens = c.get_attrib_span("words").split()
+        if len(tokens) <= self.k:
+            return True
+        else:
+            return False
+
 
 class CandidateExtractor(object):
     """Temporary class for interfacing with the post-candidate-extraction code"""

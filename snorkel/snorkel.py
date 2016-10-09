@@ -20,27 +20,27 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 
+import codecs
+import cPickle as pickle
+
 def mp_apply_lfs(lfs, candidates, nprocs):
-    '''MP + labeling functions
-    http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/
-    '''
-    print "Using {} processes...".format(nprocs)
-    
-    def worker(idxs, out_queue):
+    '''http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/'''
+    def worker(pid, idxs, out_queue):
+        print "\tLF process_id={} {} items".format(pid, len(idxs))
         outdict = {}
         for i in idxs:
-            outdict[i] = [lfs[i](c) for c in candidates]
+            outdict[i] = [lf(candidates[i]) for lf in lfs]
         out_queue.put(outdict)
 
     out_queue = Queue()
-    chunksize = int(math.ceil(len(lfs) / float(nprocs)))
+    chunksize = int(math.ceil(len(candidates) / float(nprocs)))
     procs = []
 
-    nums = range(0,len(lfs))
+    nums = range(0,len(candidates))
     for i in range(nprocs):
         p = Process(
                 target=worker,
-                args=(nums[chunksize * i:chunksize * (i + 1)],
+                args=(i,nums[chunksize * i:chunksize * (i + 1)],
                       out_queue))
         procs.append(p)
         p.start()
@@ -53,13 +53,15 @@ def mp_apply_lfs(lfs, candidates, nprocs):
     for p in procs:
         p.join()
 
+    print "Building sparse LF matrix"
     X = sparse.lil_matrix((len(candidates), len(lfs)))
-    for j in resultdict:
-        for i,v in enumerate(resultdict[j]):
+    for i in sorted(resultdict):
+        for j,v in enumerate(resultdict[i]):
             if v != 0:
                 X[i,j] = v
 
     return X.tocsr()
+
 
 
 class TrainingSet(object):
@@ -157,7 +159,7 @@ class Learner(object):
         self.F_train         = self.training_set.F
         self.X_train         = None
         self.n_train, self.m = self.L_train.shape
-        self.f               = self.F_train.shape[1]
+        self.f               = self.F_train.shape[1] if self.F_train is not None else None
 
         # Cache the transformed test set as well
         self.test_candidates = None
@@ -323,3 +325,143 @@ class RepresentationLearner(PipelinedLearner):
 
     def predictions(self):
         return self.model.predict(self.test_candidates)
+
+class CRFSpanLearner(PipelinedLearner):
+    """
+    Implements the _pipelined_ approach for an end model that also learns a representation
+    """
+    def train(self, lf_w0=5.0, **model_hyperparams):
+        """Train model: **as default, use "joint" approach**"""
+        print "Training LF model... {}".format(lf_w0)
+        training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+        self.training_marginals = training_marginals
+
+    def make_single_bag(self, span_bag, thresh):
+        span_bag.append((None, 0.))
+        # normalize probability
+        # New sampling approach
+        for z in range(len(span_bag)):
+            span_bag[z] = (span_bag[z][0], span_bag[z][1] if span_bag[z][1] > thresh else 0.)
+        s = sum(c[1] for c in span_bag)
+        if s > 0.1:
+            span_bag = [(c, p / s) for c, p in span_bag]
+        else:
+            span_bag = None
+        return span_bag
+
+    def get_all_sentence(self):
+        sentences={}
+        for c in self.training_set.training_candidates:
+            if c.sent_id not in sentences:
+                sentence = c.sentence
+                sentence['xmltree'] = None
+                sentences[c.sent_id] = sentence
+        self.sentences = sentences
+
+    def generate_span_bag(self, thresh=0.0, **model_hyperparams):
+        self.train(**model_hyperparams)
+        self.get_all_sentence()
+        # Group candidates based on sentence id
+        candidate_group = dict()
+        for c, p in zip(self.training_set.training_candidates, self.training_marginals):
+#            if p < thresh: continue
+            if c.sent_id not in candidate_group:
+                candidate_group[c.sent_id] = []
+            candidate_group[c.sent_id].append((c, p))
+
+        span_bags = []
+        for k, v in candidate_group.iteritems():
+            v.sort(key=lambda x: x[0].word_start, reverse=False)
+            span_bag = []
+            word_end = -1
+            for i in v:
+                if word_end != -1 and i[0].word_start > word_end:
+                    span_bags.append(self.make_single_bag(span_bag, thresh))
+                    span_bag = [i]
+                    word_end = i[0].word_end
+                else:
+                    span_bag.append(i)
+                    word_end = max(word_end, i[0].word_end)
+            if span_bag != []:
+                span_bags.append(self.make_single_bag(span_bag, thresh))
+        self.span_bags = [_ for _ in span_bags if _ is not None]
+
+    def print_to_file(self, tag = '', num_sample = 10, filename = 'conll_format_data.txt', format = 'conll'):
+        if format == 'conll':
+            with codecs.open(filename,"w","utf-8") as fp:
+                span_bag_group_by_sent = {}
+                for span_bag in self.span_bags:
+                    sent_id = span_bag[0][0].sent_id
+                    if sent_id not in span_bag_group_by_sent:
+                        span_bag_group_by_sent[sent_id] = []
+                    span_bag_group_by_sent[sent_id].append(span_bag)
+                self.span_bag_group_by_sent = span_bag_group_by_sent
+                sent_ids = []
+                for k, v in span_bag_group_by_sent.iteritems():
+                    words = v[0][0][0].sentence['words']
+                    poses = v[0][0][0].sentence['poses']
+                    sent_ids.append(k)
+                    samples = []
+                    for span_bag in v:
+                        samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
+                    for i in range(num_sample):
+                        tags = ['O'] * len(words)
+                        for idx, span_bag in enumerate(v):
+                            c = span_bag[samples[idx][i]][0]
+                            if c is None: continue
+                            for x in c.idxs:
+                                if x == min(c.idxs):
+                                    tags[x] = 'B-' + tag.strip()
+                                else:
+                                    tags[x] = 'I-' + tag.strip()
+                        for idx, w in enumerate(words):
+                            fp.write(w + ' ' + poses[idx] + ' ' + tags[idx] + '\n')
+                        fp.write('\n')
+                # sample sentence without tags
+                for k, v in self.sentences.iteritems():
+                    if k not in sent_ids:
+                        for i in range(num_sample):
+                            for idx in range(len(v['words'])):
+                                fp.write(v['words'][idx] + ' ' + v['poses'][idx] + ' O\n')
+                            fp.write('\n')
+        elif format == 'pkl':
+                span_bag_group_by_sent = {}
+                for span_bag in self.span_bags:
+                    sent_id = span_bag[0][0].sent_id
+                    if sent_id not in span_bag_group_by_sent:
+                        span_bag_group_by_sent[sent_id] = []
+                    span_bag_group_by_sent[sent_id].append(span_bag)
+                self.span_bag_group_by_sent = span_bag_group_by_sent
+                output_pkl = dict()
+                sent_ids = []
+                for k, v in span_bag_group_by_sent.iteritems():
+                    sent_id = v[0][0][0].sent_id
+                    cand = v[0][0][0].sentence
+                    sent_ids.append(k)
+                    cand['xmltree'] = None
+                    sent_tags = []
+                    words = v[0][0][0].sentence['words']
+                    samples = []
+                    for span_bag in v:
+                        samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
+                    for i in range(num_sample):
+                        tags = ['O'] * len(words)
+                        for idx, span_bag in enumerate(v):
+                            c = span_bag[samples[idx][i]][0]
+                            if c is None: continue
+                            for x in c.idxs:
+                                if x == min(c.idxs):
+                                    tags[x] = 'B-' + tag.strip()
+                                else:
+                                    tags[x] = 'I-' + tag.strip()
+                        sent_tags.append(tags)
+                    output_pkl[sent_id] = {'sent': cand, 'tags': sent_tags}
+                # sample sentence without tags
+                for k, v in self.sentences.iteritems():
+                    if k not in sent_ids:
+                        sent_tags = [['O'] * len(v['poses']) for i in range(num_sample)]
+                        output_pkl[k] = {'sent': v, 'tags': sent_tags}
+                pickle.dump(output_pkl, open(filename, "w"))
+        else:
+            print >> sys.stderr, "Unknown output format."
+            return

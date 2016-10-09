@@ -2,6 +2,11 @@ import sys, os
 sys.path.append(os.environ['SNORKELHOME'] + '/treedlib/treedlib')
 from templates import *
 
+try:
+    from nltk.stem.porter import PorterStemmer
+except ImportError:
+    warnings.warn("nltk not installed- some default functionality may be absent.")
+
 def compile_entity_feature_generator():
   """
   Given optional arguments, returns a generator function which accepts an xml root
@@ -31,6 +36,9 @@ def get_ddlib_feats(sent, idxs):
   """
   Minimalist port of generic mention features from ddlib
   """
+  for mention_feat in _get_mention_features(sent, idxs):
+    yield mention_feat
+
   for seq_feat in _get_seq_features(sent, idxs):
     yield seq_feat
   
@@ -40,15 +48,63 @@ def get_ddlib_feats(sent, idxs):
   if sent.sentence['words'][idxs[0]][0].isupper():
       yield "STARTS_WITH_CAPTIAL"
 
-  yield "LENGTH_{}".format(len(idxs))
+
+def _get_mention_features(sent, idxs):
+  for i in idxs:
+    # The lemma of each word
+    yield "WORD_LEMMA_[" + sent.sentence['lemmas'][i] + "]"
+    # The part of speech of each word
+    yield "WORD_POS_[" + sent.sentence['poses'][i] + "]"
+    # word class: convert upper-case letters to "A", lowercase letters to "a", digits to "0" and other characters to "x"
+  tokens = sent.get_attrib_span("words").split()
+  for token in tokens:
+    word_class = ""
+    for ch in token:
+        if ch.isupper():
+            word_class = word_class + "A"
+        elif ch.islower():
+            word_class = word_class + "a"
+        elif ch.isdigit():
+            word_class = word_class + "0"
+        else:
+            word_class = word_class + "x"
+    yield "WORD_CLASS_[" + word_class + "]"
+    # Numeric normalization
+    if sent.sentence['words'][i].isdigit():
+        yield "WORD_NUMERIC_NORMALIZATION"
+    # 2, 3 and 4-character prefixes and suffixes
+    if len(token)>1: yield "WORD_PREFIX_" + token[:2]
+    if len(token)>2: yield "WORD_PREFIX_" + token[:3]
+    if len(token)>3: yield "WORD_PREFIX_" + token[:4]
+    if len(token)>1: yield "WORD_SUFFIX_" + token[-2:]
+    if len(token)>2: yield "WORD_SUFFIX_" + token[-3:]
+    if len(token)>3: yield "WORD_SUFFIX_" + token[-4:]
+  # 2 and 3 character n-grams
+  mention = sent.get_attrib_span("words")
+  for i in range(len(mention) - 1):
+    yield "CHARACTER_N_GRAM_[" + mention[i:i+2] + "]"
+  for i in range(len(mention) - 2):
+    yield "CHARACTER_N_GRAM_[" + mention[i:i+3] + "]"
+
 
 def _get_seq_features(sent, idxs):
-  yield "WORD_SEQ_[" + " ".join(sent.sentence['words'][i] for i in idxs) + "]"
-  yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
-  yield "POS_SEQ_[" + " ".join(sent.sentence['poses'][i] for i in idxs) + "]"
-  yield "DEP_SEQ_[" + " ".join(sent.sentence['dep_labels'][i] for i in idxs) + "]"
+  if sent.get_attrib_span("words") == " ".join(sent.sentence['words'][i] for i in idxs):
+    stemmer = PorterStemmer()
+    yield "WORD_SEQ_[" + " ".join(sent.sentence['words'][i] for i in idxs) + "]"
+    yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(sent.sentence['words'][i].lower()) for i in idxs) + "]"
+    yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
+    yield "POS_SEQ_[" + " ".join(sent.sentence['poses'][i] for i in idxs) + "]"
+    yield "DEP_SEQ_[" + " ".join(sent.sentence['dep_labels'][i] for i in idxs) + "]"
+  else:
+    tokens = sent.get_attrib_span("words").split()
+    stemmer = PorterStemmer()
+    yield "WORD_SEQ_[" + " ".join(i for i in tokens) + "]"
+    yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(i.lower()) for i in tokens) + "]"
+    yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
+    yield "POS_SEQ_[" + " ".join(sent.sentence['poses'][i] for i in idxs) + "]"
+    yield "DEP_SEQ_[" + " ".join(sent.sentence['dep_labels'][i] for i in idxs) + "]"
 
-def _get_window_features(sent, idxs, window=3, combinations=True, isolated=True):
+def _get_window_features(sent, idxs, window=3, combinations=False, isolated=False):
     left_lemmas = []
     left_poses = []
     right_lemmas = []

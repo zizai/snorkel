@@ -17,6 +17,10 @@ from utils import corenlp_cleaner, sort_X_on_Y
 
 Document = namedtuple('Document', ['id', 'file', 'text', 'attribs'])
 
+PTB = {'-RRB-': ')', '-LRB-': '(', '-RCB-': '}', '-LCB-': '{',
+         '-RSB-': ']', '-LSB-': '['}
+
+
 class DocParser:
     """Parse a file or directory of files into a set of Document objects."""
     def __init__(self, path):
@@ -194,6 +198,12 @@ class SentenceParser:
             parts['doc_name'] = doc_name
             parts['id'] = "%s-%s" % (parts['doc_id'], parts['sent_id'])
             parts['xmltree'] = None
+            
+            # replace PennTreeBank tags with original forms
+            parts['words'] = [PTB[w] if w in PTB else w for w in parts['words']]
+            parts['lemmas'] = [PTB[w.upper()] if w.upper() in PTB else w for w in parts['lemmas']]
+
+            
             sent = Sentence(**parts)
             sent_id += 1
             yield sent
