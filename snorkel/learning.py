@@ -148,8 +148,10 @@ class LogRegSimple(NoiseAwareModel):
         return m_t.dot(np.log(1 + np.exp(-z))) + (1 - m_t).dot(np.log(1 + np.exp(z))) \
                 + mu * (alpha*np.linalg.norm(w, ord=1) + (1-alpha)*np.linalg.norm(w, ord=2))
 
-    def train(self, X, training_marginals, method='GD', n_iter=1000, w0=None, rate=0.001, backtracking=False, beta=0.8, mu=1e-6, alpha=0.5, rate_decay=0.999, hard_thresh=False):
-
+    def train(self, X, training_marginals, method='GD', n_iter=1000, w0=None, rate=0.001, 
+              backtracking=False, beta=0.8, mu=1e-6, alpha=0.0, 
+              rate_decay=0.999, hard_thresh=False):
+        
         # First, we remove the rows (candidates) that have no LF coverage
         covered            = np.where(np.abs(training_marginals - 0.5) > 1e-3)[0]
         training_marginals = training_marginals[covered]
@@ -260,7 +262,8 @@ class LogReg(NoiseAwareModel):
         * warm_starts:
         * tol:         For testing for SGD convergence, i.e. stopping threshold
         """
-        print "DP",training_marginals
+        print "!!!!!! alpha",alpha
+        
         # First, we remove the rows (candidates) that have no LF coverage
         if training_marginals is not None:
             covered            = np.where(np.abs(training_marginals - 0.5) > 1e-3)[0]
