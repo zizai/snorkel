@@ -164,7 +164,7 @@ class GridSearch(object):
         # Iterate over the param values
         run_stats   = []
         param_opts  = np.zeros(len(self.param_names))
-        f1_opt      = 0.0
+        f1_opt      = -1.0
         for param_vals in product(*self.param_val_ranges):
 
             # Set the new hyperparam configuration to test
@@ -190,7 +190,7 @@ class GridSearch(object):
                 scores = self.learner.test(cv_candidates, cv_gold_labels, display=False, return_vals=True)
             p, r, f1 = scores[:3]
             run_stats.append(list(param_vals) + [p, r, f1])
-            if f1 > f1_opt:
+            if f1 > f1_opt or f1_opt < 0:
                 w_opt      = self.learner.model.w
                 param_opts = param_vals
                 f1_opt     = f1
