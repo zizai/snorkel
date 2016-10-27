@@ -42,6 +42,7 @@ def test_scores(pred, gold, return_vals=True, verbose=False):
     tn   = np.sum((pred < 1) * (gold == -1))
     fn   = np.sum((pred < 1) * (gold == 1))
     
+    acc  = (tp + tn) / float(n_t)
     prec = tp / float(tp + fp)
     rec  = tp / float(tp + fn)
     f1   = 2 * (prec * rec) / (prec + rec)
@@ -51,6 +52,7 @@ def test_scores(pred, gold, return_vals=True, verbose=False):
         print "=" * 40
         print "Test set size:\t%s" % n_t
         print "-" * 40
+        print "Accuracy:\t%s" % acc
         print "Precision:\t%s" % prec
         print "Recall:\t\t%s" % rec
         print "F1 Score:\t%s" % f1
