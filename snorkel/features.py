@@ -13,6 +13,8 @@ from tree_structs import corenlp_to_xmltree, XMLTree
 from utils import get_as_dict
 from entity_features import *
 
+from .featurizers import AcronymFeaturizer
+
 import math
 import numpy as np
 from multiprocessing import Process, Queue
@@ -239,7 +241,7 @@ def generate_mention_feats(get_feats, prefix, candidates):
         for ftr in get_feats(c):
             yield i, prefix + ftr
 
-
+            
 class FeaturizerMP(object):
     
     def __init__(self, num_procs=1):
@@ -493,6 +495,8 @@ class NgramFeaturizer(Featurizer):
     def _match_contexts(self, candidates):
         feature_generators = []
         
+        acronym_ftrs = AcronymFeaturizer(candidates)
+        
         # Unary relations
         if self.arity == 1:
 
@@ -529,6 +533,13 @@ class NgramFeaturizer(Featurizer):
             # mention word linear chain
             feature_generators.append( generate_mention_feats( \
                 lambda c: binary_mention_features(c, range(c.word_start, c.word_end+1)), "WS_", candidates) )            
+            
+            # acronym features
+            feature_generators.append( generate_mention_feats( acronym_ftrs.get_ftrs, "", candidates) )            
+            
+            
+            
+ 
  
         if self.arity == 2:
             raise NotImplementedError("Featurizer needs to be implemented for binary relations!")
