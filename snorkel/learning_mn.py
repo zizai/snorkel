@@ -150,18 +150,8 @@ class LogReg(NoiseAwareModel):
                     print "SGD converged for mu={} after {} steps".format(mu, step)
                 break
 
-            #print "w", w.shape
-            #print "g", g.shape
-            #print rate
-
-            #print w
-            #print g
-
-            #print "!!!!!",rate * g
-
             # Update weights
             w -= rate * g
-
 
             # Apply elastic net penalty
             w_bias    = w[-1]
