@@ -1,7 +1,28 @@
 import re
-from .features import NgramFeaturizer
-from .candidates import *
+import codecs
+from candidates import *
 
+
+class KMeansFeaturizer(object):
+    def __init__(self,cluster_defs):
+        self.word2cluster = self._load_cluster_defs(cluster_defs)
+    
+    def _load_cluster_defs(self, filename):
+        d = {}
+        for line in codecs.open(filename, 'r', 'utf-8'):
+            cid, w = line.strip().split('\t')
+            words = w.split('|')
+            for w in words:
+                d[w] = cid
+        return d
+
+    def get_ftrs(self,c):
+        tokens = c.get_attrib_tokens("lemmas")
+        for t in tokens:
+            if t.lower() in self.word2cluster:
+                ftr = 'WORD_CLUSTER_' + str(self.word2cluster[t.lower()])
+                yield ftr
+        
 class AcronymFeaturizer(object):
     '''Requires document-level knowledge
     '''
@@ -12,7 +33,9 @@ class AcronymFeaturizer(object):
         self.docs = [c.metadata["doc"] for c in candidates if "doc" in c.metadata]
         self.short_form_index = self.get_short_form_index(self.docs)
         self.ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
-        self.featurizer = NgramFeaturizer()
+        #self.global_ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
+        
+        self.featurizer = NgramFeaturizer(use_acronym_ftrs=False)
         
         # compute features for each short form
         for doc_id in self.short_form_index:
@@ -21,8 +44,14 @@ class AcronymFeaturizer(object):
                 for lf in self.short_form_index[doc_id][sf]:
                     ftrs += self.get_short_form_ftrs(lf)
                 self.ftr_index[doc_id][sf] = list(set(ftrs))
-                #print doc_id,sf, len(self.ftr_index[doc_id][sf])
+                #print sf, len(self.ftr_index[doc_id][sf]), self.ftr_index[doc_id][sf][0:10]
+                #print
+                #if sf not in self.global_ftr_index:
+                #    self.global_ftr_index[sf] = []
+                #self.global_ftr_index[sf] += self.ftr_index[doc_id][sf]
         
+        #for sf in self.global_ftr_index:
+        #    print sf, len(self.global_ftr_index[sf]), self.global_ftr_index[sf]
 
         
         
@@ -155,29 +184,29 @@ class AcronymFeaturizer(object):
         w_ftrs = []
         if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
             w_ftrs += list(self.ftr_index[c.doc_id][word])
-        i = 0
+           
         for i,ftr in enumerate(w_ftrs):
             yield ftr
-            #i += 1
-        if i > 0:
-            print c,i
+        
         
         
     def get_short_form_ftrs(self,c):
         '''Hack to filter out some features'''
         ftrs = self.featurizer.get_features_by_candidate(c)
         f_ftrs = []
-        rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|TDL_|WS_)"
+        #rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|TDL_|WS_)" 
+        rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|WS_)" 
         for f in ftrs:
             if not re.search(rgx,f):
                 continue
             if "WS_LEMMA_" in f:
                 continue
             f_ftrs += [f]
+            
         tokens = c.get_attrib_tokens("lemmas")
         for t in tokens:
             f_ftrs += ["TDL_LEMMA:MENTION[{}]".format(t)]
         f_ftrs += ["WS_SHORT_FORM_DEFINED"]
         return list(set(f_ftrs))
 
-    
+from features import NgramFeaturizer  
