@@ -24,7 +24,6 @@ def odds_to_prob(l):
     """
     return np.exp(l) / (1.0 + np.exp(l))
 
-
 def exact_marginals_single_candidate(X, w):
     """
     This function computes the marginal probabilities of each class (of D classes) for **a single candidate**
@@ -40,8 +39,15 @@ def exact_marginals_single_candidate(X, w):
     of this candidate, then this would be expressed as having uniform distribution over all cols. except j.
     in row i of X.
     """
+
     z = np.exp(np.dot(w.T, X))
     return z / z.sum()
+
+    # for sparse matrices
+    #z = np.exp(X.T.dot(w))
+    #return (z / z.sum()).T
+
+
 
 
 def compute_lf_accs(Xs, w):
@@ -67,13 +73,18 @@ def compute_lf_accs(Xs, w):
 
         # Get the expected accuracy of the LFs for this candidate
         # TODO: Check this...
+        #accs += X.dot(z.T) / np.linalg.norm(z)  # M X D * D
         accs += np.dot(X,z.T) / np.linalg.norm(z) # M X D * D
+
 
         # Add whether there was a prediction made or not
         # TODO: Check this...
-        n_pred += X.sum(1) #summing across rows 0/1
 
-    p_correct = (1. / (n_pred + 1e-8)).reshape(-1,1) * accs
+        #n_pred += X.sum(1) #summing across rows 0/1
+        n_pred += np.ravel(X.sum(1)) # summing across rows 0/1
+
+    p_correct = (1. / (n_pred + 1e-8)).reshape(-1, 1) * accs
+
     return p_correct, n_pred
 
 
@@ -121,6 +132,7 @@ class LogReg(NoiseAwareModel):
         w = w0.copy()
         g = np.zeros(M)
         l = np.zeros(M)
+
         g_size = 0
 
         # Gradient descent
@@ -151,6 +163,7 @@ class LogReg(NoiseAwareModel):
                 break
 
             # Update weights
+            #print w.shape, g.shape
             w -= rate * g
 
             # Apply elastic net penalty

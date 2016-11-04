@@ -22,10 +22,12 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 from itertools import combinations
-from scipy.sparse import csc_matrix,csr_matrix
+from scipy.sparse import csc_matrix,csr_matrix,lil_matrix
 
 import codecs
 import cPickle as pickle
+
+
 
 def mp_apply_lfs(lfs, candidates, nprocs):
     '''http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/'''
@@ -518,11 +520,40 @@ class MultinomialSpanLearner(PipelinedLearner):
         for b in bags:
             yield b
 
+    '''
 
+    def _split_candidate(c,splits):
+        cands = []
+        mention = c.get_attrib_span("words")
+        splits = [0] + reduce(lambda x,y:x+y, [[x,x+1] for x in splits]) + [len(mention)]
+        for k in range(len(splits)-1):
+            i,j = splits[k:k+2]
+            cands.append( c[i:j] )
+        return cands
 
+    def _break_bag(bag, split_chars):
+        k, seq = self._bag_arity(bag)
+        if not set(split_chars).intersection(seq):
+            return [bag]
+        bridges = [c for c in bag if set(list(c.get_attrib_span("words"))).intersection(split_chars)]
+        not_bridges = [c for c in bag if c not in bridges]
 
-    def _get_bags(self, candidates):
+        idxs = [[i for i,char in enumerate(c.get_attrib_span("words")) if char in split_chars] for c in bridges]
+        bridges = [ _split_candidate(c,idx) for c,idx in zip(bridges,idxs) ]
 
+        t_bags = set(list(itertools.chain.from_iterable(bridges)) + not_bridges)
+        t_bags = [b for b in self._get_sentence_bags(t_bags)]
+
+        return t_bags
+
+    '''
+
+    def _get_bags(self, candidates, split_chars=["/"]):
+        """
+        Create span bags for multinomial classification
+        :param candidates:
+        :return:
+        """
         L = self.training_set.L
 
         # building bags by starting with positive labeled candidates
@@ -543,23 +574,39 @@ class MultinomialSpanLearner(PipelinedLearner):
             for b in self._get_sentence_bags(sent_cands[sent_id]):
                 sent_bags.append(b)
 
-            # check for disjoint
+            cand_idx = {c: 1 for c in list(itertools.chain.from_iterable(sent_bags))}
 
+            # TODO: add heuristic to break up very long bags
+
+            # sanity check for disjoint bags
+            if self._disjoint(sent_bags):
+                print>>sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
+                self._disjoint(sent_bags,verbose=True)
             bags += sent_bags
 
         return bags
 
-
-    def _disjoint(self,sent_bags):
+    def _disjoint(self,sent_bags, verbose=False):
+        ''' SANITY CHECK -- ensure bags are truly disjoint '''
         spans = []
         for bag in sent_bags:
-            start,end = None,0
+            start,end = 9999999,None
             for c in bag:
                 start = min(c.char_start,start)
                 end = max(c.char_end,end)
             spans += [(start,end)]
-        # overlaps?
 
+        # overlaps?
+        v = False
+        for i in range(len(spans)):
+            for j in range(len(spans)):
+                if i == j:
+                    continue
+                flag = max(spans[i][0], spans[j][0]) <= min(spans[i][1], spans[j][1])
+                v |= flag
+                if verbose and flag:
+                    print spans[i],spans[j]
+        return v
 
 
     def train(self, lf_w0=1.0, **model_hyperparams):
@@ -599,7 +646,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         return (2 ** len(seq)), seq
 
     def _set_span(self, candidates):
-        offsets = reduce(lambda x, y: x + y, [[c.char_start, c.char_end] for c in candidates])
+        offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
         i, j = min(offsets), max(offsets)
         text = candidates[0].sentence["text"]
         offset = candidates[0].sentence["char_offsets"][0]
@@ -614,7 +661,9 @@ class MultinomialSpanLearner(PipelinedLearner):
         k, seq = self._bag_arity(bag)
         candidates = [c for c in bag if c != None]
 
-        P = np.zeros((num_lfs, k))  # M x D_i probabilty distrib
+        P = np.zeros((num_lfs, k))
+
+        #P = lil_matrix((num_lfs, k), dtype=np.float32) # M x D_i probabilty distrib
 
         # transform candidates into multinomial seqs
         samples = self.candidate_multinomials(candidates)
@@ -644,6 +693,9 @@ class MultinomialSpanLearner(PipelinedLearner):
         P = (P.T / np.sum(P, axis=1)).T
         P[np.isnan(P)] = 0
 
+        #print P.shape
+        #P = csr_matrix(P)
+
         strs = []
         classes = zip(*sorted(classes.items(), key=lambda x: x[1], reverse=0))[0]
         seq = np.array(seq)
@@ -671,20 +723,33 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         return classes
 
-    def lf_prob(self,include_neg=False):
+    def lf_prob(self, include_neg=False, class_threshold=1024):
 
         if "span_bags" not in self.__dict__:
             self.generate_span_bags()
 
         Xs, Ys, strs, f_bags = [], [], [], []
         L = self.training_set.L
+
         cand_idx = {c: i for i, c in enumerate(self.training_set.training_candidates)}
+        #candidates = list(itertools.chain.from_iterable([bag for bag in self.span_bags]))
+        #cand_idx = {c: i for i, c in enumerate(candidates)}
 
         for i, bag in enumerate(self.span_bags):
+
+            if i % 1000 == 0:
+                progress = math.ceil(i / float(len(self.span_bags)) * 100)
+                sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, len(self.span_bags)))
+                sys.stdout.flush()
 
             # build LF matrix for bag candidates
             idxs = [cand_idx[c] for c in bag]
             prob, classes, seqs = self.bag_lf_prob(bag, L[idxs])
+
+            # skip degenerate long classes
+            # TODO
+            if len(classes) > class_threshold:
+                continue
 
             if not include_neg and np.all(L[idxs].toarray() <= 0):
                 continue
@@ -732,8 +797,7 @@ class MultinomialSpanLearner(PipelinedLearner):
                 s_cand_set = []
                 for bag_i in sent_bags_idxs[sent_id]:
 
-                    # TODO -- not correct really
-                    # restrict samples to known candidates
+                    # restrict samples to known candidates (i.e., discard impossible samples, like discontinuous spans)
                     prob = sorted(zip(marginals[bag_i],self.strs[bag_i]),reverse=1)
                     mentions = []
                     for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
