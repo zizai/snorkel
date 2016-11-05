@@ -653,7 +653,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         s = text[i - offset:j - offset + 1]
         return s, (i - offset, j - offset + 1)
 
-    def bag_lf_prob(self, bag, L):
+    def bag_lf_prob(self, bag, L, sparsity_threshold=128):
         '''Create the M x D_i (num_lfs X num_classes) matrix
         '''
         num_lfs = self.training_set.L.shape[1]
@@ -661,14 +661,15 @@ class MultinomialSpanLearner(PipelinedLearner):
         k, seq = self._bag_arity(bag)
         candidates = [c for c in bag if c != None]
 
+        # M x D_i probabilty distrib
+        #if k > sparsity_threshold:
+        #    P = lil_matrix((num_lfs, k), dtype=np.float32)
+        #else:
         P = np.zeros((num_lfs, k))
-
-        #P = lil_matrix((num_lfs, k), dtype=np.float32) # M x D_i probabilty distrib
 
         # transform candidates into multinomial seqs
         samples = self.candidate_multinomials(candidates)
 
-        # classes
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
         classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
@@ -693,8 +694,9 @@ class MultinomialSpanLearner(PipelinedLearner):
         P = (P.T / np.sum(P, axis=1)).T
         P[np.isnan(P)] = 0
 
-        #print P.shape
-        #P = csr_matrix(P)
+        # force sparse matrix give some candidate space size
+        if k > sparsity_threshold:
+            P = csr_matrix(P)
 
         strs = []
         classes = zip(*sorted(classes.items(), key=lambda x: x[1], reverse=0))[0]
@@ -737,19 +739,19 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         for i, bag in enumerate(self.span_bags):
 
-            if i % 1000 == 0:
+            if i % 100 == 0:
                 progress = math.ceil(i / float(len(self.span_bags)) * 100)
                 sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, len(self.span_bags)))
                 sys.stdout.flush()
 
+            # skip degenerate long classes
+            k, _ = self._bag_arity(bag)
+            if k > class_threshold:
+                continue
+
             # build LF matrix for bag candidates
             idxs = [cand_idx[c] for c in bag]
             prob, classes, seqs = self.bag_lf_prob(bag, L[idxs])
-
-            # skip degenerate long classes
-            # TODO
-            if len(classes) > class_threshold:
-                continue
 
             if not include_neg and np.all(L[idxs].toarray() <= 0):
                 continue

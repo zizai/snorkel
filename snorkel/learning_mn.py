@@ -40,12 +40,12 @@ def exact_marginals_single_candidate(X, w):
     in row i of X.
     """
 
-    z = np.exp(np.dot(w.T, X))
-    return z / z.sum()
+    #z = np.exp(np.dot(w.T, X))
+    #return z / z.sum()
 
     # for sparse matrices
-    #z = np.exp(X.T.dot(w))
-    #return (z / z.sum()).T
+    z = np.exp(X.T.dot(w))
+    return (z / z.sum()).T
 
 
 
@@ -73,8 +73,8 @@ def compute_lf_accs(Xs, w):
 
         # Get the expected accuracy of the LFs for this candidate
         # TODO: Check this...
-        #accs += X.dot(z.T) / np.linalg.norm(z)  # M X D * D
-        accs += np.dot(X,z.T) / np.linalg.norm(z) # M X D * D
+        accs += X.dot(z.T) / np.linalg.norm(z)  # M X D * D
+        #accs += np.dot(X,z.T) / np.linalg.norm(z) # M X D * D
 
 
         # Add whether there was a prediction made or not
