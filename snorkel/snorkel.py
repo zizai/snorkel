@@ -32,7 +32,7 @@ import cPickle as pickle
 def mp_apply_lfs(lfs, candidates, nprocs):
     '''http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/'''
     def worker(pid, idxs, out_queue):
-        print "\tLF process_id={} {} items".format(pid, len(idxs))
+        #print "\tLF process_id={} {} items".format(pid, len(idxs))
         outdict = {}
         for i in idxs:
             outdict[i] = [lf(candidates[i]) for lf in lfs]
@@ -520,33 +520,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         for b in bags:
             yield b
 
-    '''
 
-    def _split_candidate(c,splits):
-        cands = []
-        mention = c.get_attrib_span("words")
-        splits = [0] + reduce(lambda x,y:x+y, [[x,x+1] for x in splits]) + [len(mention)]
-        for k in range(len(splits)-1):
-            i,j = splits[k:k+2]
-            cands.append( c[i:j] )
-        return cands
-
-    def _break_bag(bag, split_chars):
-        k, seq = self._bag_arity(bag)
-        if not set(split_chars).intersection(seq):
-            return [bag]
-        bridges = [c for c in bag if set(list(c.get_attrib_span("words"))).intersection(split_chars)]
-        not_bridges = [c for c in bag if c not in bridges]
-
-        idxs = [[i for i,char in enumerate(c.get_attrib_span("words")) if char in split_chars] for c in bridges]
-        bridges = [ _split_candidate(c,idx) for c,idx in zip(bridges,idxs) ]
-
-        t_bags = set(list(itertools.chain.from_iterable(bridges)) + not_bridges)
-        t_bags = [b for b in self._get_sentence_bags(t_bags)]
-
-        return t_bags
-
-    '''
 
     def _get_bags(self, candidates, split_chars=["/"]):
         """
@@ -555,6 +529,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         :return:
         """
         L = self.training_set.L
+        self.span_classes = {}
 
         # building bags by starting with positive labeled candidates
         coverage = np.zeros(L.shape[0])
@@ -570,11 +545,19 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         bags = []
         for i, sent_id in enumerate(sent_cands):
+
+            if i % 100 == 0:
+                progress = math.ceil(i / float(len(sent_cands)) * 100)
+                sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, len(sent_cands)))
+                sys.stdout.flush()
+
             sent_bags = []
             for b in self._get_sentence_bags(sent_cands[sent_id]):
+                # create multinomial class names
+                k, seq = self._bag_arity(b)
+                if not tuple(seq) in self.span_classes:
+                    self.span_classes[tuple(seq)] = self.candidate_multinomials(b)
                 sent_bags.append(b)
-
-            cand_idx = {c: 1 for c in list(itertools.chain.from_iterable(sent_bags))}
 
             # TODO: add heuristic to break up very long bags
 
@@ -582,8 +565,10 @@ class MultinomialSpanLearner(PipelinedLearner):
             if self._disjoint(sent_bags):
                 print>>sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
                 self._disjoint(sent_bags,verbose=True)
+
             bags += sent_bags
 
+        print "\nCreated {} bags".format(len(bags))
         return bags
 
     def _disjoint(self,sent_bags, verbose=False):
@@ -646,6 +631,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         return (2 ** len(seq)), seq
 
     def _set_span(self, candidates):
+        #print {sent_id:1 for sent_id in [c.sent_id for c in candidates]}
         offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
         i, j = min(offsets), max(offsets)
         text = candidates[0].sentence["text"]
@@ -662,13 +648,20 @@ class MultinomialSpanLearner(PipelinedLearner):
         candidates = [c for c in bag if c != None]
 
         # M x D_i probabilty distrib
-        #if k > sparsity_threshold:
-        #    P = lil_matrix((num_lfs, k), dtype=np.float32)
-        #else:
+        #P = lil_matrix((num_lfs, k), dtype=np.float32)
         P = np.zeros((num_lfs, k))
 
         # transform candidates into multinomial seqs
+
         samples = self.candidate_multinomials(candidates)
+        #samples = self.span_classes[tuple(seq)]
+
+        # TODO -- bag classes are out of order when cached (WHY)
+        # sanity check
+        #if self.span_classes[tuple(seq)] != samples:
+        #    print seq, samples, "-->",self.span_classes[tuple(seq)]
+
+
 
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
@@ -684,8 +677,13 @@ class MultinomialSpanLearner(PipelinedLearner):
         for c_i in row:
             for lf_j in col:
                 if not assign_na:
-                    k = classes[samples[c_i]]
-                    P[lf_j, k] += L[c_i, lf_j]
+
+                    try:
+                        k = classes[samples[c_i]]
+                        P[lf_j, k] += L[c_i, lf_j]
+                    except:
+                        print "FAILURE", k, classes, c_i, P.shape, (lf_j, k)
+
                 else:
                     k = classes[tuple()]
                     P[lf_j, k] += 1
@@ -714,6 +712,10 @@ class MultinomialSpanLearner(PipelinedLearner):
         seq, _ = self._set_span(candidates)
         span = self._tokenize(seq, split_chars)
         classes = []
+
+        # char to word idx
+        s, (i, j) = self._set_span(candidates)
+        seq = self._tokenize(s, split_chars)
 
         for c in candidates:
             mention = self._tokenize(c.get_attrib_span("words"), split_chars)
@@ -750,8 +752,14 @@ class MultinomialSpanLearner(PipelinedLearner):
                 continue
 
             # build LF matrix for bag candidates
+            #try:
             idxs = [cand_idx[c] for c in bag]
             prob, classes, seqs = self.bag_lf_prob(bag, L[idxs])
+            #except Exception as e:
+            #    print>>sys.stderr,idxs,L[idxs]
+            #    print>>sys.stderr,"FATAL error",e
+            #    print>>sys.stderr,bag
+            #    return
 
             if not include_neg and np.all(L[idxs].toarray() <= 0):
                 continue
