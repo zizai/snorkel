@@ -262,7 +262,7 @@ class LogReg(NoiseAwareModel):
         * warm_starts:
         * tol:         For testing for SGD convergence, i.e. stopping threshold
         """
-        print "!!!!!! alpha",alpha
+        print "Using alpha",alpha
         
         # First, we remove the rows (candidates) that have no LF coverage
         if training_marginals is not None:
