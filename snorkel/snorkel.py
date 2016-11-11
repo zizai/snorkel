@@ -472,26 +472,63 @@ class CRFSpanLearner(PipelinedLearner):
         else:
             print >> sys.stderr, "Unknown output format."
             return
-        
+
+
+def expand_pos_tag(word, tag):
+    pos_tag_map = {"/": ":", "-": ":"}
+    tags = [tag if t not in pos_tag_map else pos_tag_map[t] for t in word.split()]
+    return tags
+
+
+def overlaps(c1, c2):
+    v = c1.doc_id == c2.doc_id
+    return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
+
+
+def align(a, b):
+    j = 0
+    offsets = []
+    for i in range(0, len(a)):
+        matched = False
+        while not matched and j < len(b):
+            if a[i] == b[j]:
+                offsets += [(i, j)]
+                matched = True
+            j += 1
+    return offsets
+
+def tokenize(s, split_chars):
+    '''Force tokenization'''
+    rgx = r'([{}]+)+'.format("".join(split_chars))
+    seq = re.sub(rgx, r' \1 ', s)
+    seq = seq.replace("'s", " 's")
+    return seq.replace("s'", "s '").split()
+
+
+def disjoint(sent_bags, verbose=False):
+    ''' SANITY CHECK -- ensure bags are truly disjoint'''
+    spans = []
+    for bag in sent_bags:
+        start, end = 9999999, None
+        for c in bag:
+            start = min(c.char_start, start)
+            end = max(c.char_end, end)
+        spans += [(start, end)]
+
+    # overlaps?
+    v = False
+    for i in range(len(spans)):
+        for j in range(len(spans)):
+            if i == j:
+                continue
+            flag = max(spans[i][0], spans[j][0]) <= min(spans[i][1], spans[j][1])
+            v |= flag
+            if verbose and flag:
+                print spans[i], spans[j]
+    return v
+
 
 class MultinomialSpanLearner(PipelinedLearner):
-
-    def _index_candidates(self, candidates):
-        indx = {}
-        for c in candidates:
-            indx[c.sent_id] = indx.get(c.sent_id, []) + [c]
-        for sent_id in indx:
-            indx[sent_id] = zip(*sorted([(c.char_start, c) for c in indx[sent_id]]))[1]
-        return indx
-
-    def _overlaps(self, c1, c2):
-        v = c1.doc_id == c2.doc_id
-        return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
-
-    def _sentence_index(self,candidates):
-        indx = defaultdict(list)
-        for c in candidates:
-            indx[c.sent_id].append(c)
 
     def _get_sentence_bags(self, candidates):
         '''All disjoint (non-overlapping) spans in candidate set'''
@@ -506,7 +543,7 @@ class MultinomialSpanLearner(PipelinedLearner):
 
             span_overlap = False
             for c in curr:
-                if self._overlaps(c, candidates[i]):
+                if overlaps(c, candidates[i]):
                     span_overlap = True
 
             if span_overlap:
@@ -519,7 +556,6 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         for b in bags:
             yield b
-
 
 
     def _get_bags(self, candidates, split_chars=["/"]):
@@ -555,43 +591,21 @@ class MultinomialSpanLearner(PipelinedLearner):
             for b in self._get_sentence_bags(sent_cands[sent_id]):
                 # create multinomial class names
                 k, seq = self._bag_arity(b)
-                if not tuple(seq) in self.span_classes:
-                    self.span_classes[tuple(seq)] = self.candidate_multinomials(b)
+                #if not tuple(seq) in self.span_classes:
+                #    self.span_classes[tuple(seq)] = sorted(self.candidate_multinomials(b))
                 sent_bags.append(b)
 
             # TODO: add heuristic to break up very long bags
 
             # sanity check for disjoint bags
-            if self._disjoint(sent_bags):
+            if disjoint(sent_bags):
                 print>>sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
-                self._disjoint(sent_bags,verbose=True)
+                disjoint(sent_bags,verbose=True)
 
             bags += sent_bags
 
         print "\nCreated {} bags".format(len(bags))
         return bags
-
-    def _disjoint(self,sent_bags, verbose=False):
-        ''' SANITY CHECK -- ensure bags are truly disjoint '''
-        spans = []
-        for bag in sent_bags:
-            start,end = 9999999,None
-            for c in bag:
-                start = min(c.char_start,start)
-                end = max(c.char_end,end)
-            spans += [(start,end)]
-
-        # overlaps?
-        v = False
-        for i in range(len(spans)):
-            for j in range(len(spans)):
-                if i == j:
-                    continue
-                flag = max(spans[i][0], spans[j][0]) <= min(spans[i][1], spans[j][1])
-                v |= flag
-                if verbose and flag:
-                    print spans[i],spans[j]
-        return v
 
 
     def train(self, lf_w0=1.0, **model_hyperparams):
@@ -604,34 +618,15 @@ class MultinomialSpanLearner(PipelinedLearner):
     def generate_span_bags(self, thresh=0.0, break_on=["/"], **model_hyperparams):
         self.span_bags =  self._get_bags(self.training_set.training_candidates)
 
-    def _align(self,a, b):
-        j = 0
-        offsets = []
-        for i in range(0, len(a)):
-            matched = False
-            while not matched and j < len(b):
-                if a[i] == b[j]:
-                    offsets += [(i, j)]
-                    matched = True
-                j += 1
-        return offsets
-
-    def _tokenize(self, s, split_chars):
-        '''Force tokenization'''
-        rgx = r'([{}]+)+'.format("".join(split_chars))
-        seq = re.sub(rgx, r' \1 ', s)
-        seq = seq.replace("'s", " 's")
-        return seq.replace("s'", "s '").split()
 
     def _bag_arity(self, bag, split_chars=["/", "-"]):
         '''Determine num_words per bag,
         forcing splits on certain characters '''
         s, (i, j) = self._set_span(bag)
-        seq = self._tokenize(s, split_chars)
+        seq = tokenize(s, split_chars)
         return (2 ** len(seq)), seq
 
     def _set_span(self, candidates):
-        #print {sent_id:1 for sent_id in [c.sent_id for c in candidates]}
         offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
         i, j = min(offsets), max(offsets)
         text = candidates[0].sentence["text"]
@@ -648,7 +643,6 @@ class MultinomialSpanLearner(PipelinedLearner):
         candidates = [c for c in bag if c != None]
 
         # M x D_i probabilty distrib
-        #P = lil_matrix((num_lfs, k), dtype=np.float32)
         P = np.zeros((num_lfs, k))
 
         # transform candidates into multinomial seqs
@@ -660,8 +654,6 @@ class MultinomialSpanLearner(PipelinedLearner):
         # sanity check
         #if self.span_classes[tuple(seq)] != samples:
         #    print seq, samples, "-->",self.span_classes[tuple(seq)]
-
-
 
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
@@ -710,19 +702,19 @@ class MultinomialSpanLearner(PipelinedLearner):
     def candidate_multinomials(self, candidates, split_chars=["/", "-"]):
         '''convert candidates to tokenized binary sequences '''
         seq, _ = self._set_span(candidates)
-        span = self._tokenize(seq, split_chars)
+        span = tokenize(seq, split_chars)
         classes = []
 
         # char to word idx
         s, (i, j) = self._set_span(candidates)
-        seq = self._tokenize(s, split_chars)
+        seq = tokenize(s, split_chars)
 
         for c in candidates:
-            mention = self._tokenize(c.get_attrib_span("words"), split_chars)
+            mention = tokenize(c.get_attrib_span("words"), split_chars)
             tags = np.array([0] * len(span))
-            for i, j in self._align(span, span):
+            for i, j in align(span, span):
                 tags[j] = 1
-            tags = tuple([j for i, j in self._align(mention, span)])
+            tags = tuple([j for i, j in align(mention, span)])
             classes += [tags]
 
         return classes
@@ -736,8 +728,6 @@ class MultinomialSpanLearner(PipelinedLearner):
         L = self.training_set.L
 
         cand_idx = {c: i for i, c in enumerate(self.training_set.training_candidates)}
-        #candidates = list(itertools.chain.from_iterable([bag for bag in self.span_bags]))
-        #cand_idx = {c: i for i, c in enumerate(candidates)}
 
         for i, bag in enumerate(self.span_bags):
 
@@ -752,14 +742,8 @@ class MultinomialSpanLearner(PipelinedLearner):
                 continue
 
             # build LF matrix for bag candidates
-            #try:
             idxs = [cand_idx[c] for c in bag]
             prob, classes, seqs = self.bag_lf_prob(bag, L[idxs])
-            #except Exception as e:
-            #    print>>sys.stderr,idxs,L[idxs]
-            #    print>>sys.stderr,"FATAL error",e
-            #    print>>sys.stderr,bag
-            #    return
 
             if not include_neg and np.all(L[idxs].toarray() <= 0):
                 continue
@@ -776,14 +760,257 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         return Xs, Ys, strs, f_bags
 
+    def sample_sentence_simple(self, sentence, sample_set, tagfmt="IOB2"):
+        '''Assume fixed tokenization'''
 
-    def sample_sentence(self, sentence, bags, marginals):
+        # expand_set = {}
+        # for cs in sample_set:
+        #     samples = [s[0] for s in cs if s[0] != None]
+        #     # expand any tokens and features
+        #     for c in samples:
+        #         mention = c.get_attrib_span("words").replace(" ","")
+        #         tokens  = "".join(c.get_attrib_tokens("words"))
+        #         if mention != tokens:
+        #             expand_set[c] = 1
+        #
+        # if expand_set:
+        #     for c in expand_set:
+        #         print c.get_attrib_tokens()
 
-        for prob,bag in zip(marginals,bags):
-            pass
+        for cs in sample_set:
+            samples = [s[0] for s in cs if s[0] != None]
+            ner_tags = np.array(['O'] * len(sentence["words"]))
+
+            c_idx = {}
+            for c in samples:
+                if 'I' in list(ner_tags[c.idxs]) or 'B' in list(ner_tags[c.idxs]):
+                    print>> sys.stderr, "WARNING Double Samples", c.doc_id
+                    continue
+
+                if tagfmt == "IOB2":
+                    tag_seq = ['B'] + ['I'] * (len(c.idxs) - 1)
+                else:
+                    tag_seq =  ['B'] + ['I'] * (len(c.idxs) - 1)
+                    tag_seq = ["S"] if len(c.idxs) == 1 else tag_seq[0:-1] + ["E"]
+
+                ner_tags[c.idxs] = tag_seq
+                for i in range(min(c.idxs), max(c.idxs) + 1):
+                    c_idx[i] = c
+
+        yield ner_tags
 
 
-    def sample(self, marginals, num_samples=10, format="conll", threshold=0.0):
+
+    def sample_sentence(self, sentence, sample_set, split_chars=["/", "-"]):
+        '''
+        Total hack to force tokenizaton
+        :param sentence:
+        :param sample_set:
+        :return:
+        '''
+        tokens = [" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["words"]]
+        lemmas = [" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["lemmas"]]
+
+        for cs in sample_set:
+            samples = [s[0] for s in cs if s[0] != None]
+            sidx = sentence["char_offsets"][0]
+            sent = " ".join(sentence["words"])
+
+            ner_tags = np.array(['O'] * len(sentence["words"]))
+            c_idx = {}
+            for c in samples:
+                if 'I' in list(ner_tags[c.idxs]) or 'B' in list(ner_tags[c.idxs]):
+                    #print>> sys.stderr, "WARNING Double Samples", c.doc_id
+                    continue
+
+                ner_tags[c.idxs] = ['B'] + ['I'] * (len(c.idxs) - 1)
+                for i in range(min(c.idxs), max(c.idxs) + 1):
+                    c_idx[i] = c
+
+            # expand tokens
+            exp_tagged = []
+            tagged = zip(sentence["words"], tokens, lemmas, sentence["poses"],
+                         sentence["dep_parents"], sentence["dep_labels"], ner_tags)
+            for idx, t in enumerate(tagged):
+                word, t_word, lemma, pos_tag, dep_parent, dep_label, ner_tag = t
+
+                if u"\xa0" in word:
+                    word = word.replace(u"\xa0", u"_")
+                    exp_tagged += [(word, pos_tag, ner_tag)]
+                    #exp_tagged += [(word, lemma, pos_tag, dep_label, dep_parent, ner_tag)]
+
+                # keep default tokenization for numbers
+                # elif re.search("^[-]*([0-9]+/[0-9]+|[0-9]+[.]*[0-9]*)$",word):
+                #    exp_tagged += [(word,pos_tag,ner_tag)]
+
+                elif word != t_word:
+                    exp = []
+                    if idx in c_idx:
+                        c_mention = c_idx[idx].get_attrib_span("words")
+
+                        if word == c_mention:
+                            pos_tags = expand_pos_tag(t_word, pos_tag)
+                            num_tok = len(t_word.split())
+
+                            # sent = Sentence(**parts)
+                            t_sentence = [t_word.split(),lemma.split(), pos_tags,
+                                          [dep_parent] * num_tok, [dep_label] * num_tok]
+
+
+
+                            ner_tags = [ner_tag] + (['I'] * (len(t_word.split()) - 1))
+                            for t1 in zip(t_word.split(), pos_tags, ner_tags):
+                                exp_tagged += [t1]
+
+                        else:
+                            t_tokens = t_word.split()
+                            t_mention_tok = tokenize(c_mention, split_chars=split_chars)
+
+                            # partial match
+                            if len(t_tokens) < len(t_mention_tok):
+                                ner_tags = [ner_tag] + (['I'] * (len(t_tokens) - 1))
+                                pos_tags = expand_pos_tag(t_word, pos_tag)
+
+                                for t1 in zip(t_tokens, pos_tags, ner_tags):
+                                    exp_tagged += [t1]
+
+                            # single token fully contained
+                            elif len(t_tokens) > len(t_mention_tok) and len(t_mention_tok) == 1:
+                                t_idx = t_tokens.index(t_mention_tok[0])
+                                ner_tags = ['O'] * len(t_tokens)
+                                ner_tags[t_idx] = ner_tag
+                                pos_tags = expand_pos_tag(t_word, pos_tag)
+
+                                for t1 in zip(t_tokens, pos_tags, ner_tags):
+                                    exp_tagged += [t1]
+                            else:
+                                t_idx = [t_tokens.index(t) for t in t_tokens if t in t_mention_tok]
+                                t_idx = min(t_idx)
+
+                                ner_tags = ['O'] * len(t_tokens)
+                                ner_tags[t_idx] = ner_tag
+                                pos_tags = expand_pos_tag(t_word, pos_tag)
+
+                                for t1 in zip(t_tokens, pos_tags, ner_tags):
+                                    exp_tagged += [t1]
+                    else:
+
+                        pos_tags = expand_pos_tag(t_word, pos_tag)
+                        ner_tags = [ner_tag] + (['O'] * (len(t_word.split()) - 1))
+                        t_word = t_word.split()
+                        for t1 in zip(t_word, pos_tags, ner_tags):
+                            exp_tagged += [t1]
+
+                else:
+                    exp_tagged += [(t_word, pos_tag, ner_tag)]
+
+            yield exp_tagged
+
+
+
+
+    def sample_sentence_BROKEN(self, sentence, sample_set, split_chars=["/", "-"]):
+        '''This version forces different tokenization'''
+
+        # map tokenization to new offsets
+        tokens = [" ".join(tokenize(w, split_chars=["/", "-"])) for w in sentence["words"]]
+        # replace CoreNLP generated tokens
+        corenlp_tok = {u'``':'"',u"''":u'"'}
+        tokens = [w if w not in corenlp_tok else corenlp_tok[w] for w in tokens]
+
+        t_text = " ".join(tokens)
+        char2tchar = dict(align(re.sub("\s{2,}"," ",sentence["text"]), t_text))
+
+        if sentence["text"].replace(" ","") != t_text.replace(" ",""):
+            print >>sys.stderr, "ERROR -- text transforms do not align"
+            print >> sys.stderr, sentence["text"].replace(" ","")
+            print >> sys.stderr, t_text.replace(" ","")
+            return
+
+        tchar2token = []
+        seq = zip(range(0,len(t_text)),t_text)
+        i = 0
+        for key, igroup in itertools.groupby(seq, lambda x: x[1] != ' '):
+            igroup = list(igroup)
+            if key:
+                idxs,chars = zip(*igroup)
+                tchar2token += [(j,i) for j in idxs]
+                i += 1
+
+        tchar2token = dict(tchar2token)
+
+        # fix pos tags under new tokenization
+        pos_tags = []
+        for i,(word,t_word) in enumerate(zip(sentence["words"],tokens)):
+            tag = sentence["poses"][i]
+            if word != t_word:
+                pos_tags += expand_pos_tag(t_word, tag)
+            else:
+                pos_tags.append(tag)
+
+        # split tokens into final, new tokenization
+        tokens = " ".join(tokens).split()
+
+        # HOT FIX -- fix weird unicode bug
+        tokens = map(lambda x: x.replace(u"\xa0", u"_"), tokens)
+
+        if not len(tokens) == len(pos_tags):
+            print>>sys.stderr,"ERROR -- pos tag tokenization error"
+
+        for sample in sample_set:
+
+            ner_tags = np.array(['O'] * len(tokens))
+            for cand,bag_id in sample:
+                if cand:
+
+                    try:
+                        # transform to relative sentence offsets
+                        offset = sentence["char_offsets"][0]
+                        i = tchar2token[char2tchar[cand.char_start - offset]]
+                        j = tchar2token[char2tchar[cand.char_end - offset]]
+                    except:
+                        print [sentence["text"]]
+
+                    mention = cand.get_attrib_span("words")
+                    t_mention = tokens[i:j+1]
+
+                    if mention.replace(" ","") != "".join(t_mention):
+                        print "-------------------"
+                        for ii in char2tchar:
+                            if ii not in char2tchar:
+                                continue
+                            if char2tchar[ii] not in tchar2token:
+                                print "XXX"
+                                continue
+
+                            print ii, char2tchar[ii], tchar2token[char2tchar[ii]], tokens[tchar2token[char2tchar[ii]]]
+
+                        print cand.char_start - offset
+                        print cand.char_end - offset
+
+                        print i, j
+                        print>> sys.stderr,"-------------------"
+                        print>> sys.stderr,"{} vs. {}".format(mention,t_mention)
+                        print>> sys.stderr,"-------------------"
+
+
+                    #print tokens
+                    c_idxs = np.array(range(i, j + 1))
+
+                    # if 'I' in list(ner_tags[c_idxs]) or 'B' in list(ner_tags[c_idxs]):
+                    #     print>> sys.stderr, "----------------------------"
+                    #     print>> sys.stderr, "ERROR Double Samples"
+                    #     print>> sys.stderr, c_idxs
+                    #     print>> sys.stderr, cand
+                    #     print>> sys.stderr, "----------------------------"
+
+                    ner_tags[c_idxs] = ['B'] + ['I'] * (len(c_idxs) - 1)
+
+            yield zip(tokens,pos_tags,ner_tags)
+
+
+    def sample(self, marginals, num_samples=10, format="conll",
+               threshold=0.0, show_progress=False):
 
         cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
         sentences = {c.sent_id:c.sentence for c in cands}
@@ -792,10 +1019,22 @@ class MultinomialSpanLearner(PipelinedLearner):
         for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
             sent_bags_idxs[sent_id].append(i)
 
+        # maximum probable tag per word
+        # max_prob_tag = defaultdict(dict)
+        # for sent_id in sentences:
+        #     s = sentences[sent_id]
+        #     pos_tags = zip(s["words"],s["poses"])
+        #     for word,tag in pos_tags:
+        #         if tag not in max_prob_tag[word]:
+        #             max_prob_tag[word][tag] = 0
+        #         max_prob_tag[word][tag] += 1
+
+
         for progress, sent_id in enumerate(sorted(sentences)):
 
-            if progress % 100 == 0:
-                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format( (progress / float(len(sentences)) * 100), progress, len(sentences) ))
+            if show_progress and progress % 100 == 0 or progress == len(sentences):
+                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format( ( progress / float(len(sentences)) * 100),
+                                                                     progress, len(sentences) ))
                 sys.stdout.flush()
 
             #
@@ -807,15 +1046,16 @@ class MultinomialSpanLearner(PipelinedLearner):
                 s_cand_set = []
                 for bag_i in sent_bags_idxs[sent_id]:
 
-                    # restrict samples to known candidates (i.e., discard impossible samples, like discontinuous spans)
+                    # restrict samples to known candidates (i.e., ignore impossible samples, like discontinuous spans)
                     prob = sorted(zip(marginals[bag_i],self.strs[bag_i]),reverse=1)
                     mentions = []
                     for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
-                        mentions += [" ".join(self._tokenize(m, split_chars=["/", "-"]))]
+                        mentions += [" ".join(tokenize(m, split_chars=["/", "-"]))]
 
                     dist = [[p, name] for p,name in prob if name in mentions or name == '<N/A>']
                     m = zip(*dist)[0]
                     p = [(p/sum(m),name) for p,name in dist]
+
                     #for x in sorted(p, key=lambda x: x[0], reverse=1):
                     #    print x
                     #print
@@ -829,155 +1069,25 @@ class MultinomialSpanLearner(PipelinedLearner):
                     else:
                         print>>sys.stderr,"Warning: candidate sample error {}".format(rs)
 
-                    s_cand_set += [(rs, bag_i, p)]
+                    s_cand_set += [(rs, bag_i)]
 
                 samples += [s_cand_set]
 
-            # create re-tokenized sentence and create IOB2 sentence instance
-            pos_tag_map = {"/":":"}
-            tokens = [" ".join(self._tokenize(w, split_chars=["/","-"])) for w in sentences[sent_id]["words"]]
-
-            def expand_pos_tag(word,tag):
-                pos_tag_map = {"/": ":","-":":"}
-                tags = [tag if t not in pos_tag_map else pos_tag_map[t] for t in word.split()]
-                return tags
-
             #
-            # Sentence Samples
+            # Generate Sentence Samples
             #
-            for cs in samples:
+            for s in self.sample_sentence(sentences[sent_id], samples):
+                try:
+                    yield s
+                except:
+                    continue
 
-                samples = [s[0] for s in cs if s[0] != None]
-                sidx = sentences[sent_id]["char_offsets"][0]
-                sent = " ".join(sentences[sent_id]["words"])
-
-                ner_tags = np.array(['O'] * len(sentences[sent_id]["words"]))
-                c_idx = {}
-                for c in samples:
-                    if 'I' in list(ner_tags[c.idxs]) or 'B' in list(ner_tags[c.idxs]):
-                        print>>sys.stderr, "ERROR Double Samples"
-                        print samples
-                        continue
-                    ner_tags[c.idxs] = ['B'] + ['I'] * (len(c.idxs) - 1)
-                    for i in range(min(c.idxs),max(c.idxs)+1):
-                        c_idx[i] = c
-
-                # expand tokens
-                exp_tagged = []
-                tagged = zip(sentences[sent_id]["words"], tokens, sentences[sent_id]["poses"], ner_tags)
-                for idx,t in enumerate(tagged):
-                    word,t_word,pos_tag,ner_tag = t
-
-                    if u"\xa0" in word:
-                        word = word.replace(u"\xa0",u"_")
-                        exp_tagged += [(word, pos_tag, ner_tag)]
-
-                    # keep default tokenization for numbers
-                    #elif re.search("^[-]*([0-9]+/[0-9]+|[0-9]+[.]*[0-9]*)$",word):
-                    #    exp_tagged += [(word,pos_tag,ner_tag)]
-
-                    elif word != t_word:
-                        exp = []
-                        if idx in c_idx:
-                            c_mention = c_idx[idx].get_attrib_span("words")
-
-                            if word == c_mention:
-                                pos_tags = expand_pos_tag(t_word,pos_tag)
-                                ner_tags = [ner_tag] + (['I'] * (len(t_word.split())-1))
-                                for t1 in zip(t_word.split(),pos_tags,ner_tags):
-                                    exp_tagged += [t1]
-
-                            else:
-                                t_tokens = t_word.split()
-                                t_mention_tok = self._tokenize(c_mention, split_chars=["/","-"])
-
-                                # partial match
-                                if len(t_tokens) < len(t_mention_tok):
-                                    ner_tags = [ner_tag] + (['I'] * (len(t_tokens) - 1))
-                                    pos_tags = expand_pos_tag(t_word, pos_tag)
-                                    for t1 in zip(t_tokens, pos_tags, ner_tags):
-                                        exp_tagged += [t1]
-
-                                # single token fully contained
-                                elif len(t_tokens) > len(t_mention_tok) and len(t_mention_tok) == 1:
-
-                                    t_idx = t_tokens.index(t_mention_tok[0])
-                                    ner_tags = ['O'] * len(t_tokens)
-                                    ner_tags[t_idx] = ner_tag
-                                    pos_tags = expand_pos_tag(t_word, pos_tag)
-                                    for t1 in zip(t_tokens, pos_tags, ner_tags):
-                                        exp_tagged += [t1]
-
-
-                                else:
-
-                                    #t_idx = [t_mention_tok.index(t) for t in t_tokens if t in t_mention_tok]
-                                    t_idx = [t_tokens.index(t) for t in t_tokens if t in t_mention_tok]
-                                    t_idx = min(t_idx)
-
-                                    ner_tags = ['O'] * len(t_tokens)
-                                    ner_tags[t_idx] = ner_tag
-                                    pos_tags = expand_pos_tag(t_word, pos_tag)
-                                    for t1 in zip(t_tokens, pos_tags, ner_tags):
-                                        exp_tagged += [t1]
-
-
-                        else:
-
-                            pos_tags = expand_pos_tag(t_word, pos_tag)
-                            ner_tags = [ner_tag] + (['O'] * (len(t_word.split()) - 1))
-                            t_word = t_word.split()
-                            for t1 in zip(t_word, pos_tags, ner_tags):
-                                exp_tagged += [t1]
-
-
-                    else:
-                        exp_tagged += [(t_word, pos_tag, ner_tag)]
-
-                # final sample
-                #words,pos_tags,ner_tags = zip(*exp_tagged)
-                yield exp_tagged
-
-
-
-    def _get_tagged_sentence(self, sentence, candidates, tag_fmt="IOB2"):
-
-        tokens = [" ".join(self._tokenize(w, split_chars=["/"])) for w in sentence["words"]]
-        pos_tags = []
-        for tw,w,pos in zip(tokens,sentence["words"],sentence["poses"]):
-            if tw != w:
-                print pos, tw, w
-
-
-    def sample_v1(self, marginals, num_samples=10, format="conll"):
-
-        sent_idx = {}
-        for i,sent_id in [(i,bag[0].sent_id) for i,bag in enumerate(self.f_bags)]:
-            sent_idx[sent_id] = sent_idx.get(sent_id,[]) + [i]
-
-        bag_idx = {}
-        for bag in self.f_bags:
-            sent_id = bag[0].sent_id
-            if sent_id not in bag_idx:
-                bag_idx[sent_id] = []
-                bag_idx[sent_id] += [bag]
-
-        j = 0
-        for sent_id in bag_idx:
-            idxs = sent_idx[sent_id]
-
-            for i in idxs:
-                mentions = []
-                for m in [c.get_attrib_span("words") for c in self.f_bags[i]]:
-                    mentions += [" ".join(self._tokenize(m,split_chars=["/", "-"]))]
-
-                accept = False
-                while not accept:
-                    s = self.sample_candidate(self.Ys[i], self.strs[i], marginals[i])[0]
-                    idx = self.Ys[i].index(s)
-                    m = self.strs[i][idx]
-
-                    if m == "<N/A>" or m in mentions:
-                        print m, marginals[i][idx]
-                        accept = True
+                '''
+                if format == "conll":
+                    words = sentences[sent_id]["words"]
+                    pos_tags = sentences[sent_id]["poses"]
+                    yield zip(words,pos_tags,ner_tags)
+                elif format == "sentence":
+                    yield (sentences[sent_id],ner_tags)
+                '''
 
