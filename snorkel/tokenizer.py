@@ -82,7 +82,7 @@ def retokenize_sentence(sentence, split_chars=["/", "-"]):
             print>> sys.stderr, word, "|", sentence["text"][i:j]
             print>> sys.stderr, " ".join(parts["words"])
 
-    # santity check for token lengths
+    # sanity check for token lengths
     t_sentence = parts.values()
     lengths = map(len, t_sentence)
     if lengths.count(max(lengths)) != len(lengths):

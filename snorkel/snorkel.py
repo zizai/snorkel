@@ -749,11 +749,12 @@ class MultinomialSpanLearner(PipelinedLearner):
         return Xs, Ys, strs, f_bags
 
 
-    def export(self, marginals, num_samples, outfile, tagname="DISEASE", fmt="pkl"):
+    def export(self, marginals, num_samples, outfile,
+               tagname="DISEASE", fmt="pkl", threshold=0.0):
         '''Export tagged sentences to file of given format'''
         sentences = {}
         ner_tags = defaultdict(list)
-        for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples)):
+        for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples, threshold=threshold)):
             sent, tags = tag_sentence(sentence, cands)
             tags = [t + "-{}".format(tagname) if t != "O" else t for t in tags]
             ner_tags[sent.id].append(tags)
@@ -777,8 +778,6 @@ class MultinomialSpanLearner(PipelinedLearner):
                             tag = (word, pos_tag, ner_tag)
                             fp.write(" ".join(tag) + u"\n")
                         fp.write(u"\n")
-
-
 
 
     def sample(self, marginals, num_samples=10, format="conll",
@@ -812,7 +811,11 @@ class MultinomialSpanLearner(PipelinedLearner):
                         for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
                             mentions += [" ".join(tokenize(m, split_chars=["/", "-"]))]
 
-                        dist = [[p, name] for p,name in prob if name in mentions or name == '<N/A>']
+                        # threshold prob. if threshold is too high, choose max(prob)
+                        if threshold > 0.0 and max(zip(*prob)[0]) < threshold:
+                            threshold = max(zip(*prob)[0])
+
+                        dist = [[p, name] for p,name in prob if (name in mentions or name == '<N/A>') and p >= threshold]
                         m = zip(*dist)[0]
                         p = [(p/sum(m),name) for p,name in dist]
 
