@@ -479,11 +479,9 @@ def expand_pos_tag(word, tag):
     tags = [tag if t not in pos_tag_map else pos_tag_map[t] for t in word.split()]
     return tags
 
-
 def overlaps(c1, c2):
     v = c1.doc_id == c2.doc_id
     return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
-
 
 def align(a, b):
     j = 0
@@ -591,8 +589,6 @@ class MultinomialSpanLearner(PipelinedLearner):
             for b in self._get_sentence_bags(sent_cands[sent_id]):
                 # create multinomial class names
                 k, seq = self._bag_arity(b)
-                #if not tuple(seq) in self.span_classes:
-                #    self.span_classes[tuple(seq)] = sorted(self.candidate_multinomials(b))
                 sent_bags.append(b)
 
             # TODO: add heuristic to break up very long bags
@@ -646,15 +642,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         P = np.zeros((num_lfs, k))
 
         # transform candidates into multinomial seqs
-
         samples = self.candidate_multinomials(candidates)
-        #samples = self.span_classes[tuple(seq)]
-
-        # TODO -- bag classes are out of order when cached (WHY)
-        # sanity check
-        #if self.span_classes[tuple(seq)] != samples:
-        #    print seq, samples, "-->",self.span_classes[tuple(seq)]
-
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
         classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
@@ -799,11 +787,18 @@ class MultinomialSpanLearner(PipelinedLearner):
 
         yield ner_tags
 
-
-
     def sample_sentence(self, sentence, sample_set, split_chars=["/", "-"]):
+        for cs in sample_set:
+            samples = [s[0] for s in cs if s[0] != None]
+            yield (sentence, samples)
+
+
+
+
+    def sample_sentence_working(self, sentence, sample_set, split_chars=["/", "-"]):
         '''
-        Total hack to force tokenizaton
+        What a mess. Total hack to force tokenizaton.
+        TODO: use simple tokenization from above. Write some arbitrary tokenization mapping
         :param sentence:
         :param sample_set:
         :return:
@@ -817,11 +812,12 @@ class MultinomialSpanLearner(PipelinedLearner):
             sent = " ".join(sentence["words"])
 
             ner_tags = np.array(['O'] * len(sentence["words"]))
+            # candidate index
             c_idx = {}
             for c in samples:
-                if 'I' in list(ner_tags[c.idxs]) or 'B' in list(ner_tags[c.idxs]):
-                    #print>> sys.stderr, "WARNING Double Samples", c.doc_id
-                    continue
+                #if 'I' in list(ner_tags[c.idxs]) or 'B' in list(ner_tags[c.idxs]):
+                #    #print>> sys.stderr, "WARNING Double Samples", c.doc_id
+                #    continue
 
                 ner_tags[c.idxs] = ['B'] + ['I'] * (len(c.idxs) - 1)
                 for i in range(min(c.idxs), max(c.idxs) + 1):
@@ -831,6 +827,7 @@ class MultinomialSpanLearner(PipelinedLearner):
             exp_tagged = []
             tagged = zip(sentence["words"], tokens, lemmas, sentence["poses"],
                          sentence["dep_parents"], sentence["dep_labels"], ner_tags)
+
             for idx, t in enumerate(tagged):
                 word, t_word, lemma, pos_tag, dep_parent, dep_label, ner_tag = t
 
@@ -844,7 +841,7 @@ class MultinomialSpanLearner(PipelinedLearner):
                 #    exp_tagged += [(word,pos_tag,ner_tag)]
 
                 elif word != t_word:
-                    exp = []
+
                     if idx in c_idx:
                         c_mention = c_idx[idx].get_attrib_span("words")
 
@@ -852,11 +849,9 @@ class MultinomialSpanLearner(PipelinedLearner):
                             pos_tags = expand_pos_tag(t_word, pos_tag)
                             num_tok = len(t_word.split())
 
-                            # sent = Sentence(**parts)
                             t_sentence = [t_word.split(),lemma.split(), pos_tags,
                                           [dep_parent] * num_tok, [dep_label] * num_tok]
-
-
+                            print t_sentence
 
                             ner_tags = [ner_tag] + (['I'] * (len(t_word.split()) - 1))
                             for t1 in zip(t_word.split(), pos_tags, ner_tags):
@@ -864,12 +859,16 @@ class MultinomialSpanLearner(PipelinedLearner):
 
                         else:
                             t_tokens = t_word.split()
+
                             t_mention_tok = tokenize(c_mention, split_chars=split_chars)
 
                             # partial match
                             if len(t_tokens) < len(t_mention_tok):
                                 ner_tags = [ner_tag] + (['I'] * (len(t_tokens) - 1))
                                 pos_tags = expand_pos_tag(t_word, pos_tag)
+
+                                t_sentence = [t_tokens, lemma.split(), pos_tags,
+                                              [dep_parent] * num_tok, [dep_label] * num_tok]
 
                                 for t1 in zip(t_tokens, pos_tags, ner_tags):
                                     exp_tagged += [t1]
@@ -891,18 +890,38 @@ class MultinomialSpanLearner(PipelinedLearner):
                                 ner_tags[t_idx] = ner_tag
                                 pos_tags = expand_pos_tag(t_word, pos_tag)
 
+
                                 for t1 in zip(t_tokens, pos_tags, ner_tags):
                                     exp_tagged += [t1]
+
+                    # word is not found in a NER candidate
                     else:
 
-                        pos_tags = expand_pos_tag(t_word, pos_tag)
-                        ner_tags = [ner_tag] + (['O'] * (len(t_word.split()) - 1))
-                        t_word = t_word.split()
-                        for t1 in zip(t_word, pos_tags, ner_tags):
+                        print t_word
+                        print lemma
+                        print
+
+                        t_tokens = t_word.split()
+                        num_tok = len(t_tokens)
+
+                        t_lemmas = lemma.split()
+
+
+                        t_pos_tags = expand_pos_tag(t_word, pos_tag)
+
+                        ner_tags = [ner_tag] + (['O'] * (num_tok - 1))
+
+                        t_sentence = [t_tokens, t_lemmas, pos_tags,
+                                     [dep_parent] * num_tok, [dep_label] * num_tok]
+
+
+                        for t1 in zip(t_tokens, pos_tags, ner_tags):
                             exp_tagged += [t1]
 
                 else:
                     exp_tagged += [(t_word, pos_tag, ner_tag)]
+
+            ## sent = Sentence(**parts)
 
             yield exp_tagged
 
@@ -1019,17 +1038,6 @@ class MultinomialSpanLearner(PipelinedLearner):
         for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
             sent_bags_idxs[sent_id].append(i)
 
-        # maximum probable tag per word
-        # max_prob_tag = defaultdict(dict)
-        # for sent_id in sentences:
-        #     s = sentences[sent_id]
-        #     pos_tags = zip(s["words"],s["poses"])
-        #     for word,tag in pos_tags:
-        #         if tag not in max_prob_tag[word]:
-        #             max_prob_tag[word][tag] = 0
-        #         max_prob_tag[word][tag] += 1
-
-
         for progress, sent_id in enumerate(sorted(sentences)):
 
             if show_progress and progress % 100 == 0 or progress == len(sentences):
@@ -1037,9 +1045,7 @@ class MultinomialSpanLearner(PipelinedLearner):
                                                                      progress, len(sentences) ))
                 sys.stdout.flush()
 
-            #
             # Candidate (bag) Samples
-            #
             samples = []
             for i in range(num_samples):
 
@@ -1056,38 +1062,37 @@ class MultinomialSpanLearner(PipelinedLearner):
                     m = zip(*dist)[0]
                     p = [(p/sum(m),name) for p,name in dist]
 
-                    #for x in sorted(p, key=lambda x: x[0], reverse=1):
-                    #    print x
-                    #print
-
                     p,classes = zip(*p)
                     rs = np.random.choice(classes, 1, p=p)[0]
                     if rs in mentions:
                         rs = self.f_bags[bag_i][mentions.index(rs)]
                     elif rs == "<N/A>":
-                        rs = None
+                        #rs = None
+                        continue
                     else:
                         print>>sys.stderr,"Warning: candidate sample error {}".format(rs)
-
+                        continue
                     s_cand_set += [(rs, bag_i)]
 
                 samples += [s_cand_set]
 
+
             #
             # Generate Sentence Samples
             #
+
             for s in self.sample_sentence(sentences[sent_id], samples):
                 try:
                     yield s
                 except:
                     continue
 
-                '''
-                if format == "conll":
-                    words = sentences[sent_id]["words"]
-                    pos_tags = sentences[sent_id]["poses"]
-                    yield zip(words,pos_tags,ner_tags)
-                elif format == "sentence":
-                    yield (sentences[sent_id],ner_tags)
-                '''
+            '''
+            if format == "conll":
+                words = sentences[sent_id]["words"]
+                pos_tags = sentences[sent_id]["poses"]
+                yield zip(words,pos_tags,ner_tags)
+            elif format == "sentence":
+                yield (sentences[sent_id],ner_tags)
+            '''
 
