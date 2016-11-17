@@ -79,7 +79,7 @@ class TrainingSet(object):
         - A set of labeling functions (LFs) which are functions f : Candidate -> {-1,0,1}
         - A Featurizer object, which is applied to the Candidate objects to generate features
     """
-    def __init__(self, training_candidates, lfs, featurizer=None, num_procs=6):
+    def __init__(self, training_candidates, lfs, featurizer=None, num_procs=1):
         self.num_procs  = num_procs
         self.training_candidates = training_candidates
         self.featurizer          = featurizer
@@ -630,7 +630,7 @@ class MultinomialSpanLearner(PipelinedLearner):
         s = text[i - offset:j - offset + 1]
         return s, (i - offset, j - offset + 1)
 
-    def bag_lf_prob(self, bag, L, sparsity_threshold=128):
+    def bag_lf_prob(self, bag, L, sparsity_threshold=1024):
         '''Create the M x D_i (num_lfs X num_classes) matrix
         '''
         num_lfs = self.training_set.L.shape[1]

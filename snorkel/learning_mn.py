@@ -111,7 +111,7 @@ class LogReg(NoiseAwareModel):
         self.bias_term = bias_term
 
     def train(self, Xs, n_iter=1000, w0=None, rate=DEFAULT_RATE, alpha=DEFAULT_ALPHA, \
-            mu=DEFAULT_MU, tol=1e-6, verbose=True):
+            mu=DEFAULT_MU, tol=1e-6, subsample=1.0, verbose=True):
         """
         Xs is defined as in compute_lf_accs.
 
@@ -141,7 +141,14 @@ class LogReg(NoiseAwareModel):
         for step in range(n_iter):
 
             # Get the expected LF accuracies
-            p_correct, n_pred = compute_lf_accs(Xs, w)
+            # ---------------------------------
+            if subsample != 1.0:
+                s_Xs = np.random.choice(range(len(Xs)), int(len(Xs) * subsample))
+                s_Xs = [Xs[i] for i in s_Xs]
+                p_correct, n_pred = compute_lf_accs(s_Xs, w)
+            # ---------------------------------
+            else:
+                p_correct, n_pred = compute_lf_accs(Xs, w)
 
             # Get the "empirical log odds"; NB: this assumes one is correct, clamp is for sampling...
             l = np.clip(log_odds(p_correct), -10, 10).flatten()
@@ -155,7 +162,7 @@ class LogReg(NoiseAwareModel):
             # Check for convergence
             wn     = np.linalg.norm(w, ord=2)
             g_size = np.linalg.norm(g, ord=2)
-            if step % 250 == 0 and verbose:
+            if step % 100 == 0 and verbose:
                 print "\tLearning epoch = {}\tGradient mag. = {:.6f}".format(step, g_size)
             if (wn < 1e-12 or g_size / wn < tol) and step >= 10:
                 if verbose:
