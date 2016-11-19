@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 '''
 Apply tokenization to sentence object
 '''
@@ -7,57 +9,86 @@ import numpy as np
 from collections import defaultdict
 from .parser import Sentence
 
-# :
+unicode_map = {u'‘':u"'",
+               u"’s":u"'s",
+               u'’':u"'",
+               u"”":u'"',
+               u"“":u'"',
+               u"…":u"...",
+               u"€":u"$",
+               u"'":""}
+
+core_nlp = {'-RRB-': ')', '-LRB-': '(', '-RCB-': '}',
+            '-LCB-': '{', '-RSB-': ']', '-LSB-': '['}
+
 def tokenize(s, split_chars):
-    #s = s.replace(u"\xa0", u"_")  # HACK
-    s = s.replace(u"\xa0", u" ")  # HACK
+
+    s = s.replace(u"\xa03", u"_")  # HACK
     tokens = s.split()
-    rgx = r'([{}]+)+'.format("".join(split_chars))
+    rgx = r'([{}]+)+'.format(u"".join(split_chars))
     t_tokens = []
     for t in tokens:
-        t = t.replace("'s", " 's")
-        t = t.replace("s'", "s '")
+
+        t = t.replace(u"'s", u" 's")
+        t = t.replace(u"s'", u"s '")
+
         # corenlp replacement tokens
-        t = t.replace("``", '"')
-        t = t.replace("''", '"')
-        t = t.replace("`", "'")
-        if not re.search("^[-]*([0-9]+/[0-9]+|[0-9]+[.]*[0-9]*)$",t):
+        t = t.replace(u"``", u'"')
+        t = t.replace(u"''", u'"')
+        t = t.replace(u"`", u"'")
+        # for PTB-style tokens embedded in words (how does this happen??)
+        # e.g., ";-RRB-"
+        for ptb in core_nlp:
+            if ptb in t:
+                t = t.replace(ptb,core_nlp[ptb])
+
+        if re.search('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+',t):
+            pass
+        elif t == "--":
+            continue
+        elif not re.search("^[-]*([0-9]+/[0-9]+|[0-9]+[.]*[0-9]*)$",t):
             t = re.sub(rgx, r' \1 ', t)
+
         t_tokens += [t]
-    seq = re.sub("\s{2,}"," "," ".join(t_tokens))
+
+    seq = re.sub(u"\s{2,}",u" ",u" ".join(t_tokens))
     return seq.split()
 
-
-    # rgx = r'([{}]+)+'.format("".join(split_chars))
-    # seq = re.sub(rgx, r' \1 ', s)
-    # seq = seq.replace("'s", " 's")
-    # seq = seq.replace("s'", "s '")
-    # # corenlp replacement tokens
-    # seq = seq.replace("``", '"')
-    # seq = seq.replace("''", '"')
-    # seq = seq.replace("`", "'")
-    # return seq.split()
-
-
-def retokenize_sentence(sentence, split_chars=["/", "-"]):
+def retokenize_sentence(sentence, split_chars=[u"/", u"-"]):
     '''Force new tokenization and create new Sentence object'''
-    pos_tag_map = {"/": ":", "-": ":"}
-    words = [" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["words"]]
-    lemmas = [" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["lemmas"]]
+    pos_tag_map = {u"/": u":", u"-": u":"}
+    words = [u" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["words"]]
+    lemmas = [u" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["lemmas"]]
 
     parts = defaultdict(list)
     for i in range(len(words)):
         tokens = words[i].split()
         if len(tokens) != 1:
+
             # remap offsets
             char_start = sentence["char_offsets"][i]
-            char_end = char_start + len(sentence["words"][i]) + 1
+            #char_end = char_start + len(sentence["words"][i]) + 1
+
+            # use length of orginal text span
+            # ---------------------
+            j = sentence["char_offsets"][i+1] - sentence["char_offsets"][0] if i < len(sentence["char_offsets"])-1 else None
+            text_span = sentence["text"][char_start-sentence["char_offsets"][0]:j]
+            # ---------------------
+
+            char_end = char_start + len(text_span.strip()) + 1
             char_idxs = range(char_start, char_end)
+
             for t in tokens:
+                start = char_idxs[0]
+                # if this offset was originally a space, increment char_start
+                while sentence["text"][start-sentence["char_offsets"][0]] == " ":
+                    char_idxs = char_idxs[1:]
+                    start = char_idxs[0]
+
                 parts["char_offsets"] += [char_idxs[0]]
                 char_idxs = char_idxs[len(t):]
 
-                # fix syntactic tags
+            # fix syntactic tags
             pos_tag = sentence["poses"][i]
             parts["poses"] += [pos_tag if t not in pos_tag_map else pos_tag_map[t] for t in tokens]
             parts["dep_labels"] += [sentence["dep_labels"][i]] * len(tokens)
@@ -77,16 +108,26 @@ def retokenize_sentence(sentence, split_chars=["/", "-"]):
         offset = sentence["char_offsets"][0]
         i -= offset
         j = i + len(word)
-        if word != sentence["text"][i:j]:
-            print>> sys.stderr, "Warning -- char offset error"
-            print>> sys.stderr, word, "|", sentence["text"][i:j]
-            print>> sys.stderr, " ".join(parts["words"])
+        # some characters are automatically substituted by CoreNLP, so we won't have an exact string match
+        # (some of) these characters are stored in unicode_map
+        if word != sentence["text"][i:j] and sentence["text"][i:j] not in unicode_map:
+            continue
+            # print>> sys.stderr, "Warning -- char offset error"
+            # print>> sys.stderr, word, "|", sentence["text"][i:j], i, j, len(word)
+            # print>> sys.stderr, [sentence["text"]],"\n"
+            # print>> sys.stderr, " ".join(parts["words"]), "\n"
 
     # sanity check for token lengths
     t_sentence = parts.values()
     lengths = map(len, t_sentence)
     if lengths.count(max(lengths)) != len(lengths):
-        print>> sys.stderr, "Warning -- sentence conversion error"
+        # print>> sys.stderr, "Warning -- sentence conversion error"
+        # print>> sys.stderr, lengths
+        # print>> sys.stderr, sentence["text"]
+        # for item in parts:
+        #     print>> sys.stderr, item, parts[item]
+        # print>> sys.stderr, "-------------------"
+        return None
 
     parts['text'] = sentence["text"]
     parts['sent_id'] = sentence["sent_id"]
@@ -114,9 +155,13 @@ def char2idx(sentence, candidate):
 
     return idxs
 
+
 def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
     sent = retokenize_sentence(sentence) if split_chars else sentence
-    ner_tags = np.array(['O'] * len(sent.words))
+    if sent is None:
+        return None,None
+
+    ner_tags = np.array([u'O'] * len(sent.words))
 
     c_idx = {}
     for c in candidates:
@@ -131,10 +176,10 @@ def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
             continue
 
         if tag_fmt == "IOB2":
-            tag_seq = ['B'] + ['I'] * (len(idxs) - 1)
+            tag_seq = [u'B'] + [u'I'] * (len(idxs) - 1)
         else:
-            tag_seq = ['B'] + ['I'] * (len(idxs) - 1)
-            tag_seq = ["S"] if len(idxs) == 1 else tag_seq[0:-1] + ["E"]
+            tag_seq = [u'B'] + [u'I'] * (len(idxs) - 1)
+            tag_seq = [u"S"] if len(idxs) == 1 else tag_seq[0:-1] + [u"E"]
 
         ner_tags[idxs] = tag_seq
         for i in range(min(idxs), max(idxs) + 1):

@@ -17,6 +17,7 @@ from learning_utils import test_scores, calibration_plots, training_set_summary_
     LF_overlaps, LF_conflicts, LF_accuracies
 from pandas import Series, DataFrame
 from random import random
+import logging
 
 import math
 import numpy as np
@@ -27,6 +28,17 @@ from scipy.sparse import csc_matrix,csr_matrix,lil_matrix
 import codecs
 import cPickle as pickle
 from tokenizer import *
+
+logger = logging.getLogger('snorkel')
+
+class ProgressBar(object):
+    def __init__(self,steps):
+        self.steps = steps
+
+    def update(self,i):
+        progress = math.ceil(i / float(len(self.steps)) * 100)
+        sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, self.steps))
+        sys.stdout.flush()
 
 
 def mp_apply_lfs(lfs, candidates, nprocs):
@@ -756,7 +768,9 @@ class MultinomialSpanLearner(PipelinedLearner):
         ner_tags = defaultdict(list)
         for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples, threshold=threshold)):
             sent, tags = tag_sentence(sentence, cands)
-            tags = [t + "-{}".format(tagname) if t != "O" else t for t in tags]
+            if sent is None: # HACK sometimes retokenization fails do to char offsets.
+                continue
+            tags = [t + u"-{}".format(tagname) if t != u"O" else t for t in tags]
             ner_tags[sent.id].append(tags)
             sentences[sent.id] = sent
 
@@ -774,7 +788,6 @@ class MultinomialSpanLearner(PipelinedLearner):
                     for tags in ner_tags[sent_id]:
                         tagged = zip(sentence.words, sentence.poses, tags)
                         for word, pos_tag, ner_tag in tagged:
-                            #ner_tag = ner_tag + "-{}".format(tagname) if ner_tag != "O" else ner_tag
                             tag = (word, pos_tag, ner_tag)
                             fp.write(" ".join(tag) + u"\n")
                         fp.write(u"\n")
@@ -793,12 +806,12 @@ class MultinomialSpanLearner(PipelinedLearner):
         for progress, sent_id in enumerate(sorted(sentences)):
 
             if show_progress and progress % 100 == 0 or progress == len(sentences):
-                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format( ( progress / float(len(sentences)) * 100),
+                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format( (progress / float(len(sentences)) * 100),
                                                                      progress, len(sentences) ))
                 sys.stdout.flush()
 
             try:
-                # Candidate (bag) Samples
+                # Candidate Samples
                 samples = []
                 for i in range(num_samples):
 
@@ -824,7 +837,6 @@ class MultinomialSpanLearner(PipelinedLearner):
                         if rs in mentions:
                             rs = self.f_bags[bag_i][mentions.index(rs)]
                         elif rs == "<N/A>":
-                            #rs = None
                             continue
                         else:
                             print>>sys.stderr,"Warning: candidate sample error {}".format(rs)
