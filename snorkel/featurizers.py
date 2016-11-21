@@ -21,21 +21,21 @@ class KMeansFeaturizer(object):
         for t in tokens:
             if t.lower() in self.word2cluster:
                 ftr = 'WORD_CLUSTER_' + str(self.word2cluster[t.lower()])
+                #ftr = str(self.word2cluster[t.lower()])
                 yield ftr
         
 class AcronymFeaturizer(object):
     '''Requires document-level knowledge
     '''
-    def __init__(self,candidates):
+    def __init__(self, documents, featurizer):
         self.accept_rgx = '[0-9A-Z-]{2,8}[s]*'
         self.reject_rgx = '([0-9]+/[0-9]+|[0-9]+[-][0-7]+)'
         
-        self.docs = [c.metadata["doc"] for c in candidates if "doc" in c.metadata]
+        self.docs = documents
         self.short_form_index = self.get_short_form_index(self.docs)
         self.ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
-        #self.global_ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
-        
-        self.featurizer = NgramFeaturizer(use_acronym_ftrs=False)
+
+        self.featurizer = featurizer
         
         # compute features for each short form
         for doc_id in self.short_form_index:
@@ -44,17 +44,7 @@ class AcronymFeaturizer(object):
                 for lf in self.short_form_index[doc_id][sf]:
                     ftrs += self.get_short_form_ftrs(lf)
                 self.ftr_index[doc_id][sf] = list(set(ftrs))
-                #print sf, len(self.ftr_index[doc_id][sf]), self.ftr_index[doc_id][sf][0:10]
-                #print
-                #if sf not in self.global_ftr_index:
-                #    self.global_ftr_index[sf] = []
-                #self.global_ftr_index[sf] += self.ftr_index[doc_id][sf]
-        
-        #for sf in self.global_ftr_index:
-        #    print sf, len(self.global_ftr_index[sf]), self.global_ftr_index[sf]
 
-        
-        
 
     def is_short_form(self, s, min_length=2):
         '''
@@ -76,6 +66,7 @@ class AcronymFeaturizer(object):
         
         return False if reject else True
 
+
     def get_parenthetical_short_forms(self, sentence):
         '''
         Generator that returns indices of all words 
@@ -87,7 +78,8 @@ class AcronymFeaturizer(object):
                 if (window[0] == "(" and window[-1] == ")"):
                     if self.is_short_form(window[1]):
                         yield i
-        
+
+
     def extract_long_form(self, i, sentence, max_dup_chars=2):
         '''
         Search the left window for a candidate long-form sequence.
@@ -179,6 +171,7 @@ class AcronymFeaturizer(object):
                     
         return sf_index
 
+
     def get_ftrs(self,c):
         word = c.get_attrib_span("words")
         w_ftrs = []
@@ -187,26 +180,17 @@ class AcronymFeaturizer(object):
            
         for i,ftr in enumerate(w_ftrs):
             yield ftr
-        
-        
-        
-    def get_short_form_ftrs(self,c):
-        '''Hack to filter out some features'''
-        ftrs = self.featurizer.get_features_by_candidate(c)
-        f_ftrs = []
-        #rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|TDL_|WS_)" 
-        rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|WS_)" 
-        for f in ftrs:
-            if not re.search(rgx,f):
-                continue
-            if "WS_LEMMA_" in f:
-                continue
-            f_ftrs += [f]
-            
-        tokens = c.get_attrib_tokens("lemmas")
-        for t in tokens:
-            f_ftrs += ["TDL_LEMMA:MENTION[{}]".format(t)]
-        f_ftrs += ["WS_SHORT_FORM_DEFINED"]
-        return list(set(f_ftrs))
 
-from features import NgramFeaturizer  
+
+    def get_short_form_ftrs(self,c):
+        ftrs = list(self.featurizer.get_ftrs(c))
+
+        ftrs = [f for f in ftrs if f not in ["BOS","EOS"] and not re.search("^[+-]*1:",f)]
+        #ftrs += ["word.lower=%s" % c.get_attrib_span("words").lower().replace(" ","_")]
+        ftrs += ["word.span=%s" % c.get_attrib_span("words").lower().replace(" ", "_")]
+
+        # just add word tokens
+        #for t in c.get_attrib_span("words").lower().split():
+        #   ftrs += ["word.lower=%s" % t]
+
+        return ftrs
