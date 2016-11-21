@@ -112,21 +112,21 @@ def retokenize_sentence(sentence, split_chars=[u"/", u"-"]):
         # (some of) these characters are stored in unicode_map
         if word != sentence["text"][i:j] and sentence["text"][i:j] not in unicode_map:
             continue
-            # print>> sys.stderr, "Warning -- char offset error"
-            # print>> sys.stderr, word, "|", sentence["text"][i:j], i, j, len(word)
-            # print>> sys.stderr, [sentence["text"]],"\n"
-            # print>> sys.stderr, " ".join(parts["words"]), "\n"
+            print>> sys.stderr, "Warning -- char offset error"
+            print>> sys.stderr, word, "|", sentence["text"][i:j], i, j, len(word)
+            print>> sys.stderr, [sentence["text"]],"\n"
+            print>> sys.stderr, " ".join(parts["words"]), "\n"
 
     # sanity check for token lengths
     t_sentence = parts.values()
     lengths = map(len, t_sentence)
     if lengths.count(max(lengths)) != len(lengths):
-        # print>> sys.stderr, "Warning -- sentence conversion error"
-        # print>> sys.stderr, lengths
-        # print>> sys.stderr, sentence["text"]
-        # for item in parts:
-        #     print>> sys.stderr, item, parts[item]
-        # print>> sys.stderr, "-------------------"
+        print>> sys.stderr, "Warning -- sentence conversion error"
+        #print>> sys.stderr, lengths
+        #print>> sys.stderr, sentence["text"]
+        #for item in parts:
+        #    print>> sys.stderr, item, parts[item]
+        #print>> sys.stderr, "-------------------"
         return None
 
     parts['text'] = sentence["text"]
