@@ -108,30 +108,6 @@ class SciKitLR(NoiseAwareModel):
         return self.model.predict_proba(X)
 
 
-class LogRegSklearn(NoiseAwareModel):
-    """Logistic regression."""
-    def __init__(self, bias_term=False):
-        self.w         = None
-        self.bias_term = bias_term
-
-    def train(self, X, training_marginals=None, n_iter=1000, w0=None, rate=DEFAULT_RATE, alpha=DEFAULT_ALPHA, \
-            mu=DEFAULT_MU, sample=False, n_samples=100, evidence=None, warm_starts=False, tol=1e-6, \
-            verbose=True):
-        
-        #self.model = linear_model.LogisticRegression(**scikit_params)
-        self.model = linear_model.LogisticRegression(penalty='l1', C=1.0, dual=False) #dual=False, tol=0.0001, C=1.0, bias_term=False
-       
-        ypred = [1 if x > 0.5 else 0 for x in training_marginals] 
-        self.model.fit(X, ypred)
-       
-        # Return learned weights
-        self.w = self.model.coef_.flatten()
-        
-    
-    def marginals(self, X):
-        m = self.model.predict_proba(X)
-        return self.model.predict_proba(X)[...,1]
-
 
 class LogRegSimple(NoiseAwareModel):
     def __init__(self, bias_term=False):
@@ -175,6 +151,8 @@ class LogRegSimple(NoiseAwareModel):
         w = w0.copy()
         g = np.zeros(M)
 
+        step_update_rate = 250 # print updates at this rate
+
         # Scipy optimize
         if method == 'L-BFGS':
             print "Using L-BFGS-B..."
@@ -186,7 +164,7 @@ class LogRegSimple(NoiseAwareModel):
         elif method == 'GD':
             print "Using gradient descent..."
             for step in range(n_iter):
-                if step % 100 == 0:
+                if step % step_update_rate == 0:
                     print "\tLearning epoch = {}\tStep size = {}".format(step, rate)
 
                 # Compute the gradient step
@@ -206,7 +184,7 @@ class LogRegSimple(NoiseAwareModel):
 
                 # Compute the loss
                 L = self._loss(X, w, m_t, mu, alpha)
-                if step % 100 == 0:
+                if step % step_update_rate == 0:
                     print "\tLoss = {:.6f}\tGradient magnitude = {:.6f}".format(L, np.linalg.norm(g0, ord=2))
 
                 # Momentum term
@@ -237,6 +215,7 @@ class LogRegSimple(NoiseAwareModel):
             raise NotImplementedError()
 
     def marginals(self, X):
+        print "LogRegSimple.marginals"
         return odds_to_prob(X.dot(self.w))
 
 
@@ -262,8 +241,6 @@ class LogReg(NoiseAwareModel):
         * warm_starts:
         * tol:         For testing for SGD convergence, i.e. stopping threshold
         """
-        print "Using alpha",alpha
-        
         # First, we remove the rows (candidates) that have no LF coverage
         if training_marginals is not None:
             covered            = np.where(np.abs(training_marginals - 0.5) > 1e-3)[0]
@@ -340,8 +317,7 @@ class LogReg(NoiseAwareModel):
         self.w = w
 
     def marginals(self, X):
-        print "LogReg() Marginals", odds_to_prob(X.dot(self.w)).shape
-        print  odds_to_prob(X.dot(self.w)).flatten()
+        print "LogReg.marginals"
         return odds_to_prob(X.dot(self.w))
 
 
@@ -356,4 +332,5 @@ class LSTM(NoiseAwareModel):
         self.lstm.train(**hyperparams)
 
     def marginals(self, test_candidates):
+        print "LSTM.marginals"
         return self.lstm.test(test_candidates)

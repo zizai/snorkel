@@ -8,6 +8,7 @@ import re
 import numpy as np
 from collections import defaultdict
 from .parser import Sentence
+import itertools
 
 unicode_map = {u'‘':u"'",
                u"’s":u"'s",
@@ -25,7 +26,7 @@ def tokenize(s, split_chars):
 
     s = s.replace(u"\xa03", u"_")  # HACK
     tokens = s.split()
-    rgx = r'([{}]+)+'.format(u"".join(split_chars))
+    rgx = r'([{}]+)+'.format(u"".join(sorted(split_chars)))
     t_tokens = []
     for t in tokens:
 
@@ -54,8 +55,13 @@ def tokenize(s, split_chars):
     seq = re.sub(u"\s{2,}",u" ",u" ".join(t_tokens))
     return seq.split()
 
-def retokenize_sentence(sentence, split_chars=[u"/", u"-"]):
+def retokenize_sentence(sentence, split_chars=[u"/", u"-", u"+"]):
     '''Force new tokenization and create new Sentence object'''
+    try:
+        sentence = sentence._asdict()
+    except:
+        pass
+
     pos_tag_map = {u"/": u":", u"-": u":"}
     words = [u" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["words"]]
     lemmas = [u" ".join(tokenize(w, split_chars=split_chars)) for w in sentence["lemmas"]]
@@ -67,7 +73,6 @@ def retokenize_sentence(sentence, split_chars=[u"/", u"-"]):
 
             # remap offsets
             char_start = sentence["char_offsets"][i]
-            #char_end = char_start + len(sentence["words"][i]) + 1
 
             # use length of orginal text span
             # ---------------------
@@ -92,16 +97,37 @@ def retokenize_sentence(sentence, split_chars=[u"/", u"-"]):
             pos_tag = sentence["poses"][i]
             parts["poses"] += [pos_tag if t not in pos_tag_map else pos_tag_map[t] for t in tokens]
             parts["dep_labels"] += [sentence["dep_labels"][i]] * len(tokens)
-            parts["dep_parents"] += [sentence["dep_parents"][i]] * len(tokens)
+            parts["dep_parents"] += [[sentence["dep_parents"][i]] * len(tokens)]
             parts["lemmas"] += lemmas[i].split()
             parts["words"] += tokens
+
         else:
             parts["char_offsets"] += [sentence["char_offsets"][i]]
             parts["words"] += tokens
             parts["lemmas"] += lemmas[i].split()
             parts["poses"] += [sentence["poses"][i]]
             parts["dep_labels"] += [sentence["dep_labels"][i]]
-            parts["dep_parents"] += [sentence["dep_parents"][i]]
+            parts["dep_parents"] += [[sentence["dep_parents"][i]]]
+
+    # repair dependency tree
+    # ---------------------
+    shift = defaultdict(int)
+    for t in parts["dep_parents"]:
+        if len(t) > 1:
+            shift[t[0]] += len(t) - 1
+
+    parts["dep_parents"] = [t for t in itertools.chain.from_iterable(parts["dep_parents"])]
+
+    transform = {}
+    for parent in sorted(set(parts["dep_parents"])):
+        curr_shift = 0
+        for offset in shift:
+            if parent >= offset:
+                curr_shift += shift[offset]
+        transform[parent] = parent + curr_shift
+
+    parts["dep_parents"] = [ transform[t] for t in parts["dep_parents"]]
+    # ---------------------
 
     # sanity check for character offsets
     for (i, word) in zip(parts["char_offsets"], parts["words"]):

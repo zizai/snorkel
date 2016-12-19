@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 from features import Featurizer
 from learning import LogReg, odds_to_prob, SciKitLR
+from learning_mn import MnLogReg
+
 from lstm import *
 from learning_utils import test_scores, calibration_plots, training_set_summary_stats, sparse_abs, LF_coverage, \
     LF_overlaps, LF_conflicts, LF_accuracies
@@ -23,6 +25,7 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 from itertools import combinations
+import itertools
 from scipy.sparse import csc_matrix,csr_matrix,lil_matrix
 
 import codecs
@@ -39,6 +42,11 @@ class ProgressBar(object):
         progress = math.ceil(i / float(len(self.steps)) * 100)
         sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, self.steps))
         sys.stdout.flush()
+
+    def stop(self):
+        sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(100.0, self.steps, self.steps))
+        sys.stdout.flush()
+        sys.stdout.write('Complete\n')
 
 
 def mp_apply_lfs(lfs, candidates, nprocs):
@@ -63,7 +71,7 @@ def mp_apply_lfs(lfs, candidates, nprocs):
         procs.append(p)
         p.start()
 
-    # Collect all results 
+    # Collect all results
     resultdict = {}
     for i in range(nprocs):
         resultdict.update(out_queue.get())
@@ -101,7 +109,7 @@ class TrainingSet(object):
         self.dev_candidates      = None
         self.dev_labels          = None
         self.L_dev               = None
-        
+
         self.summary_stats()
 
     def transform(self, candidates, fit=False):
@@ -140,7 +148,7 @@ class TrainingSet(object):
             'overlaps'  : Series(data=LF_overlaps(self.L), index=self.lf_names),
             'conflicts' : Series(data=LF_conflicts(self.L), index=self.lf_names)
         }
-        
+
         # Empirical stats, based on supplied development set
         if dev_candidates and dev_labels is not None:
             if self.L_dev is None or dev_candidates != self.dev_candidates or any(dev_labels != self.dev_labels):
@@ -152,7 +160,7 @@ class TrainingSet(object):
             n = sparse_abs(self.L_dev).sum(axis=0)
             n = np.ravel(n).astype(np.int32)
             d["n"] = Series(data=n, index=self.lf_names)
-            
+
         return DataFrame(data=d, index=self.lf_names)
 
 
@@ -164,7 +172,7 @@ class Learner(object):
 
     As input takes a TrainingSet object and a NoiseAwareModel object (the discriminative model to train).
     """
-    def __init__(self, training_set, model=None):
+    def __init__(self, training_set, model=None, gen_model=LogReg()):
         self.training_set = training_set
         self.model        = model
 
@@ -184,6 +192,8 @@ class Learner(object):
         self.L_test          = None
         self.F_test          = None
         self.X_test          = None
+
+        self.gen_model = gen_model
 
     def _set_model_X(self, L, F):
         """Given LF matrix L, feature matrix F, return the matrix used by the end discriminative model."""
@@ -275,8 +285,7 @@ class PipelinedLearner(Learner):
     def train_lf_model(self, w0=1.0, **model_hyperparams):
         """Train the first _generative_ model of the LFs"""
         w0 = w0*np.ones(self.m)
-        self.training_model =  LogReg() #SciKitLR() 
-        
+        self.training_model =  self.gen_model
         self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
         # Compute marginal probabilities over the candidates from this model of the training set
@@ -292,7 +301,7 @@ class PipelinedLearner(Learner):
 
     def train(self, feat_w0=0.0, lf_w0=5.0, class_balance=False, **model_hyperparams):
         """Train model: **as default, use "joint" approach**"""
-        print "Training LF model... {}".format(lf_w0)
+
         training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
         self.training_marginals = training_marginals
 
@@ -305,6 +314,7 @@ class PipelinedLearner(Learner):
             print "Number of positive:", pp
             print "Number of negative:", nn
             majority = neg if nn > pp else pos
+            minority = pos if nn > pp else neg
 
             # Just set the non-subsampled members to 0.5, so they will be filtered out
             for i in majority:
@@ -343,147 +353,433 @@ class RepresentationLearner(PipelinedLearner):
     def predictions(self):
         return self.model.predict(self.test_candidates)
 
-class CRFSpanLearner(PipelinedLearner):
-    """
-    Implements the _pipelined_ approach for an end model that also learns a representation
-    """
-    def train(self, lf_w0=5.0, **model_hyperparams):
-        """Train model: **as default, use "joint" approach**"""
-        print "Training LF model... {}".format(lf_w0)
-        training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
-        self.training_marginals = training_marginals
 
-    def make_single_bag(self, span_bag, thresh):
-        span_bag.append((None, 0.))
-        # normalize probability
-        # New sampling approach
-        for z in range(len(span_bag)):
-            span_bag[z] = (span_bag[z][0], span_bag[z][1] if span_bag[z][1] > thresh else 0.)
-        s = sum(c[1] for c in span_bag)
-        if s > 0.1:
-            span_bag = [(c, p / s) for c, p in span_bag]
-        else:
-            span_bag = None
-        return span_bag
 
-    def get_all_sentence(self):
-        sentences={}
-        for c in self.training_set.training_candidates:
-            if c.sent_id not in sentences:
-                sentence = c.sentence
-                sentence['xmltree'] = None
-                sentences[c.sent_id] = sentence
-        self.sentences = sentences
+class SpanLearner(PipelinedLearner):
 
-    def generate_span_bags(self, thresh=0.0, **model_hyperparams):
-        self.train(**model_hyperparams)
-        self.get_all_sentence()
-        # Group candidates based on sentence id
-        candidate_group = dict()
-        for c, p in zip(self.training_set.training_candidates, self.training_marginals):
-            #if p < thresh: continue
-            if c.sent_id not in candidate_group:
-                candidate_group[c.sent_id] = []
-            candidate_group[c.sent_id].append((c, p))
+    #def __init__(self,split_chars=[]):
+    #    self.split_chars=split_chars
+    #    pass
 
-        span_bags = []
-        for k, v in candidate_group.iteritems():
-            v.sort(key=lambda x: x[0].word_start, reverse=False)
-            span_bag = []
-            word_end = -1
-            for i in v:
-                if word_end != -1 and i[0].word_start > word_end:
-                    span_bags.append(self.make_single_bag(span_bag, thresh))
-                    span_bag = [i]
-                    word_end = i[0].word_end
+    def train_gen_model(self,lf_w0=5.0, **model_hyperparams):
+        print "\nTraining generative model..."
+        self.training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+
+    def train_disc_model(self,  feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
+        if self.model:
+            print "\nTraining discriminitive model..."
+            self.train_model(self.training_marginals, w0=feat_w0, **model_hyperparams)
+
+    def _get_sentence_bags(self, candidates):
+        '''All disjoint (non-overlapping) spans in candidate set'''
+        candidates = zip(*sorted([(c.char_start, c) for c in candidates]))[1]
+
+        bags = []
+        curr = [candidates[0]]
+        for i in range(1, len(candidates)):
+            if not curr:
+                curr += [candidates[i]]
+                continue
+
+            span_overlap = False
+            for c in curr:
+                if overlaps(c, candidates[i]):
+                    span_overlap = True
+
+            if span_overlap:
+                curr += [candidates[i]]
+            else:
+                bags += [curr]
+                curr = [candidates[i]]
+        if curr:
+            bags += [curr]
+
+        for b in bags:
+            yield b
+
+    def _get_bags(self, candidates, split_chars=["/"]):
+        """
+        Create span bags for multinomial classification
+        :param candidates:
+        :return:
+        """
+        L = self.training_set.L
+
+        # building bags by starting with positive labeled candidates
+        coverage = np.zeros(L.shape[0])
+        coverage[(L < 0).nonzero()[0]] = -1
+        coverage[(L > 0).nonzero()[0]] = 1
+
+        # sentence candidates
+        sent_cands = defaultdict(list)
+        for i, c in enumerate(candidates):
+            if coverage[i] == 0:
+                continue
+            sent_cands[c.sent_id].append(c)
+
+        bags = []
+        for i, sent_id in enumerate(sent_cands):
+            sent_bags = []
+            for b in self._get_sentence_bags(sent_cands[sent_id]):
+                sent_bags.append(b)
+
+            # TODO: add heuristic to break up very long bags
+
+            # sanity check for disjoint bags
+            if disjoint(sent_bags):
+                print>> sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
+                disjoint(sent_bags, verbose=True)
+
+            bags += sent_bags
+
+        return bags
+
+    def generate_span_bags(self, thresh=0.0, break_on=["/"], **model_hyperparams):
+        self.span_bags = self._get_bags(self.training_set.training_candidates)
+
+
+    def _set_span(self, candidates):
+        '''Get candidate set span'''
+        offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
+        i, j = min(offsets), max(offsets)
+        text = candidates[0].sentence["text"]
+        offset = candidates[0].sentence["char_offsets"][0]
+        s = text[i - offset:j - offset + 1]
+        return s, (i - offset, j - offset + 1)
+
+    # ------------------------------
+
+    def train_lf_model(self, w0=5.0, **model_hyperparams):
+
+        num_lfs = self.training_set.L.shape[1]
+        lf_w = np.array([w0] * num_lfs)
+
+        # multinomial
+        if type(self.gen_model) is MnLogReg:
+            print "\nMultinomial LogReg generative model"
+            self.generate_span_bags()
+
+            Xs, Ys, classes, f_bags = self.lf_prob(include_neg=True)
+
+            self.Xs = Xs
+            self.Ys = Ys
+            self.classes = classes
+            self.f_bags = f_bags
+
+            self.gen_model.train(Xs, w0=lf_w, **model_hyperparams)
+
+            marginals = []
+            mn_marginals = self.gen_model.marginals(self.Xs)
+            #cand_index = {c: i for i in range(len(f_bags)) for c in f_bags[i]}
+            cand_index = {}
+            for i in range(len(f_bags)):
+                for c in f_bags[i]:
+                    cand_index[c] = i
+
+
+            # marginals for multinomials are per spanset, so we need to flatten
+            # matrices back to our original observed candidate set
+            # candidate with no LF coverage are assumed 0.5 (random)
+            for c in self.training_set.training_candidates:
+
+                if c not in cand_index:
+                    print>> sys.stderr, "MISSING in candidate index (skipped)", c
+                    marginals.append(0.5)
+                    continue
+
+                i = cand_index[c]
+
+                mention = c.get_attrib_span("words").replace(" ", "")
+                classes = [x.replace(" ", "") for x in self.classes[i]]
+                if mention not in classes:
+                    # HACK fix this bug with words and punctuation
+                    print "Multinomial Seq Error", c
+                    print mention
+                    print classes
+                    marginals.append(0.5)
                 else:
-                    span_bag.append(i)
-                    word_end = max(word_end, i[0].word_end)
-            if span_bag != []:
-                span_bags.append(self.make_single_bag(span_bag, thresh))
-        self.span_bags = [_ for _ in span_bags if _ is not None]
+                    k = classes.index(mention)
+                    marginals.append(mn_marginals[i][k])
 
-    def print_to_file(self, tag = '', num_sample = 10, filename = 'conll_format_data.txt', format = 'conll'):
-        if format == 'conll':
-            with codecs.open(filename,"w","utf-8") as fp:
-                span_bag_group_by_sent = {}
-                for span_bag in self.span_bags:
-                    sent_id = span_bag[0][0].sent_id
-                    if sent_id not in span_bag_group_by_sent:
-                        span_bag_group_by_sent[sent_id] = []
-                    span_bag_group_by_sent[sent_id].append(span_bag)
-                self.span_bag_group_by_sent = span_bag_group_by_sent
-                sent_ids = []
-                for k, v in span_bag_group_by_sent.iteritems():
-                    words = v[0][0][0].sentence['words']
-                    poses = v[0][0][0].sentence['poses']
-                    sent_ids.append(k)
-                    samples = []
-                    for span_bag in v:
-                        samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
-                    for i in range(num_sample):
-                        tags = ['O'] * len(words)
-                        for idx, span_bag in enumerate(v):
-                            c = span_bag[samples[idx][i]][0]
-                            if c is None: continue
-                            for x in c.idxs:
-                                if x == min(c.idxs):
-                                    tags[x] = 'B-' + tag.strip()
-                                else:
-                                    tags[x] = 'I-' + tag.strip()
-                        for idx, w in enumerate(words):
-                            # HACK
-                            w = w.replace(u"\xa0","_")
-                            fp.write(w + ' ' + poses[idx] + ' ' + tags[idx] + '\n')
-                        fp.write('\n')
-                # sample sentence without tags
-                for k, v in self.sentences.iteritems():
-                    if k not in sent_ids:
-                        for i in range(num_sample):
-                            for idx in range(len(v['words'])):
-                                fp.write(v['words'][idx] + ' ' + v['poses'][idx] + ' O\n')
-                            fp.write('\n')
-        elif format == 'pkl':
-                span_bag_group_by_sent = {}
-                for span_bag in self.span_bags:
-                    sent_id = span_bag[0][0].sent_id
-                    if sent_id not in span_bag_group_by_sent:
-                        span_bag_group_by_sent[sent_id] = []
-                    span_bag_group_by_sent[sent_id].append(span_bag)
-                self.span_bag_group_by_sent = span_bag_group_by_sent
-                output_pkl = dict()
-                sent_ids = []
-                for k, v in span_bag_group_by_sent.iteritems():
-                    sent_id = v[0][0][0].sent_id
-                    cand = v[0][0][0].sentence
-                    sent_ids.append(k)
-                    cand['xmltree'] = None
-                    sent_tags = []
-                    words = v[0][0][0].sentence['words']
-                    samples = []
-                    for span_bag in v:
-                        samples.append(np.random.choice(len(span_bag), num_sample, p=[c[1] for c in span_bag]))
-                    for i in range(num_sample):
-                        tags = ['O'] * len(words)
-                        for idx, span_bag in enumerate(v):
-                            c = span_bag[samples[idx][i]][0]
-                            if c is None: continue
-                            for x in c.idxs:
-                                if x == min(c.idxs):
-                                    tags[x] = 'B-' + tag.strip()
-                                else:
-                                    tags[x] = 'I-' + tag.strip()
-                        sent_tags.append(tags)
-                    output_pkl[sent_id] = {'sent': cand, 'tags': sent_tags}
-                # sample sentence without tags
-                for k, v in self.sentences.iteritems():
-                    if k not in sent_ids:
-                        sent_tags = [['O'] * len(v['poses']) for i in range(num_sample)]
-                        output_pkl[k] = {'sent': v, 'tags': sent_tags}
-                pickle.dump(output_pkl, open(filename, "w"))
+            self.marginals = mn_marginals
+
+            return np.array(marginals)
+
+        # binary
         else:
-            print >> sys.stderr, "Unknown output format."
-            return
+            print "\nBinary LogReg generative model"
+            w0 = w0 * np.ones(self.m)
+            self.gen_model.train(self.L_train, w0=lf_w, **model_hyperparams)
+            return self.gen_model.marginals(self.L_train)
+
+
+    def _get_class_idx(self, candidate, classes):
+        pass
+
+
+    def _bag_arity(self, bag, split_chars=["/", "-"]):
+        '''Determine num_words per bag,
+        forcing splits on certain characters '''
+        s, (i, j) = self._set_span(bag)
+        seq = tokenize(s, split_chars)
+        return (2 ** len(seq)), seq
+
+
+    def bag_lf_prob(self, bag, L, sparsity_threshold=1024):
+        '''Create the M x D_i (num_lfs X num_classes) matrix
+        '''
+        num_lfs = self.training_set.L.shape[1]
+        candidates = [c for c in bag if c != None]
+
+        # generate class space and candidate instances
+        seq, instances = self.candidate_multinomials(candidates)
+        P = np.zeros((num_lfs, 2**len(seq))) # M x D_i probabilty distrib
+        idxs = range(0, len(seq))
+        classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
+
+        if len(instances) != len({s:1 for s in instances}):
+            print "ERROR!!"
+
+        classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
+
+        # HEURISTIC: if all LFs vote negative, assign all mass to <N/A>
+        assign_na = False
+        if np.all(L.toarray() <= 0):
+            assign_na = True
+
+        # compute probability matrix
+        row, col = L.nonzero()
+        for c_i in row:
+            for lf_j in col:
+                if not assign_na:
+                    try:
+                        k = classes[instances[c_i]]
+                        P[lf_j, k] += L[c_i, lf_j]
+                    except:
+                        print "FAILURE", k, classes, c_i, P.shape, (lf_j, k)
+
+                else:
+                    k = classes[tuple()]
+                    P[lf_j, k] += 1
+
+        P = (P.T - np.min(P, axis=1)).T
+        P = (P.T / np.sum(P, axis=1)).T
+        P[np.isnan(P)] = 0
+
+        # force sparse matrix give some candidate space size
+        #if k > sparsity_threshold:
+        #    P = csr_matrix(P)
+
+        class_names = []
+        classes = zip(*sorted(classes.items(), key=lambda x: x[1], reverse=0))[0]
+        seq = np.array(seq)
+        for key in classes:
+            if len(key) == 0:
+                class_names += ["<N/A>"]
+                continue
+            class_names += [" ".join(seq[np.array(key)])]
+
+        # specific instance indices
+        instances = [classes[idxs] for idxs in instances]
+
+        return P, classes, class_names, instances
+
+    '''
+    def _force_tokenize(self, candidates, split_chars=[]):
+
+        idxs = set(itertools.chain.from_iterable([c.idxs for c in candidates]))
+        idxs = sorted(list(idxs))
+        offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
+        i, j = min(offsets), max(offsets)
+
+        tokens = []
+        words = candidates[0].sentence["words"][min(idxs):max(idxs)+1]
+
+        for w in words:
+            rgx = r'([{}]+)+'.format("".join(split_chars))
+            tokens += [re.sub(rgx, r' \1 ', w)]
+
+        return np.array(tokens), idxs
+    '''
+
+    def candidate_multinomials(self, candidates, split_chars=["/", "-", "+"]):
+        '''convert candidates to tokenized binary sequences '''
+        sentence = candidates[0].sentence
+        offset = sentence["char_offsets"][0]
+        char_offsets = [i - offset for i in sentence["char_offsets"]]
+
+        # candidate span
+        span = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
+        start, end = min(span), max(span)
+        idxs = sorted(list(set(itertools.chain.from_iterable([c.idxs for c in candidates]))))
+
+        # current tokenization
+        splits = char_offsets[min(idxs):max(idxs)+1] + [end - offset + 1]
+        tokens = []
+        for k in range(len(splits)-1):
+            i,j = splits[k], splits[k + 1]
+            t = sentence["text"][i:j].strip()
+            tokens += [[t, [i, i + len(t)]]]
+
+        # force additional tokenization
+        t_tokens = []
+        for t in tokens:
+            term,span = t
+            rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
+            t_term = re.sub(rgx, r' \1 ', term)
+
+            if t_term != term:
+                t_spans = []
+                curr = span[0]
+                for t1 in t_term.split():
+                    t_spans += [ [t1, [curr, curr+len(t1)]] ]
+                    curr = curr + len(t1)
+                t_tokens.extend(t_spans)
+            else:
+                t_tokens.append(t)
+
+        # create candidate instances (subsequences)
+        instances = []
+        tokens, charmap = zip(*t_tokens)
+        for c in candidates:
+            offset = c.sentence["char_offsets"][0]
+            i,j = c.char_start - offset, c.char_end - offset
+            idxs = []
+            for k in range(len(charmap)):
+                ii,jj = charmap[k]
+                jj -= 1 # use token slots, otherwise overlap detection is off by one
+                if max(i, ii) <= min(j, jj):
+                    idxs += [k]
+            instances += [tuple(idxs)]
+
+        return tokens, instances
+
+
+    def lf_prob(self, include_neg=True, class_threshold=8192):
+
+        Xs, Ys, strs, f_bags, f_instances = [], [], [], [], []
+        L = self.training_set.L
+        cand_idx = {c: i for i, c in enumerate(self.training_set.training_candidates)}
+
+        for i, bag in enumerate(self.span_bags):
+
+            # skip long classes
+            k, _ = self._bag_arity(bag)
+            if k > class_threshold:
+                print "SKIPPING", class_threshold, k
+                continue
+
+            # build LF matrix for bag candidates
+            idxs = [cand_idx[c] for c in bag]
+            prob, classes, seqs, instances = self.bag_lf_prob(bag, L[idxs])
+
+            if not include_neg and np.all(L[idxs].toarray() <= 0):
+                continue
+
+            Xs += [prob]
+            Ys += [classes]
+            strs += [seqs]
+            f_bags += [bag]
+            f_instances += [instances]
+            
+        return Xs, Ys, strs, f_bags
+
+
+    def export(self, outfile, marginals=None, num_samples=10,
+               tagname="DISEASE", fmt="pkl", threshold=0.0):
+        '''Export tagged sentences to file of given format'''
+        if marginals == None:
+            marginals = self.marginals
+
+        sentences = {}
+        ner_tags = defaultdict(list)
+        for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples, threshold=threshold)):
+            sent, tags = tag_sentence(sentence, cands)
+            if sent is None:  # HACK sometimes re-tokenization fails due to char offsets.
+                continue
+            tags = [t + u"-{}".format(tagname) if t != u"O" else t for t in tags]
+            ner_tags[sent.id].append(tags)
+            sentences[sent.id] = sent
+
+        if fmt == "pkl":
+            pkl = {}
+            for sent_id in sentences:
+                sent = sentences[sent_id]
+                pkl[sent_id] = {"sent": sent._asdict(), "tags": ner_tags[sent_id]}
+            cPickle.dump(pkl, open(outfile, "w"))
+
+        elif fmt == "conll":
+            with codecs.open(outfile, "w", "utf-8") as fp:
+                for sent_id in sentences:
+                    sentence = sentences[sent_id]
+                    for tags in ner_tags[sent_id]:
+                        tagged = zip(sentence.words, sentence.poses, tags)
+                        for word, pos_tag, ner_tag in tagged:
+                            tag = (word, pos_tag, ner_tag)
+                            fp.write(" ".join(tag) + u"\n")
+                        fp.write(u"\n")
+
+    def sample(self, marginals, num_samples=10, format="conll",
+               threshold=0.0, show_progress=False):
+
+        cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
+        sentences = {c.sent_id: c.sentence for c in cands}
+
+        sent_bags_idxs = defaultdict(list)
+        for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
+            sent_bags_idxs[sent_id].append(i)
+
+        for progress, sent_id in enumerate(sorted(sentences)):
+
+            if show_progress and progress % 100 == 0 or progress == len(sentences):
+                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format((progress / float(len(sentences)) * 100),
+                                                                    progress, len(sentences)))
+                sys.stdout.flush()
+
+            #try:
+            samples = []
+            for i in range(num_samples):
+
+                s_cand_set = []
+                for bag_i in sent_bags_idxs[sent_id]:
+
+                    # restrict samples to known candidates (i.e., ignore impossible samples, like discontinuous spans)
+                    prob = sorted(zip(marginals[bag_i], self.classes[bag_i]), reverse=1)
+                    mentions = []
+                    for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
+                        mentions += [" ".join(tokenize(m, split_chars=["/", "-", "+"]))]
+
+                    # threshold prob. if threshold is too high, choose max(prob)
+                    if threshold > 0.0 and max(zip(*prob)[0]) < threshold:
+                        threshold = max(zip(*prob)[0])
+
+                    dist = [[p, name] for p, name in prob if
+                            (name in mentions or name == '<N/A>') and p >= threshold]
+                    m = zip(*dist)[0]
+                    p = [(p / sum(m), name) for p, name in dist]
+
+                    p, classes = zip(*p)
+                    rs = np.random.choice(classes, 1, p=p)[0]
+                    if rs in mentions:
+                        rs = self.f_bags[bag_i][mentions.index(rs)]
+                    elif rs == "<N/A>":
+                        continue
+                    else:
+                        print>> sys.stderr, "Warning: candidate sample error {}".format(rs)
+                        continue
+                    s_cand_set += [(rs, bag_i)]
+
+                samples += [s_cand_set]
+
+            # Generate Sentence Samples
+            # consisting of sentence + candidate list
+            for cs in samples:
+                cs = [c[0] for c in cs]
+                yield (sentences[sent_id], cs)
+
+            #except Exception as e:
+            #    print>> sys.stderr, "Warning -- sampling error!", e
+            #    continue
 
 
 def expand_pos_tag(word, tag):
@@ -509,7 +805,7 @@ def align(a, b):
 
 def tokenize(s, split_chars):
     '''Force tokenization'''
-    rgx = r'([{}]+)+'.format("".join(split_chars))
+    rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
     seq = re.sub(rgx, r' \1 ', s)
     seq = seq.replace("'s", " 's")
     return seq.replace("s'", "s '").split()
@@ -537,319 +833,3 @@ def disjoint(sent_bags, verbose=False):
                 print spans[i], spans[j]
     return v
 
-
-class MultinomialSpanLearner(PipelinedLearner):
-
-    def _get_sentence_bags(self, candidates):
-        '''All disjoint (non-overlapping) spans in candidate set'''
-        candidates = zip(*sorted([(c.char_start, c) for c in candidates]))[1]
-
-        bags = []
-        curr = [candidates[0]]
-        for i in range(1,len(candidates)):
-            if not curr:
-                curr += [candidates[i]]
-                continue
-
-            span_overlap = False
-            for c in curr:
-                if overlaps(c, candidates[i]):
-                    span_overlap = True
-
-            if span_overlap:
-                curr += [candidates[i]]
-            else:
-                bags += [curr]
-                curr = [candidates[i]]
-        if curr:
-            bags += [curr]
-
-        for b in bags:
-            yield b
-
-
-    def _get_bags(self, candidates, split_chars=["/"]):
-        """
-        Create span bags for multinomial classification
-        :param candidates:
-        :return:
-        """
-        L = self.training_set.L
-        self.span_classes = {}
-
-        # building bags by starting with positive labeled candidates
-        coverage = np.zeros(L.shape[0])
-        coverage[(L < 0).nonzero()[0]] = -1
-        coverage[(L > 0).nonzero()[0]] = 1
-
-        # sentence candidates
-        sent_cands = defaultdict(list)
-        for i,c in enumerate(candidates):
-            if coverage[i] == 0:
-                continue
-            sent_cands[c.sent_id].append(c)
-
-        bags = []
-        for i, sent_id in enumerate(sent_cands):
-
-            if i % 100 == 0:
-                progress = math.ceil(i / float(len(sent_cands)) * 100)
-                sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, len(sent_cands)))
-                sys.stdout.flush()
-
-            sent_bags = []
-            for b in self._get_sentence_bags(sent_cands[sent_id]):
-                # create multinomial class names
-                k, seq = self._bag_arity(b)
-                sent_bags.append(b)
-
-            # TODO: add heuristic to break up very long bags
-
-            # sanity check for disjoint bags
-            if disjoint(sent_bags):
-                print>>sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
-                disjoint(sent_bags,verbose=True)
-
-            bags += sent_bags
-
-        print "\nCreated {} bags".format(len(bags))
-        return bags
-
-
-    def train(self, lf_w0=1.0, **model_hyperparams):
-        """Train model: **as default, use "joint" approach**"""
-        print "Training LF model... {}".format(lf_w0)
-        training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
-        self.training_marginals = training_marginals
-
-
-    def generate_span_bags(self, thresh=0.0, break_on=["/"], **model_hyperparams):
-        self.span_bags =  self._get_bags(self.training_set.training_candidates)
-
-
-    def _bag_arity(self, bag, split_chars=["/", "-"]):
-        '''Determine num_words per bag,
-        forcing splits on certain characters '''
-        s, (i, j) = self._set_span(bag)
-        seq = tokenize(s, split_chars)
-        return (2 ** len(seq)), seq
-
-    def _set_span(self, candidates):
-        offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
-        i, j = min(offsets), max(offsets)
-        text = candidates[0].sentence["text"]
-        offset = candidates[0].sentence["char_offsets"][0]
-        s = text[i - offset:j - offset + 1]
-        return s, (i - offset, j - offset + 1)
-
-    def bag_lf_prob(self, bag, L, sparsity_threshold=1024):
-        '''Create the M x D_i (num_lfs X num_classes) matrix
-        '''
-        num_lfs = self.training_set.L.shape[1]
-
-        k, seq = self._bag_arity(bag)
-        candidates = [c for c in bag if c != None]
-
-        # M x D_i probabilty distrib
-        P = np.zeros((num_lfs, k))
-
-        # transform candidates into multinomial seqs
-        samples = self.candidate_multinomials(candidates)
-        idxs = range(0, len(seq))
-        classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
-        classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
-
-        # HEURISTIC: if all LFs vote negative, assign all mass to <N/A>
-        assign_na = False
-        if np.all(L.toarray() <= 0):
-            assign_na = True
-
-        # compute probability matrix
-        row, col = L.nonzero()
-        for c_i in row:
-            for lf_j in col:
-                if not assign_na:
-
-                    try:
-                        k = classes[samples[c_i]]
-                        P[lf_j, k] += L[c_i, lf_j]
-                    except:
-                        print "FAILURE", k, classes, c_i, P.shape, (lf_j, k)
-
-                else:
-                    k = classes[tuple()]
-                    P[lf_j, k] += 1
-
-        P = (P.T - np.min(P, axis=1)).T
-        P = (P.T / np.sum(P, axis=1)).T
-        P[np.isnan(P)] = 0
-
-        # force sparse matrix give some candidate space size
-        if k > sparsity_threshold:
-            P = csr_matrix(P)
-
-        strs = []
-        classes = zip(*sorted(classes.items(), key=lambda x: x[1], reverse=0))[0]
-        seq = np.array(seq)
-        for key in classes:
-            if len(key) == 0:
-                strs += ["<N/A>"]
-                continue
-            strs += [" ".join(seq[np.array(key)])]
-
-        return P, classes, strs
-
-    def candidate_multinomials(self, candidates, split_chars=["/", "-"]):
-        '''convert candidates to tokenized binary sequences '''
-        seq, _ = self._set_span(candidates)
-        span = tokenize(seq, split_chars)
-        classes = []
-
-        # char to word idx
-        s, (i, j) = self._set_span(candidates)
-        seq = tokenize(s, split_chars)
-
-        for c in candidates:
-            mention = tokenize(c.get_attrib_span("words"), split_chars)
-            tags = np.array([0] * len(span))
-            for i, j in align(span, span):
-                tags[j] = 1
-            tags = tuple([j for i, j in align(mention, span)])
-            classes += [tags]
-
-        return classes
-
-    def lf_prob(self, include_neg=False, class_threshold=1024):
-
-        if "span_bags" not in self.__dict__:
-            self.generate_span_bags()
-
-        Xs, Ys, strs, f_bags = [], [], [], []
-        L = self.training_set.L
-
-        cand_idx = {c: i for i, c in enumerate(self.training_set.training_candidates)}
-
-        for i, bag in enumerate(self.span_bags):
-
-            if i % 100 == 0:
-                progress = math.ceil(i / float(len(self.span_bags)) * 100)
-                sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, len(self.span_bags)))
-                sys.stdout.flush()
-
-            # skip degenerate long classes
-            k, _ = self._bag_arity(bag)
-            if k > class_threshold:
-                continue
-
-            # build LF matrix for bag candidates
-            idxs = [cand_idx[c] for c in bag]
-            prob, classes, seqs = self.bag_lf_prob(bag, L[idxs])
-
-            if not include_neg and np.all(L[idxs].toarray() <= 0):
-                continue
-
-            Xs += [prob]
-            Ys += [classes]
-            strs += [seqs]
-            f_bags += [bag]
-
-        self.Xs = Xs
-        self.Ys = Ys
-        self.strs = strs
-        self.f_bags = f_bags
-
-        return Xs, Ys, strs, f_bags
-
-
-    def export(self, marginals, num_samples, outfile,
-               tagname="DISEASE", fmt="pkl", threshold=0.0):
-        '''Export tagged sentences to file of given format'''
-        sentences = {}
-        ner_tags = defaultdict(list)
-        for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples, threshold=threshold)):
-            sent, tags = tag_sentence(sentence, cands)
-            if sent is None: # HACK sometimes retokenization fails do to char offsets.
-                continue
-            tags = [t + u"-{}".format(tagname) if t != u"O" else t for t in tags]
-            ner_tags[sent.id].append(tags)
-            sentences[sent.id] = sent
-
-        if fmt == "pkl":
-            pkl = {}
-            for sent_id in sentences:
-                sent = sentences[sent_id]
-                pkl[sent_id] = {"sent":sent._asdict(),"tags":ner_tags[sent_id]}
-            cPickle.dump(pkl, open(outfile,"w"))
-
-        elif fmt == "conll":
-            with codecs.open(outfile,"w","utf-8") as fp:
-                for sent_id in sentences:
-                    sentence = sentences[sent_id]
-                    for tags in ner_tags[sent_id]:
-                        tagged = zip(sentence.words, sentence.poses, tags)
-                        for word, pos_tag, ner_tag in tagged:
-                            tag = (word, pos_tag, ner_tag)
-                            fp.write(" ".join(tag) + u"\n")
-                        fp.write(u"\n")
-
-
-    def sample(self, marginals, num_samples=10, format="conll",
-               threshold=0.0, show_progress=False):
-
-        cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
-        sentences = {c.sent_id:c.sentence for c in cands}
-
-        sent_bags_idxs = defaultdict(list)
-        for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
-            sent_bags_idxs[sent_id].append(i)
-
-        for progress, sent_id in enumerate(sorted(sentences)):
-
-            if show_progress and progress % 100 == 0 or progress == len(sentences):
-                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format( (progress / float(len(sentences)) * 100),
-                                                                     progress, len(sentences) ))
-                sys.stdout.flush()
-
-            try:
-                # Candidate Samples
-                samples = []
-                for i in range(num_samples):
-
-                    s_cand_set = []
-                    for bag_i in sent_bags_idxs[sent_id]:
-
-                        # restrict samples to known candidates (i.e., ignore impossible samples, like discontinuous spans)
-                        prob = sorted(zip(marginals[bag_i],self.strs[bag_i]),reverse=1)
-                        mentions = []
-                        for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
-                            mentions += [" ".join(tokenize(m, split_chars=["/", "-"]))]
-
-                        # threshold prob. if threshold is too high, choose max(prob)
-                        if threshold > 0.0 and max(zip(*prob)[0]) < threshold:
-                            threshold = max(zip(*prob)[0])
-
-                        dist = [[p, name] for p,name in prob if (name in mentions or name == '<N/A>') and p >= threshold]
-                        m = zip(*dist)[0]
-                        p = [(p/sum(m),name) for p,name in dist]
-
-                        p,classes = zip(*p)
-                        rs = np.random.choice(classes, 1, p=p)[0]
-                        if rs in mentions:
-                            rs = self.f_bags[bag_i][mentions.index(rs)]
-                        elif rs == "<N/A>":
-                            continue
-                        else:
-                            print>>sys.stderr,"Warning: candidate sample error {}".format(rs)
-                            continue
-                        s_cand_set += [(rs, bag_i)]
-
-                    samples += [s_cand_set]
-
-                # Generate Sentence Samples
-                for cs in samples:
-                    cs = [c[0] for c in cs]
-                    yield (sentences[sent_id], cs)
-
-            except Exception as e:
-                print>>sys.stderr,"Warning -- sampling error!"
-                continue
