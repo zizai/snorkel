@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib
 import re
 import itertools
+
 matplotlib.use('Agg')
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -26,7 +27,7 @@ import numpy as np
 from multiprocessing import Process, Queue
 from itertools import combinations
 import itertools
-from scipy.sparse import csc_matrix,csr_matrix,lil_matrix
+from scipy.sparse import csc_matrix, csr_matrix, lil_matrix
 
 import codecs
 import cPickle as pickle
@@ -34,11 +35,12 @@ from tokenizer import *
 
 logger = logging.getLogger('snorkel')
 
+
 class ProgressBar(object):
-    def __init__(self,steps):
+    def __init__(self, steps):
         self.steps = steps
 
-    def update(self,i):
+    def update(self, i):
         progress = math.ceil(i / float(len(self.steps)) * 100)
         sys.stdout.write('Processing \r{:2.2f}% {}/{}'.format(progress, i, self.steps))
         sys.stdout.flush()
@@ -51,8 +53,9 @@ class ProgressBar(object):
 
 def mp_apply_lfs(lfs, candidates, nprocs):
     '''http://eli.thegreenplace.net/2012/01/16/python-parallelizing-cpu-bound-tasks-with-multiprocessing/'''
+
     def worker(pid, idxs, out_queue):
-        #print "\tLF process_id={} {} items".format(pid, len(idxs))
+        # print "\tLF process_id={} {} items".format(pid, len(idxs))
         outdict = {}
         for i in idxs:
             outdict[i] = [lf(candidates[i]) for lf in lfs]
@@ -62,12 +65,12 @@ def mp_apply_lfs(lfs, candidates, nprocs):
     chunksize = int(math.ceil(len(candidates) / float(nprocs)))
     procs = []
 
-    nums = range(0,len(candidates))
+    nums = range(0, len(candidates))
     for i in range(nprocs):
         p = Process(
-                target=worker,
-                args=(i,nums[chunksize * i:chunksize * (i + 1)],
-                      out_queue))
+            target=worker,
+            args=(i, nums[chunksize * i:chunksize * (i + 1)],
+                  out_queue))
         procs.append(p)
         p.start()
 
@@ -81,12 +84,11 @@ def mp_apply_lfs(lfs, candidates, nprocs):
 
     X = sparse.lil_matrix((len(candidates), len(lfs)))
     for i in sorted(resultdict):
-        for j,v in enumerate(resultdict[i]):
+        for j, v in enumerate(resultdict[i]):
             if v != 0:
-                X[i,j] = v
+                X[i, j] = v
 
     return X.tocsr()
-
 
 
 class TrainingSet(object):
@@ -99,16 +101,17 @@ class TrainingSet(object):
         - A set of labeling functions (LFs) which are functions f : Candidate -> {-1,0,1}
         - A Featurizer object, which is applied to the Candidate objects to generate features
     """
+
     def __init__(self, training_candidates, lfs, featurizer=None, num_procs=1):
-        self.num_procs  = num_procs
+        self.num_procs = num_procs
         self.training_candidates = training_candidates
-        self.featurizer          = featurizer
-        self.lfs                 = lfs
-        self.lf_names            = [lf.__name__ for lf in lfs]
-        self.L, self.F           = self.transform(self.training_candidates, fit=True)
-        self.dev_candidates      = None
-        self.dev_labels          = None
-        self.L_dev               = None
+        self.featurizer = featurizer
+        self.lfs = lfs
+        self.lf_names = [lf.__name__ for lf in lfs]
+        self.L, self.F = self.transform(self.training_candidates, fit=True)
+        self.dev_candidates = None
+        self.dev_labels = None
+        self.L_dev = None
 
         self.summary_stats()
 
@@ -128,9 +131,9 @@ class TrainingSet(object):
             return mp_apply_lfs(self.lfs, candidates, self.num_procs)
         else:
             X = sparse.lil_matrix((len(candidates), len(self.lfs)))
-            for i,c in enumerate(candidates):
-                for j,lf in enumerate(self.lfs):
-                    X[i,j] = lf(c)
+            for i, c in enumerate(candidates):
+                for j, lf in enumerate(self.lfs):
+                    X[i, j] = lf(c)
             return X.tocsr()
 
     def summary_stats(self, return_vals=False, verbose=True):
@@ -143,18 +146,18 @@ class TrainingSet(object):
 
         # Default LF stats
         d = {
-            'j'         : range(len(self.lfs)),
-            'coverage'  : Series(data=LF_coverage(self.L), index=self.lf_names),
-            'overlaps'  : Series(data=LF_overlaps(self.L), index=self.lf_names),
-            'conflicts' : Series(data=LF_conflicts(self.L), index=self.lf_names)
+            'j': range(len(self.lfs)),
+            'coverage': Series(data=LF_coverage(self.L), index=self.lf_names),
+            'overlaps': Series(data=LF_overlaps(self.L), index=self.lf_names),
+            'conflicts': Series(data=LF_conflicts(self.L), index=self.lf_names)
         }
 
         # Empirical stats, based on supplied development set
         if dev_candidates and dev_labels is not None:
             if self.L_dev is None or dev_candidates != self.dev_candidates or any(dev_labels != self.dev_labels):
                 self.dev_candidates = dev_candidates
-                self.dev_labels     = dev_labels
-                self.L_dev          = self._apply_lfs(dev_candidates)
+                self.dev_labels = dev_labels
+                self.L_dev = self._apply_lfs(dev_candidates)
             d['accuracy'] = Series(data=LF_accuracies(self.L_dev, self.dev_labels), index=self.lf_names)
             # counts
             n = sparse_abs(self.L_dev).sum(axis=0)
@@ -172,33 +175,34 @@ class Learner(object):
 
     As input takes a TrainingSet object and a NoiseAwareModel object (the discriminative model to train).
     """
+
     def __init__(self, training_set, model=None, gen_model=LogReg()):
         self.training_set = training_set
-        self.model        = model
+        self.model = model
 
         # We need to know certain properties _that are set in the model defn_
         self.bias_term = self.model.bias_term if hasattr(self.model, 'bias_term') else False
 
         # Derived objects from the training set
-        self.L_train         = self.training_set.L
-        self.F_train         = self.training_set.F
-        self.X_train         = None
+        self.L_train = self.training_set.L
+        self.F_train = self.training_set.F
+        self.X_train = None
         self.n_train, self.m = self.L_train.shape
-        self.f               = self.F_train.shape[1] if self.F_train is not None else None
+        self.f = self.F_train.shape[1] if self.F_train is not None else None
 
         # Cache the transformed test set as well
         self.test_candidates = None
-        self.gold_labels     = None
-        self.L_test          = None
-        self.F_test          = None
-        self.X_test          = None
+        self.gold_labels = None
+        self.L_test = None
+        self.F_test = None
+        self.X_test = None
 
         self.gen_model = gen_model
 
     def _set_model_X(self, L, F):
         """Given LF matrix L, feature matrix F, return the matrix used by the end discriminative model."""
         n, m = L.shape
-        X    = sparse.hstack([L, F], format='csr')
+        X = sparse.hstack([L, F], format='csr')
         if self.bias_term:
             X = sparse.hstack([X, np.ones((n, 1))], format='csr')
         return X
@@ -206,7 +210,7 @@ class Learner(object):
     def train(self, lf_w0=5.0, feat_w0=0.0, **model_hyperparams):
         """Train model: **as default, use "joint" approach**"""
         # Set the initial weights for LFs and feats
-        w0 = np.concatenate([lf_w0*np.ones(self.m), feat_w0*np.ones(self.f)])
+        w0 = np.concatenate([lf_w0 * np.ones(self.m), feat_w0 * np.ones(self.f)])
         w0 = np.append(w0, 0) if self.bias_term else w0
 
         # Construct matrix X for "joint" approach
@@ -222,13 +226,15 @@ class Learner(object):
         """
         # Cache transformed test set
         if self.X_test is None or test_candidates != self.test_candidates or any(gold_labels != self.gold_labels):
-            self.test_candidates     = test_candidates
-            self.gold_labels         = gold_labels
+            self.test_candidates = test_candidates
+            self.gold_labels = gold_labels
             self.L_test, self.F_test = self.training_set.transform(test_candidates)
-            self.X_test              = self._set_model_X(self.L_test, self.F_test)
+            self.X_test = self._set_model_X(self.L_test, self.F_test)
         if display:
             calibration_plots(self.model.marginals(self.X_train), self.model.marginals(self.X_test), gold_labels)
-        return test_scores(self.model.predict(self.X_test, thresh=thresh), gold_labels, return_vals=return_vals, verbose=display)
+
+        return test_scores(self.model.predict(self.X_test, thresh=thresh), gold_labels, return_vals=return_vals,
+                           verbose=display)
 
     def lf_weights(self):
         return self.model.w[:self.m]
@@ -237,7 +243,7 @@ class Learner(object):
         return odds_to_prob(self.lf_weights())
 
     def feature_weights(self):
-        return self.model.w[self.m:self.m+self.f]
+        return self.model.w[self.m:self.m + self.f]
 
     def predictions(self, thresh=0.5):
         return self.model.predict(self.X_test, thresh=thresh)
@@ -275,17 +281,18 @@ class PipelinedLearner(Learner):
     Implements the **"pipelined" approach**- this is the method more literally corresponding
     to the Data Programming paper
     """
+
     def _set_model_X(self, L, F):
         n, f = F.shape
-        X    = F.tocsr()
+        X = F.tocsr()
         if self.bias_term:
             X = sparse.hstack([X, np.ones((n, 1))], format='csr')
         return X
 
     def train_lf_model(self, w0=1.0, **model_hyperparams):
         """Train the first _generative_ model of the LFs"""
-        w0 = w0*np.ones(self.m)
-        self.training_model =  self.gen_model
+        w0 = w0 * np.ones(self.m)
+        self.training_model = self.gen_model
         self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
         # Compute marginal probabilities over the candidates from this model of the training set
@@ -293,11 +300,11 @@ class PipelinedLearner(Learner):
 
     def train_model(self, training_marginals, w0=0.0, **model_hyperparams):
         """Train the provided end _discriminative_ model"""
-        w0           = w0*np.ones(self.f)
-        w0           = np.append(w0, 0) if self.bias_term else w0
+        w0 = w0 * np.ones(self.f)
+        w0 = np.append(w0, 0) if self.bias_term else w0
         self.X_train = self._set_model_X(self.L_train, self.F_train)
-        self.w       = self.model.train(self.X_train, training_marginals=training_marginals, \
-                        w0=w0, **model_hyperparams)
+        self.w = self.model.train(self.X_train, training_marginals=training_marginals, \
+                                  w0=w0, **model_hyperparams)
 
     def train(self, feat_w0=0.0, lf_w0=5.0, class_balance=False, **model_hyperparams):
         """Train model: **as default, use "joint" approach**"""
@@ -308,9 +315,9 @@ class PipelinedLearner(Learner):
         # Find the larger class, then subsample, setting the ones we want to drop to 0.5
         if class_balance:
             pos = np.where(training_marginals > 0.5)[0]
-            pp  = len(pos)
+            pp = len(pos)
             neg = np.where(training_marginals < 0.5)[0]
-            nn  = len(neg)
+            nn = len(neg)
             print "Number of positive:", pp
             print "Number of negative:", nn
             majority = neg if nn > pp else pos
@@ -318,7 +325,7 @@ class PipelinedLearner(Learner):
 
             # Just set the non-subsampled members to 0.5, so they will be filtered out
             for i in majority:
-                if random() > pp/float(nn):
+                if random() > pp / float(nn):
                     training_marginals[i] = 0.5
 
         print "Training model..."
@@ -335,6 +342,7 @@ class RepresentationLearner(PipelinedLearner):
     """
     Implements the _pipelined_ approach for an end model that also learns a representation
     """
+
     def train_model(self, training_marginals, w0=0.0, **model_hyperparams):
         """Train the provided end _discriminative_ model"""
         self.w = self.model.train(self.training_set.training_candidates, training_marginals=training_marginals, \
@@ -344,28 +352,27 @@ class RepresentationLearner(PipelinedLearner):
         # Cache transformed test set
         if test_candidates != self.test_candidates or any(gold_labels != self.gold_labels):
             self.test_candidates = test_candidates
-            self.gold_labels     = gold_labels
+            self.gold_labels = gold_labels
         if display:
             calibration_plots(self.model.marginals(self.training_set.training_candidates), \
-                                self.model.marginals(self.test_candidates), gold_labels)
-        return test_scores(self.model.predict(self.test_candidates), gold_labels, return_vals=return_vals, verbose=display)
+                              self.model.marginals(self.test_candidates), gold_labels)
+        return test_scores(self.model.predict(self.test_candidates), gold_labels, return_vals=return_vals,
+                           verbose=display)
 
     def predictions(self):
         return self.model.predict(self.test_candidates)
 
 
-
 class SpanLearner(PipelinedLearner):
-
-    #def __init__(self,split_chars=[]):
+    # def __init__(self,split_chars=[]):
     #    self.split_chars=split_chars
     #    pass
 
-    def train_gen_model(self,lf_w0=5.0, **model_hyperparams):
+    def train_gen_model(self, lf_w0=5.0, **model_hyperparams):
         print "\nTraining generative model..."
         self.training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
 
-    def train_disc_model(self,  feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
+    def train_disc_model(self, feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
         if self.model:
             print "\nTraining discriminitive model..."
             self.train_model(self.training_marginals, w0=feat_w0, **model_hyperparams)
@@ -397,7 +404,7 @@ class SpanLearner(PipelinedLearner):
         for b in bags:
             yield b
 
-    def _get_bags(self, candidates, split_chars=["/"]):
+    def _get_bags(self, candidates):
         """
         Create span bags for multinomial classification
         :param candidates:
@@ -423,7 +430,7 @@ class SpanLearner(PipelinedLearner):
             for b in self._get_sentence_bags(sent_cands[sent_id]):
                 sent_bags.append(b)
 
-            # TODO: add heuristic to break up very long bags
+            # TODO: add heuristic to break up very long spans
 
             # sanity check for disjoint bags
             if disjoint(sent_bags):
@@ -436,7 +443,6 @@ class SpanLearner(PipelinedLearner):
 
     def generate_span_bags(self, thresh=0.0, break_on=["/"], **model_hyperparams):
         self.span_bags = self._get_bags(self.training_set.training_candidates)
-
 
     def _set_span(self, candidates):
         '''Get candidate set span'''
@@ -459,23 +465,23 @@ class SpanLearner(PipelinedLearner):
             print "\nMultinomial LogReg generative model"
             self.generate_span_bags()
 
-            Xs, Ys, classes, f_bags = self.lf_prob(include_neg=True)
+            Xs, Ys, classes, f_bags, f_instances = self.lf_prob(include_neg=True)
 
             self.Xs = Xs
             self.Ys = Ys
             self.classes = classes
             self.f_bags = f_bags
+            self.f_instances = f_instances
 
             self.gen_model.train(Xs, w0=lf_w, **model_hyperparams)
 
             marginals = []
             mn_marginals = self.gen_model.marginals(self.Xs)
-            #cand_index = {c: i for i in range(len(f_bags)) for c in f_bags[i]}
+            # cand_index = {c: i for i in range(len(f_bags)) for c in f_bags[i]}
             cand_index = {}
             for i in range(len(f_bags)):
                 for c in f_bags[i]:
                     cand_index[c] = i
-
 
             # marginals for multinomials are per spanset, so we need to flatten
             # matrices back to our original observed candidate set
@@ -507,15 +513,13 @@ class SpanLearner(PipelinedLearner):
 
         # binary
         else:
-            print "\nBinary LogReg generative model"
+            print "\nBinary generative model"
             w0 = w0 * np.ones(self.m)
             self.gen_model.train(self.L_train, w0=lf_w, **model_hyperparams)
             return self.gen_model.marginals(self.L_train)
 
-
     def _get_class_idx(self, candidate, classes):
         pass
-
 
     def _bag_arity(self, bag, split_chars=["/", "-"]):
         '''Determine num_words per bag,
@@ -523,7 +527,6 @@ class SpanLearner(PipelinedLearner):
         s, (i, j) = self._set_span(bag)
         seq = tokenize(s, split_chars)
         return (2 ** len(seq)), seq
-
 
     def bag_lf_prob(self, bag, L, sparsity_threshold=1024):
         '''Create the M x D_i (num_lfs X num_classes) matrix
@@ -533,11 +536,11 @@ class SpanLearner(PipelinedLearner):
 
         # generate class space and candidate instances
         seq, instances = self.candidate_multinomials(candidates)
-        P = np.zeros((num_lfs, 2**len(seq))) # M x D_i probabilty distrib
+        P = np.zeros((num_lfs, 2 ** len(seq)))  # M x D_i probabilty distrib
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
 
-        if len(instances) != len({s:1 for s in instances}):
+        if len(instances) != len({s: 1 for s in instances}):
             print "ERROR!!"
 
         classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
@@ -567,7 +570,7 @@ class SpanLearner(PipelinedLearner):
         P[np.isnan(P)] = 0
 
         # force sparse matrix give some candidate space size
-        #if k > sparsity_threshold:
+        # if k > sparsity_threshold:
         #    P = csr_matrix(P)
 
         class_names = []
@@ -580,27 +583,10 @@ class SpanLearner(PipelinedLearner):
             class_names += [" ".join(seq[np.array(key)])]
 
         # specific instance indices
-        instances = [classes[idxs] for idxs in instances]
+        instances = [classes.index(idxs) for idxs in instances]
 
         return P, classes, class_names, instances
 
-    '''
-    def _force_tokenize(self, candidates, split_chars=[]):
-
-        idxs = set(itertools.chain.from_iterable([c.idxs for c in candidates]))
-        idxs = sorted(list(idxs))
-        offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
-        i, j = min(offsets), max(offsets)
-
-        tokens = []
-        words = candidates[0].sentence["words"][min(idxs):max(idxs)+1]
-
-        for w in words:
-            rgx = r'([{}]+)+'.format("".join(split_chars))
-            tokens += [re.sub(rgx, r' \1 ', w)]
-
-        return np.array(tokens), idxs
-    '''
 
     def candidate_multinomials(self, candidates, split_chars=["/", "-", "+"]):
         '''convert candidates to tokenized binary sequences '''
@@ -614,17 +600,17 @@ class SpanLearner(PipelinedLearner):
         idxs = sorted(list(set(itertools.chain.from_iterable([c.idxs for c in candidates]))))
 
         # current tokenization
-        splits = char_offsets[min(idxs):max(idxs)+1] + [end - offset + 1]
+        splits = char_offsets[min(idxs):max(idxs) + 1] + [end - offset + 1]
         tokens = []
-        for k in range(len(splits)-1):
-            i,j = splits[k], splits[k + 1]
+        for k in range(len(splits) - 1):
+            i, j = splits[k], splits[k + 1]
             t = sentence["text"][i:j].strip()
             tokens += [[t, [i, i + len(t)]]]
 
         # force additional tokenization
         t_tokens = []
         for t in tokens:
-            term,span = t
+            term, span = t
             rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
             t_term = re.sub(rgx, r' \1 ', term)
 
@@ -632,7 +618,7 @@ class SpanLearner(PipelinedLearner):
                 t_spans = []
                 curr = span[0]
                 for t1 in t_term.split():
-                    t_spans += [ [t1, [curr, curr+len(t1)]] ]
+                    t_spans += [[t1, [curr, curr + len(t1)]]]
                     curr = curr + len(t1)
                 t_tokens.extend(t_spans)
             else:
@@ -643,17 +629,16 @@ class SpanLearner(PipelinedLearner):
         tokens, charmap = zip(*t_tokens)
         for c in candidates:
             offset = c.sentence["char_offsets"][0]
-            i,j = c.char_start - offset, c.char_end - offset
+            i, j = c.char_start - offset, c.char_end - offset
             idxs = []
             for k in range(len(charmap)):
-                ii,jj = charmap[k]
-                jj -= 1 # use token slots, otherwise overlap detection is off by one
+                ii, jj = charmap[k]
+                jj -= 1  # use token slots, otherwise overlap detection is off by one
                 if max(i, ii) <= min(j, jj):
                     idxs += [k]
             instances += [tuple(idxs)]
 
         return tokens, instances
-
 
     def lf_prob(self, include_neg=True, class_threshold=8192):
 
@@ -681,21 +666,31 @@ class SpanLearner(PipelinedLearner):
             strs += [seqs]
             f_bags += [bag]
             f_instances += [instances]
-            
-        return Xs, Ys, strs, f_bags
 
+        return Xs, Ys, strs, f_bags, f_instances
 
     def export(self, outfile, marginals=None, num_samples=10,
                tagname="DISEASE", fmt="pkl", threshold=0.0):
         '''Export tagged sentences to file of given format'''
-        if marginals == None:
-            marginals = self.marginals
+
+        # Multinomial-based sampling
+        if type(self.gen_model) is MnLogReg:
+            print "Multinomial Sampler"
+            if marginals == None:
+                marginals = self.marginals
+            sampler = self.mn_sample
+        else:
+            print "Binary Sampler"
+            if marginals == None:
+                marginals = self.training_marginals
+            sampler = self.bin_sample
 
         sentences = {}
         ner_tags = defaultdict(list)
-        for i, (sentence, cands) in enumerate(self.sample(marginals, num_samples=num_samples, threshold=threshold)):
+        for i, (sentence, cands) in enumerate(sampler(marginals, num_samples=num_samples, threshold=threshold)):
             sent, tags = tag_sentence(sentence, cands)
             if sent is None:  # HACK sometimes re-tokenization fails due to char offsets.
+                print "ERROR"
                 continue
             tags = [t + u"-{}".format(tagname) if t != u"O" else t for t in tags]
             ner_tags[sent.id].append(tags)
@@ -719,7 +714,67 @@ class SpanLearner(PipelinedLearner):
                             fp.write(" ".join(tag) + u"\n")
                         fp.write(u"\n")
 
-    def sample(self, marginals, num_samples=10, format="conll",
+
+    def bin_sample(self, marginals, num_samples=10, format="conll",
+               threshold=0.0, show_progress=False):
+        '''Sample spans using heuristics to normalize across overlapping spans'''
+        self.span_bags = self._get_bags(self.training_set.training_candidates)
+
+        cands = list(itertools.chain.from_iterable([bag for bag in self.span_bags]))
+        sentences = {c.sent_id: c.sentence for c in cands}
+        cand_idx = {c:i for i,c in enumerate(self.training_set.training_candidates)}
+
+        sent_bags_idxs = defaultdict(list)
+        for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.span_bags)]:
+            sent_bags_idxs[sent_id].append(i)
+
+        for progress, sent_id in enumerate(sorted(sentences)):
+
+            try:
+                samples = []
+                for i in range(num_samples):
+
+                    s_cand_set = []
+                    for bag_i in sent_bags_idxs[sent_id]:
+                        prob = [marginals[cand_idx[c]] for c in self.span_bags[bag_i]]
+
+                        # heuristic to force no sample
+                        na = 1.0 - max(prob)
+                        prob = [na] + prob
+                        cand_set = [None] + self.span_bags[bag_i]
+                        prob = [p/sum(prob) for p in prob]
+
+                        dist = [[p,c] for p,c in zip(prob,cand_set) if p >= threshold]
+                        m_prob = zip(*dist)[0]
+                        prob = [(p / sum(m_prob), c) for p,c in dist]
+
+                        prob, classes = zip(*prob)
+                        rs = np.random.choice(classes, 1, p=prob)[0]
+
+                        if rs != None:
+                            s_cand_set += [(rs, bag_i)]
+
+                    samples += [s_cand_set]
+
+                # Generate Sentence Samples
+                # consisting of sentence + candidate list
+                for cs in samples:
+                    cs = [c[0] for c in cs]
+                    yield (sentences[sent_id], cs)
+
+
+            except Exception as e:
+                print>> sys.stderr, "Warning -- sampling error!", e
+                continue
+
+
+    def predictions(self,threshold=0.5):
+        return None
+        self.training_marginals
+
+
+
+    def mn_sample(self, marginals, num_samples=10, format="conll",
                threshold=0.0, show_progress=False):
 
         cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
@@ -736,50 +791,48 @@ class SpanLearner(PipelinedLearner):
                                                                     progress, len(sentences)))
                 sys.stdout.flush()
 
-            #try:
-            samples = []
-            for i in range(num_samples):
+            try:
+                samples = []
+                for i in range(num_samples):
 
-                s_cand_set = []
-                for bag_i in sent_bags_idxs[sent_id]:
+                    s_cand_set = []
+                    for bag_i in sent_bags_idxs[sent_id]:
 
-                    # restrict samples to known candidates (i.e., ignore impossible samples, like discontinuous spans)
-                    prob = sorted(zip(marginals[bag_i], self.classes[bag_i]), reverse=1)
-                    mentions = []
-                    for m in [c.get_attrib_span("words") for c in self.f_bags[bag_i]]:
-                        mentions += [" ".join(tokenize(m, split_chars=["/", "-", "+"]))]
+                        # restrict samples to known candidates (i.e., ignore impossible samples, like discontinuous spans)
+                        prob = sorted(zip(marginals[bag_i], self.classes[bag_i]), reverse=1)
+                        mentions = [self.classes[bag_i][j] for j in self.f_instances[bag_i]]
 
-                    # threshold prob. if threshold is too high, choose max(prob)
-                    if threshold > 0.0 and max(zip(*prob)[0]) < threshold:
-                        threshold = max(zip(*prob)[0])
+                        # threshold prob. if threshold is too high, choose max(prob)
+                        if threshold > 0.0 and max(zip(*prob)[0]) < threshold:
+                            threshold = max(zip(*prob)[0])
 
-                    dist = [[p, name] for p, name in prob if
-                            (name in mentions or name == '<N/A>') and p >= threshold]
-                    m = zip(*dist)[0]
-                    p = [(p / sum(m), name) for p, name in dist]
+                        dist = [[p, name] for p, name in prob if
+                                (name in mentions or name == '<N/A>') and p >= threshold]
+                        m = zip(*dist)[0]
+                        p = [(p / sum(m), name) for p, name in dist]
 
-                    p, classes = zip(*p)
-                    rs = np.random.choice(classes, 1, p=p)[0]
-                    if rs in mentions:
-                        rs = self.f_bags[bag_i][mentions.index(rs)]
-                    elif rs == "<N/A>":
-                        continue
-                    else:
-                        print>> sys.stderr, "Warning: candidate sample error {}".format(rs)
-                        continue
-                    s_cand_set += [(rs, bag_i)]
+                        p, classes = zip(*p)
+                        rs = np.random.choice(classes, 1, p=p)[0]
+                        if rs in mentions:
+                            rs = self.f_bags[bag_i][mentions.index(rs)]
+                        elif rs == "<N/A>":
+                            continue
+                        else:
+                            print>> sys.stderr, "Warning: candidate sample error {}".format(rs)
+                            continue
+                        s_cand_set += [(rs, bag_i)]
 
-                samples += [s_cand_set]
+                    samples += [s_cand_set]
 
-            # Generate Sentence Samples
-            # consisting of sentence + candidate list
-            for cs in samples:
-                cs = [c[0] for c in cs]
-                yield (sentences[sent_id], cs)
+                # Generate Sentence Samples
+                # consisting of sentence + candidate list
+                for cs in samples:
+                    cs = [c[0] for c in cs]
+                    yield (sentences[sent_id], cs)
 
-            #except Exception as e:
-            #    print>> sys.stderr, "Warning -- sampling error!", e
-            #    continue
+            except Exception as e:
+               print>> sys.stderr, "Warning -- sampling error!", e
+               continue
 
 
 def expand_pos_tag(word, tag):
@@ -787,9 +840,11 @@ def expand_pos_tag(word, tag):
     tags = [tag if t not in pos_tag_map else pos_tag_map[t] for t in word.split()]
     return tags
 
+
 def overlaps(c1, c2):
     v = c1.doc_id == c2.doc_id
     return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
+
 
 def align(a, b):
     j = 0
@@ -802,6 +857,7 @@ def align(a, b):
                 matched = True
             j += 1
     return offsets
+
 
 def tokenize(s, split_chars):
     '''Force tokenization'''
