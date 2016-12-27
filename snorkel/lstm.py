@@ -31,6 +31,7 @@ class LSTMModel(object):
     self.load_emb = None
     self.emb_path = None
     self.load_word_dict = None
+    self.new_encoding = False
 
   def ortho_weight(self):
     u, s, v = np.linalg.svd(np.random.randn(self.lstm_settings['dim'], self.lstm_settings['dim']))
@@ -312,17 +313,18 @@ class LSTMModel(object):
       if verbose:
         print ("Epoch #%d, Training error: %f") % (idx, train_error)
 
-  def get_word_dict(self, contain_mention, word_window_length, ignore_case):
+  def get_word_dict(self, contain_mention, word_window_length, ignore_case, new_encoding):
     """
     Get array of training word sequences
     Return word dictionary
     """
-    lstm_dict = {'__place_holder__':0, '__unknown__':1}
+    lstm_dict = {'__place_holder__':0, '__unknown__':1, '[[1':2, '1]]':3}
     words=[]
     for c in self.training_set:
       min_idx=min(c.idxs)
       max_idx=max(c.idxs)+1
       length=len(c.get_attrib('words'))
+      word_window_length = length if new_encoding else word_window_length
       lw= range(max(0,min_idx-word_window_length), min_idx)
       rw= range(max_idx,min(max_idx+word_window_length, length))
       m=c.idxs
@@ -335,7 +337,7 @@ class LSTMModel(object):
       lstm_dict[words[i]]=i+2
     self.word_dict=lstm_dict
 
-  def map_word_to_id(self, data, contain_mention, word_window_length, ignore_case):
+  def map_word_to_id(self, data, contain_mention, word_window_length, ignore_case, new_encoding):
     """
     Get array of candidate word sequences given word dictionary
     Return array of candidate id sequences
@@ -346,11 +348,13 @@ class LSTMModel(object):
       min_idx=min(c.idxs)
       max_idx=max(c.idxs)+1
       length=len(c.get_attrib('words'))
+      word_window_length = length if new_encoding else word_window_length
       lw= range(max(0,min_idx-word_window_length), min_idx)
       rw= range(max_idx,min(max_idx+word_window_length, length))
       m=c.idxs
       w=np.array(c.get_attrib('words'))
       m=w[m] if contain_mention else ['__place_holder__']
+      if new_encoding: m = list(np.concatenate((['[[1'],m,['1]]'])))
       seq = [_.lower() if ignore_case else _ for _ in np.concatenate((w[lw],m,w[rw]))]
       x=[0]+[self.word_dict[j] if j in self.word_dict else 1 for j in seq]+[0]
       lstm_X.append(x)
@@ -371,18 +375,21 @@ class LSTMModel(object):
     self.load_emb = kwargs.get('load_emb', False)
     self.emb_path = kwargs.get('emb_path', None)
     self.load_word_dict = kwargs.get('load_word_dict', None)
+    self.new_encoding = kwargs.get('new_encoding', False)
     self.get_word_dict(contain_mention=self.contain_mention, word_window_length=self.word_window_length, \
-                       ignore_case=self.ignore_case)
+                       ignore_case=self.ignore_case, new_encoding=self.new_encoding)
     if self.load_word_dict is not None:
         self.word_dict = self.load_word_dict
     self.lstm_X = self.map_word_to_id(self.training_set, contain_mention=self.contain_mention, \
-                                      word_window_length=self.word_window_length, ignore_case=self.ignore_case)
+                                      word_window_length=self.word_window_length, ignore_case=self.ignore_case, \
+                                      new_encoding=self.new_encoding)
     self.lstm(dim=self.dim, batch_size=self.batch_size, learning_rate=self.learning_rate, epoch=self.epoch, \
               dropout=self.dropout, verbose=self.verbose, maxlen=self.maxlen)
     
   def test(self, testing_set):
     self.lstm_Y = self.map_word_to_id(testing_set, contain_mention=self.contain_mention, \
-                                      word_window_length=self.word_window_length, ignore_case=self.ignore_case)
+                                      word_window_length=self.word_window_length, ignore_case=self.ignore_case, \
+                                      new_encoding=self.new_encoding)
     self.use_noise.set_value(0.)
     test_data=[self.lstm_Y,[1]*len(testing_set),[1.]*len(testing_set)]
     ids  = self.mini_batches(len(testing_set), self.batch_size, shuffle=True)

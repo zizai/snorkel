@@ -286,7 +286,7 @@ class PipelinedLearner(Learner):
         """Train the first _generative_ model of the LFs"""
         w0 = w0*np.ones(self.m)
         self.training_model =  self.gen_model
-        self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
+        self.training_model.train(self.L_train, w0=w0)
 
         # Compute marginal probabilities over the candidates from this model of the training set
         return self.training_model.marginals(self.L_train)
