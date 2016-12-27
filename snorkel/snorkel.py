@@ -291,9 +291,15 @@ class PipelinedLearner(Learner):
 
     def train_lf_model(self, w0=1.0, **model_hyperparams):
         """Train the first _generative_ model of the LFs"""
-        w0 = w0 * np.ones(self.m)
-        self.training_model = self.gen_model
-        self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
+
+        #w0 = w0 * np.ones(self.m)
+        #self.training_model = self.gen_model
+        #self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
+
+        w0 = w0*np.ones(self.m)
+        self.training_model =  self.gen_model
+        self.training_model.train(self.L_train, w0=w0)
+
 
         # Compute marginal probabilities over the candidates from this model of the training set
         return self.training_model.marginals(self.L_train)
