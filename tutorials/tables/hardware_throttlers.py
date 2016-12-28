@@ -22,11 +22,20 @@ def same_page_throttler((part, attr)):
     return True
 # aligned or part is global
 
+def polarity_throttler((part, attr)):
+#    if not same_page((part, attr)): return False
+#    if LF_part_miss_match_part((part, attr)) < 0: return False
+    if LF_part_miss_match_polarity((part, attr)) < 0: return False
+    if same_table((part, attr)):
+        return (is_horz_aligned((part, attr)) or is_vert_aligned((part, attr)))
+    return True
+
 throttlers['ce_v_max'] = same_page_throttler
+throttlers['polarity'] = polarity_throttler
 
 def get_throttler(attr):
     # return None
-    if attr == 'ce_v_max':
+    if attr in ['ce_v_max', 'polarity']:
         return throttlers[attr]
     else:
         return None

@@ -46,6 +46,17 @@ def LF_part_num_in_high_col_num(c):
 
 part_lfs = [
 #    LF_part_in_header_tag, for ce_v_max
+#    LF_cheating_with_another_part,
+    LF_replacement_table,
+    LF_many_p_siblings,
+    LF_part_complement,
+    # LF_top_mark_col_part,
+    LF_please_to_left
+#    LF_part_num_in_high_col_num
+]
+
+ce_v_max_part_lfs = [
+#    LF_part_in_header_tag, for ce_v_max
     LF_cheating_with_another_part,
     LF_replacement_table,
     LF_many_p_siblings,
@@ -69,11 +80,28 @@ def LF_polarity_part_tabular_align(c):
 def LF_polarity_part_horz_align(c):
     return 1 if is_horz_aligned(c) else 0
 
+def LF_polarity_part_vert_align(c):
+    return 1 if is_vert_aligned(c) else 0
+
 def LF_both_in_top_third(c):
     return 1 if (get_page(c.part) == 1 and 
                  get_page(c.attr) == 1 and 
                  get_page_vert_percentile(c.part) > 0.33 and 
                  get_page_vert_percentile(c.attr) > 0.33) else 0
+
+def LF_polarity_description(c):
+    aligned_ngrams = set(get_aligned_ngrams(c.attr))
+    return 1 if overlap(['description', 'polarity'], aligned_ngrams) else 0
+
+def LF_polarity_transistor_type(c):
+    return 1 if overlap(['silicon','power', 'darlington', 'epitaxial', 'low noise', 'ampl/switch', 'switch', 'surface', 'mount'], 
+                         chain.from_iterable([
+                             get_phrase_ngrams(c.attr), 
+                             get_neighbor_phrase_ngrams(c.attr)])) else 0
+
+def LF_polarity_right_of_part(c):
+    right_ngrams = set(get_right_ngrams(c.part, lower=False))
+    return 1 if ((c.attr.get_span()=='NPN' and 'NPN' in right_ngrams) or (c.attr.get_span()=='PNP' and 'PNP' in right_ngrams)) else 0
 
 def LF_polarity_in_header_tag(c):
     return 1 if get_tag(c.attr).startswith('h') else 0
@@ -82,21 +110,57 @@ def LF_polarity_complement(c):
     return -1 if overlap(['complement','complementary'], 
                          chain.from_iterable([
                              get_phrase_ngrams(c.attr), 
-                             get_neighbor_phrase_ngrams(c.attr)])) else 0
+                             get_neighbor_phrase_ngrams(c.attr)])) else 1
 
 def LF_cheating_with_another_polarity(c):
     return -1 if ((c.attr.get_span()=='NPN' and 'PNP' in get_horz_ngrams(c.part, lower=False)) or
                   (c.attr.get_span()=='PNP' and 'NPN' in get_horz_ngrams(c.part, lower=False))) else 0
 
+def LF_both_present(c):
+    phrase_ngrams = set(get_phrase_ngrams(c.attr))
+    return -1 if ('npn' in phrase_ngrams and 'pnp' in phrase_ngrams) else 0
+
+def filter_non_polarity(c):
+    ret = set()
+    for _ in c:
+        if re.match(r'NPN|PNP', _):
+            ret.add(_)
+    return ret
+
+def LF_part_miss_match_part(c):
+    if not c[1].is_tabular(): return 0
+#    ngrams_part = set(list(get_col_ngrams(c[1], n_max=1)))
+    ngrams_part = set(list(get_row_ngrams(c[1], n_max=1, lower=False)))
+#    print '~~', ngrams_part
+    ngrams_part = filter_non_parts(ngrams_part)
+#    print '~~', ngrams_part
+    return 0 if len(ngrams_part) == 0 or any([c[0].get_span().lower().startswith(_.lower()) for _ in ngrams_part]) else -1
+
+
+def LF_part_miss_match_polarity(c):
+#    ngrams_part = set(list(get_col_ngrams(c[0], n_max=1)))
+    ngrams_part = set(list(get_row_ngrams(c[0], n_max=1, lower=False)))
+#    print '!!', ngrams_part
+    ngrams_part = filter_non_polarity(ngrams_part)
+#    print '!!', ngrams_part
+    return 0 if len(ngrams_part) == 0 or any([c[1].get_span().lower().startswith(_.lower()) for _ in ngrams_part]) else -1
+
+
 polarity_lfs = [
-    LF_default_positive,
+    # LF_default_positive,
+#    LF_polarity_description,
+    LF_polarity_transistor_type,
     LF_polarity_part_tabular_align,
     LF_polarity_part_horz_align,
-    LF_both_in_top_third,
+    LF_polarity_part_vert_align,
+    LF_polarity_right_of_part,
+    # LF_both_in_top_third,
     LF_polarity_in_header_tag,
     LF_polarity_complement,
-    LF_cheating_with_another_polarity
+    LF_both_present
+    # LF_cheating_with_another_polarity
 ]
+
 
 
 ### TEMPERATURE ###
@@ -427,4 +491,6 @@ def get_lfs(attr):
         attr_lfs = polarity_lfs
     elif attr == ('ce_v_max'):
         attr_lfs = ce_v_max_lfs
+    if attr == ('ce_v_max'):
+        return ce_v_max_part_lfs + attr_lfs
     return part_lfs + attr_lfs

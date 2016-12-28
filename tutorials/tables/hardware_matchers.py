@@ -103,7 +103,8 @@ matchers['ce_v_max_rgx'] = ce_v_max_rgx_matcher
 
 matchers['stg_temp_max'] = RegexMatchSpan(rgx=r'(?:[1][5-9]|20)[05]', longest_match_only=False)
 matchers['stg_temp_min'] = RegexMatchSpan(rgx=r'-[56][05]', longest_match_only=False)
-matchers['polarity'] = Intersect(polarity_rgx_matcher, polarity_lambda_matcher)
+matchers['polarity'] = polarity_rgx_matcher
+#matchers['polarity'] = Intersect(polarity_rgx_matcher, polarity_lambda_matcher)
 matchers['ce_v_max'] = Intersect(ce_v_max_rgx_matcher, attr_in_table_matcher, ce_v_max_row_matcher, ce_v_whole_number)
 
 ### GETTER ###
