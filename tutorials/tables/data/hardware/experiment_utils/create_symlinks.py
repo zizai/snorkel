@@ -9,6 +9,7 @@ train_other_pdf = DATA_PATH + "train_other/pdf/"
 dev_pdf = DATA_PATH + "dev/pdf/"
 dev_html = DATA_PATH + "dev/html/"
 
+# NOTE: You will need to create these folders beforehand. 
 output_html = DATA_PATH + "symlinked_html/"
 output_pdf = DATA_PATH + "symlinked_pdf/"
 
@@ -42,4 +43,5 @@ def create_symlinks(num_symlinks):
                     return
 
 if __name__ == "__main__":
+    # This determines how many symlinks to create.
     create_symlinks(1e6)
