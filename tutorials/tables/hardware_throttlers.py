@@ -9,12 +9,49 @@ of a throttler operates only on a single Span, move that logic to a matcher inst
 """
 
 throttlers = {}
+exp_throttlers = {}
 
 # Use this thin wrapper when using LFs that need 'part' and 'attr' attributes
 FakeCandidate = namedtuple('FakeCandidate', ['part', 'attr'])
 # c = FakeCandidate(part, attr)
 
 def same_page_throttler((part, attr)):
+    """
+    Used for Quality vs Context Experiments.
+    Returns true if the part and attribute are on the same page
+    """
+    return same_page((part, attr))
+
+def same_table_throttler((part, attr)):
+    """
+    Used for Quality vs Context Experiments.
+    Returns true if the part and attribute are on the same table
+    """
+    return same_table((part, attr))
+
+def same_alignment_throttler((part, attr)):
+    """
+    Used for Quality vs Context Experiments.
+    Returns true if the part and attribute are on the same row or column
+    """
+    return is_tabular_aligned((part, attr))
+
+
+def same_cell_throttler((part, attr)):
+    """
+    Used for Quality vs Context Experiments.
+    Returns true if the part and attribute are on the same page
+    """
+    return same_cell((part, attr))
+
+def same_phrase_throttler((part, attr)):
+    """
+    Used for Quality vs Context Experiments.
+    Returns true if the part and attribute are on the same page
+    """
+    return same_phrase((part, attr))
+
+def ce_v_max_throttler((part, attr)):
 #    if not same_page((part, attr)): return False
     if same_table((part, attr)):
         return (is_horz_aligned((part, attr)) or is_vert_aligned((part, attr)))
@@ -30,8 +67,31 @@ def polarity_throttler((part, attr)):
         return (is_horz_aligned((part, attr)) or is_vert_aligned((part, attr)))
     return True
 
-throttlers['ce_v_max'] = same_page_throttler
+def return_true((part, attr)):
+    """
+    Temporary function for use with Quality vs Context Experiments
+    """
+    return True
+
+exp_throttlers['page'] = same_page_throttler
+exp_throttlers['table'] = same_table_throttler
+exp_throttlers['aligned'] = same_alignment_throttler
+exp_throttlers['cell'] = same_cell_throttler
+exp_throttlers['phrase'] = same_phrase_throttler
+
+throttlers['ce_v_max'] = ce_v_max_throttler
 throttlers['polarity'] = polarity_throttler
+throttlers['stg_temp_min'] = return_true
+throttlers['stg_temp_max'] = return_true
+
+
+def make_exp_throttler(attr, context):
+    """
+    Temporary function to get a throttler that is ANDed with the original.
+    """
+    def combined(x):
+        return exp_throttlers[context](x) and throttlers[attr](x)
+    return combined
 
 def get_throttler(attr):
     # return None
@@ -39,6 +99,8 @@ def get_throttler(attr):
         return throttlers[attr]
     else:
         return None
+
+
 
 # def get_part_throttler_wrapper():
 #     """get a part throttler wrapper to throttler unary candidates with the usual binary throttler"""
@@ -56,7 +118,7 @@ def get_throttler(attr):
 #         (len(aligned_ngrams) > 25 and 'device' in aligned_ngrams) or
 #         # CentralSemiconductorCorp_2N4013.pdf:
 #         get_prev_sibling_tags(part).count('p') > 25 or
-#         overlap(['complementary', 'complement', 'empfohlene'], 
+#         overlap(['complementary', 'complement', 'empfohlene'],
 #                 chain.from_iterable([
 #                     get_left_ngrams(part, window=10),
 #                     get_aligned_ngrams(part)]))):
