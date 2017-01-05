@@ -104,7 +104,7 @@ class NoiseAwareModel(object):
         return np.array([1 if p > thresh else -1 if p < thresh else 0 for p in self.marginals(X)])
 
 
-class LogReg(NoiseAwareModel):
+class MnLogReg(NoiseAwareModel):
     """Logistic regression."""
     def __init__(self, bias_term=False):
         self.w         = None

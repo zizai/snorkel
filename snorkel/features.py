@@ -24,6 +24,8 @@ import re
 import codecs
 from candidates import *
 
+#from featurizers import DictionaryFeaturizer,KMeansFeaturizer
+
 #pyphen.language_fallback('nl_NL_variant1')
 morphology = pyphen.Pyphen(lang="en_Latn_US")
 #morphology = pyphen.Pyphen(lang="en_US")
@@ -487,14 +489,13 @@ class Featurizer(object):
 
 class NgramFeaturizer(Featurizer):
     """Feature for relations (of arity >= 1) defined over Ngram objects."""
-    def __init__(self, use_acronym_ftrs=True, use_kmeans_ftrs=False,
-                 arity=1, cluster_defs=None):
+    def __init__(self, use_acronym_ftrs=True, kmeans_ftrs=None, dict_ftrs=None,
+                 arity=1):
         super(NgramFeaturizer, self).__init__(arity,cluster_defs=None)
         self.use_acronym_ftrs = use_acronym_ftrs
-        self.use_kmeans_ftrs = use_kmeans_ftrs
-        #print "Using Acronym Features", self.use_acronym_ftrs
-        #print "Using kmeans Features", self.use_kmeans_ftrs
-       
+        self.kmeans_ftrs = kmeans_ftrs
+        self.dict_ftrs = dict_ftrs
+
     def _preprocess_candidates(self, candidates):
         for c in candidates:
             if not isinstance(c.sentence, dict):
@@ -507,11 +508,13 @@ class NgramFeaturizer(Featurizer):
         feature_generators = []
         
         if self.use_acronym_ftrs:
+            print "acronym features"
             acronym_ftrs = AcronymFeaturizer(candidates)
         
-        if self.kmeans_ftrs == None and self.cluster_defs:
-            self.kmeans_ftrs = KMeansFeaturizer(self.cluster_defs)
-            
+        #if self.kmeans_ftrs == None and self.cluster_defs:
+        #    self.kmeans_ftrs = KMeansFeaturizer(self.cluster_defs)
+
+
         # Unary relations
         if self.arity == 1:
 
@@ -520,9 +523,9 @@ class NgramFeaturizer(Featurizer):
                 lambda c : get_ddlib_feats(c, range(c.word_start, c.word_end+1)), 'DDLIB_', candidates))
 
             # Add TreeDLib entity features
-            get_feats = compile_entity_feature_generator()
-            feature_generators.append(self._generate_context_feats( \
-                lambda c : get_feats(c.sentence['xmltree'].root, range(c.word_start, c.word_end+1)), 'TDL_', candidates))
+            #get_feats = compile_entity_feature_generator()
+            #feature_generators.append(self._generate_context_feats( \
+            #    lambda c : get_feats(c.sentence['xmltree'].root, range(c.word_start, c.word_end+1)), 'TDL_', candidates))
             
             # word shape features
             feature_generators.append( generate_mention_feats( \
@@ -554,10 +557,11 @@ class NgramFeaturizer(Featurizer):
                 feature_generators.append( generate_mention_feats( acronym_ftrs.get_ftrs, "", candidates) )            
             
             # kmeans features
-            if self.use_kmeans_ftrs:
-                feature_generators.append( generate_mention_feats( self.kmeans_ftrs.get_ftrs, "", candidates) )            
-            
-            
+            if self.kmeans_ftrs != None:
+                feature_generators.append( generate_mention_feats( self.kmeans_ftrs.get_ftrs, "", candidates) )
+
+            if self.dict_ftrs != None:
+                feature_generators.append(generate_mention_feats(self.dict_ftrs.get_ftrs, "", candidates))
  
  
         if self.arity == 2:
@@ -634,17 +638,7 @@ class AcronymFeaturizer(object):
                 for lf in self.short_form_index[doc_id][sf]:
                     ftrs += self.get_short_form_ftrs(lf)
                 self.ftr_index[doc_id][sf] = list(set(ftrs))
-                #print sf, len(self.ftr_index[doc_id][sf]), self.ftr_index[doc_id][sf][0:10]
-                #print
-                #if sf not in self.global_ftr_index:
-                #    self.global_ftr_index[sf] = []
-                #self.global_ftr_index[sf] += self.ftr_index[doc_id][sf]
-        
-        #for sf in self.global_ftr_index:
-        #    print sf, len(self.global_ftr_index[sf]), self.global_ftr_index[sf]
 
-        
-        
 
     def is_short_form(self, s, min_length=2):
         '''
@@ -774,7 +768,7 @@ class AcronymFeaturizer(object):
         w_ftrs = []
         if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
             w_ftrs += list(self.ftr_index[c.doc_id][word])
-           
+
         for i,ftr in enumerate(w_ftrs):
             yield ftr
         

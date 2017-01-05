@@ -1,6 +1,206 @@
 import re
+import numpy as np
 import codecs
 from candidates import *
+from gensim.models.word2vec import Word2Vec
+
+class DictionarySeqFeaturizer(object):
+    '''Should do this at the sentence level for CRF so that we
+    capture multiple word spans'''
+    def __init__(self, dictionary):
+        self.dictionary = dictionary
+
+    def _sentence_match(self, sent, dictionary, max_ngrams=4):
+        # TODO setup to match raw span vs tokens
+        words = zip(*sent)[0]
+        tags = [0] * len(words)
+        spans = {}  # longest span match
+        for i in range(len(words)):
+            if tags[i] == 1:
+                continue
+            span_len = i + 1
+            for j in range(i + 1, min(len(words), i + 1 + max_ngrams)):
+                term = " ".join(words[i:j]).lower()
+                if term in dictionary:
+                    tags[i:j] = [1] * (j - i)
+                    spans[i] = term
+                    span_len = j
+
+            if tags[i] == 1:
+                term = spans[i]
+                for j in range(i, span_len):
+                    spans[j] = term
+
+        return tags, spans
+
+
+    def get_ftrs(self, c):
+        #dict_tags, dict_spans = dictionary_match(tokens, dict_diseases)
+        # ftrs += ['word.dictionary=%s' % (dict_tags[i] == 1)]
+        # if i in dict_spans:
+        #     ftrs += ['word.span=%s' % dict_spans[i].replace(" ", "_")]
+        pass
+
+
+class DictionaryFeaturizer(object):
+    def __init__(self, dictionary):
+        self.dictionary = dictionary
+
+    def get_ftrs(self, c):
+        term = c.get_attrib_span("words")
+        if term.lower() in self.dictionary or term in self.dictionary:
+            yield 'word.dictionary=True'
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---------------------
+# Sequence Features
+#
+class CharNgramFeaturizer(object):
+    def get_ftrs(self, word):
+        for i in range(len(word) - 1):
+            yield "word.char_ngram=" + word[i:i + 2]
+        for i in range(len(word) - 2):
+            yield "word.char_ngram=" + word[i:i + 3]
+
+
+class WordShapeFeaturizer(object):
+    def get_ftrs(self, s):
+        '''From SpaCY'''
+        if len(s) >= 100:
+            return 'LONG'
+        length = len(s)
+        shape = []
+        last = ""
+        shape_char = ""
+        seq = 0
+        for c in s:
+            if c.isalpha():
+                if c.isupper():
+                    shape_char = "X"
+                else:
+                    shape_char = "x"
+            elif c.isdigit():
+                shape_char = "d"
+            else:
+                shape_char = c
+            if shape_char == last:
+                seq += 1
+            else:
+                seq = 0
+                last = shape_char
+            if seq < 4:
+                shape.append(shape_char)
+        return ''.join(shape)
+
+
+class EmbeddingFeaturizer(object):
+    '''Load and binarize embeddings'''
+    def __init__(self, model, fmt="gensim"):
+
+        self._load_model(fmt, model)
+        self._binarize()
+
+
+    def _load_model(self, fmt, emb_model):
+
+        if fmt == "gensim":
+            model = Word2Vec.load(emb_model) if type(emb_model) is str else emb_model
+            model.init_sims()
+
+            self.index2word = {model.vocab[word].index: word for word in model.vocab}
+            self.word2index = {word: model.vocab[word].index for word in model.vocab}
+            self.emb = model.syn0norm
+
+        elif fmt == "text":
+            emb = []
+            self.index2word = {}
+            m = 0
+            with open(emb_model,"rU") as fp:
+                i,malformed = 0,0
+                for line in fp:
+                    row = line.strip().split()
+                    term,vec = row[0],row[1:]
+                    if i == 0:
+                        m = len(vec)
+                    if len(vec) != m:
+                        malformed += 1
+                        print line[0:200]
+                        print term
+                        print len(vec)
+                        continue
+                    self.index2word[i] = term
+                    emb += [[float(v) for v in vec]]
+                    i += 1
+            if malformed > 0:
+                print>> sys.stderr, "WARNING {} malformed rows".format(malformed)
+
+            self.word2index = {word:idx for idx,word in self.index2word.items()}
+            self.emb = np.array(emb)
+            print self.emb.shape
+
+        elif fmt == "word2vec":
+            print "Warning word2vec binary not implemented!"
+
+
+    def _binarize(self):
+        '''Simple transform of continuous dense embedding to binary
+        For each dimension D X Vocabulary
+         1) Split into pos/neg parts
+         2) Compute mean of pos/neg
+         3) v+ >= mean+   =  1
+            v- <= mean-   = -1
+            otherise      =  0
+        creating 2 x D additional features
+        '''
+        emb_T = self.emb.T
+        emb = np.zeros(emb_T.shape, dtype=np.int8)
+        print emb.shape
+
+        for i in range(emb_T.shape[0]):
+            pos_mean = np.mean(emb_T[i][emb_T[i] > 0])
+            neg_mean = np.mean(emb_T[i][emb_T[i] < 0])
+
+            emb[i][emb_T[i] >= pos_mean] = 1
+            emb[i][emb_T[i] <= neg_mean] = -1
+
+        self.emb = emb.T
+
+
+    def _best_match(self,c):
+        '''Attempt some common transforms to find the closest
+        matching term with a learned representation'''
+        term = c.get_attrib_span("words")
+
+        if term in self.word2index:
+            return self.word2index[term]
+        if term.lower() in self.word2index:
+            return self.word2index[term.lower()]
+
+        term = re.sub("[.=/!?]+","",term)
+        if term in self.word2index:
+            return self.word2index[term]
+        if term.lower() in self.word2index:
+            return self.word2index[term.lower()]
+        return -1
+
+    def get_ftrs(self, c):
+
+        i = self._best_match(c)
+        if i != -1:
+            row = self.emb[i]
+            for i in range(row.shape[0]):
+                yield "emb_{}={}".format(i, row[i])
 
 
 class KMeansFeaturizer(object):
@@ -21,9 +221,9 @@ class KMeansFeaturizer(object):
         for t in tokens:
             if t.lower() in self.word2cluster:
                 ftr = 'WORD_CLUSTER_' + str(self.word2cluster[t.lower()])
-                #ftr = str(self.word2cluster[t.lower()])
                 yield ftr
-        
+
+
 class AcronymFeaturizer(object):
     '''Requires document-level knowledge
     '''
@@ -45,7 +245,6 @@ class AcronymFeaturizer(object):
                     ftrs += self.get_short_form_ftrs(lf)
                 self.ftr_index[doc_id][sf] = list(set(ftrs))
 
-
     def is_short_form(self, s, min_length=2):
         '''
         Rule-based function for determining if a token is likely
@@ -66,7 +265,6 @@ class AcronymFeaturizer(object):
         
         return False if reject else True
 
-
     def get_parenthetical_short_forms(self, sentence):
         '''
         Generator that returns indices of all words 
@@ -78,7 +276,6 @@ class AcronymFeaturizer(object):
                 if (window[0] == "(" and window[-1] == ")"):
                     if self.is_short_form(window[1]):
                         yield i
-
 
     def extract_long_form(self, i, sentence, max_dup_chars=2):
         '''
@@ -145,7 +342,6 @@ class AcronymFeaturizer(object):
         char_end = max(offsets)
         return Ngram(char_start, char_end-1, sentence, {"short_form":short_form}) 
 
-
     def get_short_form_index(self, documents):
         '''
         Build a short_form->long_form mapping for each document. Any 
@@ -171,26 +367,21 @@ class AcronymFeaturizer(object):
                     
         return sf_index
 
+    def get_short_form_ftrs(self,c):
+        ftrs = list(self.featurizer.get_ftrs(c))
+        ftrs = [f for f in ftrs if f not in ["BOS","EOS"] and not re.search("^[+-]*1:",f)]
+        ftrs += ["word.span=%s" % c.get_attrib_span("words").lower().replace(" ", "_")]
+        return ftrs
 
     def get_ftrs(self,c):
         word = c.get_attrib_span("words")
         w_ftrs = []
         if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
             w_ftrs += list(self.ftr_index[c.doc_id][word])
-           
+
+        #if w_ftrs:
+        #    print c.get_attrib_span("words"), len(w_ftrs)
         for i,ftr in enumerate(w_ftrs):
             yield ftr
 
 
-    def get_short_form_ftrs(self,c):
-        ftrs = list(self.featurizer.get_ftrs(c))
-
-        ftrs = [f for f in ftrs if f not in ["BOS","EOS"] and not re.search("^[+-]*1:",f)]
-        #ftrs += ["word.lower=%s" % c.get_attrib_span("words").lower().replace(" ","_")]
-        ftrs += ["word.span=%s" % c.get_attrib_span("words").lower().replace(" ", "_")]
-
-        # just add word tokens
-        #for t in c.get_attrib_span("words").lower().split():
-        #   ftrs += ["word.lower=%s" % t]
-
-        return ftrs
