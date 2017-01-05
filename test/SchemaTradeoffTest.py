@@ -126,7 +126,7 @@ def run_benchmark(xaxis, yaxis):
             series[mat_name].append(min(timings))
         plt.plot(real_xs, series[mat_name], label=mat_name)
     
-    print 'Benchmark_' + xaxis + '\t' + '\t'.join([str(x) for x in real_xs])
+    print 'Benchmark_' + xaxis + '_vs._' + yaxis + '\t' + '\t'.join([str(x) for x in real_xs])
     for mat_name, data in series.iteritems():
         print mat_name + '\t' + '\t'.join([str(x) for x in data])
 #     show_plot(xaxis, yaxis)
