@@ -198,6 +198,7 @@ class Learner(object):
         self.X_test = None
 
         self.gen_model = gen_model
+        self.training_marginals = None
 
     def _set_model_X(self, L, F):
         """Given LF matrix L, feature matrix F, return the matrix used by the end discriminative model."""
@@ -282,6 +283,13 @@ class PipelinedLearner(Learner):
     to the Data Programming paper
     """
 
+    def train_gen_model(self, lf_w0=5.0, **model_hyperparams):
+        self.training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+
+    def train_disc_model(self, feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
+        if self.model:
+            self.train_model(self.training_marginals, w0=feat_w0, **model_hyperparams)
+
     def _set_model_X(self, L, F):
         n, f = F.shape
         X = F.tocsr()
@@ -291,14 +299,14 @@ class PipelinedLearner(Learner):
 
     def train_lf_model(self, w0=1.0, **model_hyperparams):
         """Train the first _generative_ model of the LFs"""
-
+        #gen_n_iter = 4000
         #w0 = w0 * np.ones(self.m)
         #self.training_model = self.gen_model
         #self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
         w0 = w0*np.ones(self.m)
         self.training_model =  self.gen_model
-        self.training_model.train(self.L_train, w0=w0)
+        self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
 
         # Compute marginal probabilities over the candidates from this model of the training set
@@ -384,10 +392,15 @@ class SpanLearner(PipelinedLearner):
             self.train_model(self.training_marginals, w0=feat_w0, **model_hyperparams)
 
     def _get_sentence_bags(self, candidates):
-        '''All disjoint (non-overlapping) spans in candidate set'''
+        '''
+        All disjoint (non-overlapping) spans in candidate set
+
+        :param candidates:
+        :return:
+        '''
         candidates = zip(*sorted([(c.char_start, c) for c in candidates]))[1]
 
-        bags = []
+        spans = []
         curr = [candidates[0]]
         for i in range(1, len(candidates)):
             if not curr:
@@ -402,21 +415,24 @@ class SpanLearner(PipelinedLearner):
             if span_overlap:
                 curr += [candidates[i]]
             else:
-                bags += [curr]
+                spans += [curr]
                 curr = [candidates[i]]
         if curr:
-            bags += [curr]
+            spans += [curr]
 
-        for b in bags:
-            yield b
+        for s in spans:
+            yield s
 
     def _get_bags(self, candidates):
         """
-        Create span bags for multinomial classification
+        Create candidate spansets for multinomial classification
         :param candidates:
         :return:
         """
         L = self.training_set.L
+
+        print L.shape
+        print len(candidates)
 
         # building bags by starting with positive labeled candidates
         coverage = np.zeros(L.shape[0])
@@ -438,6 +454,11 @@ class SpanLearner(PipelinedLearner):
 
             # TODO: add heuristic to break up very long spans
 
+            #for b in sent_bags:
+            #    print b
+            #break
+
+
             # sanity check for disjoint bags
             if disjoint(sent_bags):
                 print>> sys.stderr, sent_id, "ERROR -- Bags are NOT disjoint"
@@ -451,7 +472,12 @@ class SpanLearner(PipelinedLearner):
         self.span_bags = self._get_bags(self.training_set.training_candidates)
 
     def _set_span(self, candidates):
-        '''Get candidate set span'''
+        '''
+        Get candidate set span
+
+        :param candidates:
+        :return:
+        '''
         offsets = list(itertools.chain.from_iterable([[c.char_start, c.char_end] for c in candidates]))
         i, j = min(offsets), max(offsets)
         text = candidates[0].sentence["text"]
@@ -459,16 +485,25 @@ class SpanLearner(PipelinedLearner):
         s = text[i - offset:j - offset + 1]
         return s, (i - offset, j - offset + 1)
 
-    # ------------------------------
+
+    # TODO: REFACTOR
+    # ---------------------------------
 
     def train_lf_model(self, w0=5.0, **model_hyperparams):
+        '''
+
+        :param w0:
+        :param model_hyperparams:
+        :return:
+        '''
 
         num_lfs = self.training_set.L.shape[1]
         lf_w = np.array([w0] * num_lfs)
 
         # multinomial
         if type(self.gen_model) is MnLogReg:
-            print "\nMultinomial LogReg generative model"
+
+            missing = 0
             self.generate_span_bags()
 
             Xs, Ys, classes, f_bags, f_instances = self.lf_prob(include_neg=True)
@@ -484,36 +519,46 @@ class SpanLearner(PipelinedLearner):
             marginals = []
             mn_marginals = self.gen_model.marginals(self.Xs)
             # cand_index = {c: i for i in range(len(f_bags)) for c in f_bags[i]}
-            cand_index = {}
+            cand_span_index = {}
             for i in range(len(f_bags)):
                 for c in f_bags[i]:
-                    cand_index[c] = i
+                    cand_span_index[c] = i
 
-            # marginals for multinomials are per spanset, so we need to flatten
-            # matrices back to our original observed candidate set
-            # candidate with no LF coverage are assumed 0.5 (random)
+            # Marginals for multinomials are per spanset, so we need to flatten
+            # matrices back to our original observed candidate set candidate
+            # Candidates with no LF coverage are assumed 0.5
             for c in self.training_set.training_candidates:
 
-                if c not in cand_index:
-                    print>> sys.stderr, "MISSING in candidate index (skipped)", c
+                if c not in cand_span_index:
                     marginals.append(0.5)
+                    missing += 1
                     continue
 
-                i = cand_index[c]
+                i = cand_span_index[c]
 
-                mention = c.get_attrib_span("words").replace(" ", "")
-                classes = [x.replace(" ", "") for x in self.classes[i]]
-                if mention not in classes:
-                    # HACK fix this bug with words and punctuation
-                    print "Multinomial Seq Error", c
-                    print mention
-                    print classes
-                    marginals.append(0.5)
-                else:
-                    k = classes.index(mention)
+                if c in self.f_bags[i]:
+                    idx = self.f_bags[i].index(c)
+                    k = self.f_instances[i][idx]
                     marginals.append(mn_marginals[i][k])
+                else:
+                    print>>sys.err, "Multinomial Seq Error"
+                    marginals.append(0.5)
+
+                #mentions = [self.classes[i][j] for j in self.f_instances[i]]
+
+                # mention = c.get_attrib_span("words").replace(u" ", u"")
+                # classes = [x.replace(u" ", u"") for x in self.classes[i]]
+                # if mention not in classes:
+                #     missing += 1
+                #     marginals.append(0.5)
+                # else:
+                #     k = classes.index(mention)
+                #     marginals.append(mn_marginals[i][k])
 
             self.marginals = mn_marginals
+
+            if missing > 0:
+                print>>sys.stderr, "Skipped {}/{} candidates with no LF coverage".format(missing,len(self.training_set.training_candidates))
 
             return np.array(marginals)
 
@@ -524,18 +569,15 @@ class SpanLearner(PipelinedLearner):
             self.gen_model.train(self.L_train, w0=lf_w, **model_hyperparams)
             return self.gen_model.marginals(self.L_train)
 
-    def _get_class_idx(self, candidate, classes):
-        pass
-
-    def _bag_arity(self, bag, split_chars=["/", "-"]):
-        '''Determine num_words per bag,
-        forcing splits on certain characters '''
-        s, (i, j) = self._set_span(bag)
-        seq = tokenize(s, split_chars)
-        return (2 ** len(seq)), seq
 
     def bag_lf_prob(self, bag, L, sparsity_threshold=1024):
-        '''Create the M x D_i (num_lfs X num_classes) matrix
+        '''
+        Create the M x D_i (num_lfs X num_classes) matrix
+
+        :param bag:
+        :param L:
+        :param sparsity_threshold:
+        :return:
         '''
         num_lfs = self.training_set.L.shape[1]
         candidates = [c for c in bag if c != None]
@@ -543,6 +585,11 @@ class SpanLearner(PipelinedLearner):
         # generate class space and candidate instances
         seq, instances = self.candidate_multinomials(candidates)
         P = np.zeros((num_lfs, 2 ** len(seq)))  # M x D_i probabilty distrib
+
+        # HACK
+        #if 2 ** len(seq) >= sparsity_threshold:
+        #    P = lil_matrix((num_lfs, 2 ** len(seq) ), dtype=np.float32)
+
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
 
@@ -575,10 +622,6 @@ class SpanLearner(PipelinedLearner):
         P = (P.T / np.sum(P, axis=1)).T
         P[np.isnan(P)] = 0
 
-        # force sparse matrix give some candidate space size
-        # if k > sparsity_threshold:
-        #    P = csr_matrix(P)
-
         class_names = []
         classes = zip(*sorted(classes.items(), key=lambda x: x[1], reverse=0))[0]
         seq = np.array(seq)
@@ -588,6 +631,10 @@ class SpanLearner(PipelinedLearner):
                 continue
             class_names += [" ".join(seq[np.array(key)])]
 
+        # HACK -- use sparse format for large P matrices
+        if (2 ** len(seq)) > sparsity_threshold:
+            P = csr_matrix(P)
+
         # specific instance indices
         instances = [classes.index(idxs) for idxs in instances]
 
@@ -595,7 +642,12 @@ class SpanLearner(PipelinedLearner):
 
 
     def candidate_multinomials(self, candidates, split_chars=["/", "-", "+"]):
-        '''convert candidates to tokenized binary sequences '''
+        '''
+        Decompose candidate spanset into corresponding sequence instances
+        :param candidates:  spanset candidates
+        :param split_chars:
+        :return:
+        '''
         sentence = candidates[0].sentence
         offset = sentence["char_offsets"][0]
         char_offsets = [i - offset for i in sentence["char_offsets"]]
@@ -647,6 +699,13 @@ class SpanLearner(PipelinedLearner):
         return tokens, instances
 
     def lf_prob(self, include_neg=True, class_threshold=8192):
+        '''
+        For each spanset, generate a matrix of LF probabilities
+
+        :param include_neg:     include spansets that only include negative LF weights
+        :param class_threshold:
+        :return:
+        '''
 
         Xs, Ys, strs, f_bags, f_instances = [], [], [], [], []
         L = self.training_set.L
@@ -654,8 +713,9 @@ class SpanLearner(PipelinedLearner):
 
         for i, bag in enumerate(self.span_bags):
 
-            # skip long classes
-            k, _ = self._bag_arity(bag)
+            # Filer pathologically long cases
+            seq, instances = self.candidate_multinomials(bag)
+            k = 2 ** len(seq)
             if k > class_threshold:
                 print "SKIPPING", class_threshold, k
                 continue
@@ -675,25 +735,33 @@ class SpanLearner(PipelinedLearner):
 
         return Xs, Ys, strs, f_bags, f_instances
 
-    def export(self, outfile, marginals=None, num_samples=10,
-               tagname="DISEASE", fmt="pkl", threshold=0.0):
-        '''Export tagged sentences to file of given format'''
 
+    def export(self, outfile, marginals=None, num_samples=10,
+               tagname="Disease", fmt="pkl", threshold=0.0, min_coverage=1):
+        '''
+        Export sample sentences and candidates
+        :param outfile:
+        :param marginals:
+        :param num_samples:
+        :param tagname:
+        :param fmt:
+        :param threshold:
+        :return:
+        '''
         # Multinomial-based sampling
         if type(self.gen_model) is MnLogReg:
-            print "Multinomial Sampler"
             if marginals == None:
                 marginals = self.marginals
             sampler = self.mn_sample
         else:
-            print "Binary Sampler"
             if marginals == None:
                 marginals = self.training_marginals
             sampler = self.bin_sample
 
         sentences = {}
         ner_tags = defaultdict(list)
-        for i, (sentence, cands) in enumerate(sampler(marginals, num_samples=num_samples, threshold=threshold)):
+        for i, (sentence, cands) in enumerate(sampler(marginals, num_samples=num_samples,
+                                                      threshold=threshold, min_coverage=min_coverage)):
             sent, tags = tag_sentence(sentence, cands)
             if sent is None:  # HACK sometimes re-tokenization fails due to char offsets.
                 print "ERROR"
@@ -719,10 +787,12 @@ class SpanLearner(PipelinedLearner):
                             tag = (word, pos_tag, ner_tag)
                             fp.write(" ".join(tag) + u"\n")
                         fp.write(u"\n")
+        else:
+            print>>sys.stderr,"ERROR - unrecognized export format"
 
 
     def bin_sample(self, marginals, num_samples=10, format="conll",
-               threshold=0.0, show_progress=False):
+               threshold=0.0, min_coverage=1):
         '''Sample spans using heuristics to normalize across overlapping spans'''
         self.span_bags = self._get_bags(self.training_set.training_candidates)
 
@@ -750,7 +820,8 @@ class SpanLearner(PipelinedLearner):
                         cand_set = [None] + self.span_bags[bag_i]
                         prob = [p/sum(prob) for p in prob]
 
-                        dist = [[p,c] for p,c in zip(prob,cand_set) if p >= threshold]
+                        # filter probabilities (and remove candidates with p=0.5, i.e., no LF coverage)
+                        dist = [[p,c] for p,c in zip(prob,cand_set) if p >= threshold and p != 0.5]
                         m_prob = zip(*dist)[0]
                         prob = [(p / sum(m_prob), c) for p,c in dist]
 
@@ -776,26 +847,45 @@ class SpanLearner(PipelinedLearner):
 
     def predictions(self,threshold=0.5):
         return None
-        self.training_marginals
-
 
 
     def mn_sample(self, marginals, num_samples=10, format="conll",
-               threshold=0.0, show_progress=False):
-
+               threshold=0.0, min_coverage=-1):
+        '''
+        Generate sample sentences using multinomial marginals
+        :param marginals:
+        :param num_samples:
+        :param format:
+        :param threshold:
+        :return:
+        '''
         cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
         sentences = {c.sent_id: c.sentence for c in cands}
+
+        # skip sentences with any uncovered candidates (use thresholding)
+        if min_coverage != -1:
+            # covered candidates
+            span_cand_idx = dict.fromkeys(cands)
+            # sentences with uncovered candidates
+            train_cand_idx = {c:1 for c in self.training_set.training_candidates if c not in span_cand_idx}
+            # allow for sentences with <= min_coverage uncovered candidates
+            sent_freq = defaultdict(int)
+            for c in train_cand_idx:
+                sent_freq[c.sent_id] += 1
+            train_cand_idx = {c.sent_id:1 for c in train_cand_idx if sent_freq[c.sent_id] > min_coverage}
+            n = float(len(sentences))
+            sentences = {sent_id:sent for sent_id,sent in sentences.items() if sent_id not in train_cand_idx}
+        else:
+            n = float(len(sentences))
+
+        print "%2.1f%% sentences dropped" % ((1.0 - (len(sentences)/n)) * 100)
+
 
         sent_bags_idxs = defaultdict(list)
         for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
             sent_bags_idxs[sent_id].append(i)
 
         for progress, sent_id in enumerate(sorted(sentences)):
-
-            if show_progress and progress % 100 == 0 or progress == len(sentences):
-                sys.stdout.write('Sampling \r{:2.2f}% {}/{}'.format((progress / float(len(sentences)) * 100),
-                                                                    progress, len(sentences)))
-                sys.stdout.flush()
 
             try:
                 samples = []
@@ -816,8 +906,8 @@ class SpanLearner(PipelinedLearner):
                                 (name in mentions or name == '<N/A>') and p >= threshold]
                         m = zip(*dist)[0]
                         p = [(p / sum(m), name) for p, name in dist]
-
                         p, classes = zip(*p)
+
                         rs = np.random.choice(classes, 1, p=p)[0]
                         if rs in mentions:
                             rs = self.f_bags[bag_i][mentions.index(rs)]
@@ -841,29 +931,9 @@ class SpanLearner(PipelinedLearner):
                continue
 
 
-def expand_pos_tag(word, tag):
-    pos_tag_map = {"/": ":", "-": ":"}
-    tags = [tag if t not in pos_tag_map else pos_tag_map[t] for t in word.split()]
-    return tags
-
-
 def overlaps(c1, c2):
     v = c1.doc_id == c2.doc_id
     return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
-
-
-def align(a, b):
-    j = 0
-    offsets = []
-    for i in range(0, len(a)):
-        matched = False
-        while not matched and j < len(b):
-            if a[i] == b[j]:
-                offsets += [(i, j)]
-                matched = True
-            j += 1
-    return offsets
-
 
 def tokenize(s, split_chars):
     '''Force tokenization'''

@@ -129,8 +129,15 @@ Sentence = namedtuple('Sentence', ['id', 'words', 'lemmas', 'poses', 'dep_parent
     'doc_id', 'text', 'char_offsets', 'doc_name', 'xmltree'])
 
 
+PTB = {'-RRB-': ')', '-LRB-': '(', '-RCB-': '}', '-LCB-': '{',
+         '-RSB-': ']', '-LSB-': '['}
+
+CORE_ANNOTATORS = ['tokenize', 'ssplit']
+
 class SentenceParser:
-    def __init__(self, tok_whitespace=False, disable_ptb=False):
+    def __init__(self, tok_whitespace=False, disable_ptb=False, annotators=['pos', 'lemma', 'depparse', 'ner']):
+        self.annotators = CORE_ANNOTATORS + annotators
+
         # http://stanfordnlp.github.io/CoreNLP/corenlp-server.html
         # Spawn a StanfordCoreNLPServer process that accepts parsing requests at an HTTP port.
         # Kill it when python exits.
@@ -140,27 +147,31 @@ class SentenceParser:
         self.port = 12345
         self.tok_whitespace = tok_whitespace
         loc = os.path.join(os.environ['SNORKELHOME'], 'parser')
-        cmd = ['java -Xmx4g -cp "%s/*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer --port %d > /dev/null' % (loc, self.port)]
+        cmd = [
+            'java -Xmx4g -cp "%s/*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer --port %d --timeout %d > /dev/null'
+            % (loc, self.port, 600000)]
         self.server_pid = Popen(cmd, shell=True).pid
         atexit.register(self._kill_pserver)
         props = "\"tokenize.whitespace\": \"true\"," if self.tok_whitespace else ""
 
         # disable all the penn tree bank replacement tokens
-        tokenizer_options = {"normalizeParentheses":False,
-                             "normalizeCurrency":False,
-                             "normalizeFractions":False,
-                             "normalizeParentheses":False,
-                             "normalizeOtherBrackets":False,
-                             "asciiQuotes":False,
-                             "latexQuotes":False,
-                             "ptb3Ellipsis":False,
-                             "ptb3Dashes":False,
-                             "escapeForwardSlashAsterisk":False}
+        # nlp.stanford.edu/software/tokenizer.html
+        tokenizer_options = {"normalizeParentheses": False,
+                             "normalizeCurrency": False,
+                             "normalizeFractions": False,
+                             "normalizeParentheses": False,
+                             "normalizeOtherBrackets": False,
+                             "asciiQuotes": False,
+                             "latexQuotes": False,
+                             "ptb3Ellipsis": False,
+                             "ptb3Dashes": False,
+                             "escapeForwardSlashAsterisk": False,
+                             "strictTreebank3": True}
 
         opts = ["{}={}".format(key, str(value).lower()) for key, value in tokenizer_options.items()]
         tokenizer_options = "," + '"tokenize.options":"{}"'.format(",".join(opts)) if disable_ptb else ""
-
-        self.endpoint = 'http://127.0.0.1:%d/?properties={%s"annotators": "tokenize,ssplit,pos,lemma,depparse", "outputFormat": "json" %s}' % (self.port, props, tokenizer_options)
+        self.endpoint = 'http://127.0.0.1:%d/?properties={%s"annotators": "%s", "outputFormat": "json" %s}' % (
+        self.port, props, ','.join(self.annotators), tokenizer_options)
 
         # Following enables retries to cope with CoreNLP server boot-up latency
         # See: http://stackoverflow.com/a/35504626
@@ -171,7 +182,7 @@ class SentenceParser:
                         connect=20,
                         read=0,
                         backoff_factor=0.1,
-                        status_forcelist=[ 500, 502, 503, 504 ])
+                        status_forcelist=[500, 502, 503, 504])
         self.requests_session.mount('http://', HTTPAdapter(max_retries=retries))
 
     def _kill_pserver(self):
@@ -181,47 +192,87 @@ class SentenceParser:
             except:
                 sys.stderr.write('Could not kill CoreNLP server. Might already got killt...\n')
 
-    def parse(self, s, doc_id=None, doc_name=None, xmltree=True):
+    def parse(self, text, doc_id=None, doc_name=None, xmltree=True):
         """Parse a raw document as a string into a list of sentences"""
-        if len(s.strip()) == 0:
+        if len(text.strip()) == 0:
             return
-        if isinstance(s, unicode):
-            s = s.encode('utf-8')
-        resp = self.requests_session.post(self.endpoint, data=s, allow_redirects=True)
-        s = s.decode('utf-8')
+        if isinstance(text, unicode):
+            text = text.encode('utf-8', 'error')
+        resp = self.requests_session.post(self.endpoint, data=text, allow_redirects=True)
+        text = text.decode('utf-8')
         content = resp.content.strip()
-        if content.startswith("Request is too long") or content.startswith("CoreNLP request timed out"):
-            raise ValueError("File {} too long. Max character count is 100K".format(doc_id))
-        blocks = json.loads(content, strict=False)['sentences']
+        if content.startswith("Request is too long"):
+            raise ValueError("File {} too long. Max character count is 100K.".format(document.name))
+        if content.startswith("CoreNLP request timed out"):
+            raise ValueError("CoreNLP request timed out on file {}.".format(document.name))
+        try:
+            blocks = json.loads(content, strict=False)['sentences']
+        except:
+            warnings.warn("CoreNLP skipped a malformed sentence.", RuntimeWarning)
+            return
+        position = 0
+        diverged = False
+
         sent_id = 0
         for block in blocks:
             parts = defaultdict(list)
             dep_order, dep_par, dep_lab = [], [], []
             for tok, deps in zip(block['tokens'], block['basic-dependencies']):
                 parts['words'].append(tok['word'])
-                parts['lemmas'].append(tok['lemma'])
-                parts['poses'].append(tok['pos'])
+                if 'lemma' in self.annotators:
+                    parts['lemmas'].append(tok['lemma'])
+                if 'pos' in self.annotators:
+                    parts['poses'].append(tok['pos'])
+                #if 'ner' in self.annotators:
+                #    parts['ner_tags'].append(tok['ner'])
                 parts['char_offsets'].append(tok['characterOffsetBegin'])
-                dep_par.append(deps['governor'])
-                dep_lab.append(deps['dep'])
-                dep_order.append(deps['dependent'])
-            parts['dep_parents'] = sort_X_on_Y(dep_par, dep_order)
-            parts['dep_labels'] = sort_X_on_Y(dep_lab, dep_order)
+                if 'depparse' in self.annotators:
+                    dep_par.append(deps['governor'])
+                    dep_lab.append(deps['dep'])
+                    dep_order.append(deps['dependent'])
+
+            # make char_offsets relative to start of sentence
+            #abs_sent_offset = parts['char_offsets'][0]
+            #parts['char_offsets'] = [p - abs_sent_offset for p in parts['char_offsets']]
+
+            if 'depparse' in self.annotators:
+                parts['dep_parents'] = sort_X_on_Y(dep_par, dep_order)
+                parts['dep_labels'] = sort_X_on_Y(dep_lab, dep_order)
+
+            # NOTE: We have observed weird bugs where CoreNLP diverges from raw document text (see Issue #368)
+            doc_text = text[block['tokens'][0]['characterOffsetBegin']: block['tokens'][-1]['characterOffsetEnd']]
+            L = len(block['tokens'])
+            parts['text'] = doc_text
+            #parts['position'] = position
+
+            # replace PennTreeBank tags with original forms
+            parts['words'] = [PTB[w] if w in PTB else w for w in parts['words']]
+            if 'lemma' in self.annotators:
+                parts['lemmas'] = [PTB[w.upper()] if w.upper() in PTB else w for w in parts['lemmas']]
+
+            # Link the sentence to its parent document object
+            #parts['document'] = document
+
+            # Add null entity array (matching null for CoreNLP)
+            #parts['entity_cids'] = ['O' for _ in parts['words']]
+            #parts['entity_types'] = ['O' for _ in parts['words']]
+
             parts['sent_id'] = sent_id
             parts['doc_id'] = doc_id
-            parts['text'] = s[block['tokens'][0]['characterOffsetBegin'] :
-                                block['tokens'][-1]['characterOffsetEnd']]
+            parts['text'] = text[block['tokens'][0]['characterOffsetBegin']:
+            block['tokens'][-1]['characterOffsetEnd']]
             parts['doc_name'] = doc_name
             parts['id'] = "%s-%s" % (parts['doc_id'], parts['sent_id'])
             parts['xmltree'] = None
-            
-            # replace PennTreeBank tags with original forms
-            parts['words'] = [PTB[w] if w in PTB else w for w in parts['words']]
-            parts['lemmas'] = [PTB[w.upper()] if w.upper() in PTB else w for w in parts['lemmas']]
-
-            
             sent = Sentence(**parts)
             sent_id += 1
+
+
+
+            # Assign the stable id as document's stable id plus absolute character offset
+            #abs_sent_offset_end = abs_sent_offset + parts['char_offsets'][-1] + len(parts['words'][-1])
+            #parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)
+            position += 1
             yield sent
 
     def parse_docs(self, docs, xmltree=True):

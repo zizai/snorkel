@@ -290,3 +290,5 @@ class Ngrams(CandidateSpace):
                         for j in range(1, self.n_max):
                             if i>=j and m.start(1) > 0:
                                 yield Ngram(char_start=cos[i-j], char_end=char_start + m.start(1) - 1, sent=s)
+
+

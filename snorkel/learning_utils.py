@@ -181,8 +181,6 @@ class GridSearch(object):
             print "=" * 60
 
             # Train the model
-            print type(self.learner)
-            print "HYPERPARM", model_hyperparams
             self.learner.train(**model_hyperparams)
 
             # Test the model

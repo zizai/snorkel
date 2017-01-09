@@ -148,11 +148,6 @@ def retokenize_sentence(sentence, split_chars=[u"/", u"-", u"+"]):
     lengths = map(len, t_sentence)
     if lengths.count(max(lengths)) != len(lengths):
         print>> sys.stderr, "Warning -- sentence conversion error"
-        #print>> sys.stderr, lengths
-        #print>> sys.stderr, sentence["text"]
-        #for item in parts:
-        #    print>> sys.stderr, item, parts[item]
-        #print>> sys.stderr, "-------------------"
         return None
 
     parts['text'] = sentence["text"]
