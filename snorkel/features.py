@@ -769,6 +769,10 @@ class AcronymFeaturizer(object):
         if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
             w_ftrs += list(self.ftr_index[c.doc_id][word])
 
+        #if w_ftrs:
+        #    print c.get_attrib_span("words"), len(w_ftrs)
+        #    print w_ftrs[0:5]
+
         for i,ftr in enumerate(w_ftrs):
             yield ftr
         
@@ -787,7 +791,7 @@ class AcronymFeaturizer(object):
             f_ftrs += [f]
             
         tokens = c.get_attrib_tokens("lemmas")
-        for t in tokens:
-            f_ftrs += ["TDL_LEMMA:MENTION[{}]".format(t)]
+        #for t in tokens:
+        #    f_ftrs += ["TDL_LEMMA:MENTION[{}]".format(t)]
         f_ftrs += ["WS_SHORT_FORM_DEFINED"]
         return list(set(f_ftrs))
