@@ -215,7 +215,6 @@ class LogRegSimple(NoiseAwareModel):
             raise NotImplementedError()
 
     def marginals(self, X):
-        print "LogRegSimple.marginals"
         return odds_to_prob(X.dot(self.w))
 
 
@@ -317,7 +316,6 @@ class LogReg(NoiseAwareModel):
         self.w = w
 
     def marginals(self, X):
-        print "LogReg.marginals"
         return odds_to_prob(X.dot(self.w))
 
 
@@ -332,5 +330,4 @@ class LSTM(NoiseAwareModel):
         self.lstm.train(**hyperparams)
 
     def marginals(self, test_candidates):
-        print "LSTM.marginals"
         return self.lstm.test(test_candidates)

@@ -306,7 +306,12 @@ class PipelinedLearner(Learner):
 
         w0 = w0*np.ones(self.m)
         self.training_model =  self.gen_model
-        self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
+
+        print model_hyperparams
+        if "new_encoding" in model_hyperparams:
+            self.training_model.train(self.L_train, w0=w0)
+        else:
+            self.training_model.train(self.L_train, w0=w0, **model_hyperparams)
 
 
         # Compute marginal probabilities over the candidates from this model of the training set
@@ -717,7 +722,7 @@ class SpanLearner(PipelinedLearner):
             seq, instances = self.candidate_multinomials(bag)
             k = 2 ** len(seq)
             if k > class_threshold:
-                print "SKIPPING", class_threshold, k
+                print "SKIPPING", class_threshold, k, seq
                 continue
 
             # build LF matrix for bag candidates
@@ -770,15 +775,16 @@ class SpanLearner(PipelinedLearner):
             ner_tags[sent.id].append(tags)
             sentences[sent.id] = sent
 
-        if fmt == "pkl":
+        # dump sample to file
+        if fmt == "pkl" or fmt == "all":
             pkl = {}
             for sent_id in sentences:
                 sent = sentences[sent_id]
                 pkl[sent_id] = {"sent": sent._asdict(), "tags": ner_tags[sent_id]}
-            cPickle.dump(pkl, open(outfile, "w"))
+            cPickle.dump(pkl, open("{}.pkl".format(outfile), "w"))
 
-        elif fmt == "conll":
-            with codecs.open(outfile, "w", "utf-8") as fp:
+        if fmt == "conll" or fmt == "all":
+            with codecs.open("{}.conll".format(outfile), "w", "utf-8") as fp:
                 for sent_id in sentences:
                     sentence = sentences[sent_id]
                     for tags in ner_tags[sent_id]:
@@ -787,6 +793,7 @@ class SpanLearner(PipelinedLearner):
                             tag = (word, pos_tag, ner_tag)
                             fp.write(" ".join(tag) + u"\n")
                         fp.write(u"\n")
+
         else:
             print>>sys.stderr,"ERROR - unrecognized export format"
 
@@ -916,6 +923,7 @@ class SpanLearner(PipelinedLearner):
                         else:
                             print>> sys.stderr, "Warning: candidate sample error {}".format(rs)
                             continue
+
                         s_cand_set += [(rs, bag_i)]
 
                     samples += [s_cand_set]
@@ -935,12 +943,12 @@ def overlaps(c1, c2):
     v = c1.doc_id == c2.doc_id
     return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
 
-def tokenize(s, split_chars):
-    '''Force tokenization'''
-    rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
-    seq = re.sub(rgx, r' \1 ', s)
-    seq = seq.replace("'s", " 's")
-    return seq.replace("s'", "s '").split()
+# def tokenize(s, split_chars):
+#     '''Force tokenization'''
+#     rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
+#     seq = re.sub(rgx, r' \1 ', s)
+#     seq = seq.replace("'s", " 's")
+#     return seq.replace("s'", "s '").split()
 
 
 def disjoint(sent_bags, verbose=False):

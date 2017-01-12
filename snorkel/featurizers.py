@@ -379,8 +379,6 @@ class AcronymFeaturizer(object):
         if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
             w_ftrs += list(self.ftr_index[c.doc_id][word])
 
-        #if w_ftrs:
-        #    print c.get_attrib_span("words"), len(w_ftrs)
         for i,ftr in enumerate(w_ftrs):
             yield ftr
 

@@ -17,18 +17,14 @@ import math
 import numpy as np
 from multiprocessing import Process, Queue
 
-import string
+import re
 import fuzzy
 import pyphen
-import re
 import codecs
+import string
+import cPickle
 from candidates import *
 
-#from featurizers import DictionaryFeaturizer,KMeansFeaturizer
-
-#pyphen.language_fallback('nl_NL_variant1')
-morphology = pyphen.Pyphen(lang="en_Latn_US")
-#morphology = pyphen.Pyphen(lang="en_US")
 morphology = pyphen.Pyphen(lang="nl_NL_variant1")
 
 soundex = fuzzy.Soundex(4)
@@ -508,12 +504,13 @@ class NgramFeaturizer(Featurizer):
         feature_generators = []
         
         if self.use_acronym_ftrs:
-            print "acronym features"
-            acronym_ftrs = AcronymFeaturizer(candidates)
-        
-        #if self.kmeans_ftrs == None and self.cluster_defs:
-        #    self.kmeans_ftrs = KMeansFeaturizer(self.cluster_defs)
+            print "Using acronym features..."
+            featurizer =  NgramFeaturizer(dict_ftrs=self.dict_ftrs,
+                                          kmeans_ftrs=self.kmeans_ftrs,
+                                          use_acronym_ftrs=False)
 
+            acronym_ftrs = AcronymFeaturizer(candidates, featurizer)
+        
 
         # Unary relations
         if self.arity == 1:
@@ -618,26 +615,18 @@ class KMeansFeaturizer(object):
                 yield ftr
         
 class AcronymFeaturizer(object):
-    '''Requires document-level knowledge
-    '''
-    def __init__(self,candidates):
+    '''Requires document-level knowledge'''
+    def __init__(self, candidates, featurizer, cache="cache"):
+
+        self.cache = cache
         self.accept_rgx = '[0-9A-Z-]{2,8}[s]*'
         self.reject_rgx = '([0-9]+/[0-9]+|[0-9]+[-][0-7]+)'
-        
         self.docs = [c.metadata["doc"] for c in candidates if "doc" in c.metadata]
         self.short_form_index = self.get_short_form_index(self.docs)
-        self.ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
-        #self.global_ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index } #sf_index[doc.doc_id][short_form]
-        
-        self.featurizer = NgramFeaturizer(use_acronym_ftrs=False)
-        
-        # compute features for each short form
-        for doc_id in self.short_form_index:
-            for sf in self.short_form_index[doc_id]:
-                ftrs = []
-                for lf in self.short_form_index[doc_id][sf]:
-                    ftrs += self.get_short_form_ftrs(lf)
-                self.ftr_index[doc_id][sf] = list(set(ftrs))
+        print "Short form (acronym) index loaded {} docs...".format(len(self.short_form_index))
+
+        self.ftr_index = {doc_id:{sf:[] for sf in self.short_form_index[doc_id]} for doc_id in self.short_form_index }
+        self.featurizer = featurizer #NgramFeaturizer(use_acronym_ftrs=False)
 
 
     def is_short_form(self, s, min_length=2):
@@ -663,7 +652,7 @@ class AcronymFeaturizer(object):
     def get_parenthetical_short_forms(self, sentence):
         '''
         Generator that returns indices of all words 
-        directly wrapped by paranthesis or brackets
+        directly wrapped by parentheses or brackets
         '''
         for i,w in enumerate(sentence.words):
             if i > 0 and i < len(sentence.words) - 1:
@@ -711,7 +700,7 @@ class AcronymFeaturizer(object):
                 long_form += [t]
         
         # we didn't find the first letter of our short form, so 
-        # backoff and choose the longest contiguous noun phrase
+        # back-off and choose the longest contiguous noun phrase
         if (len(left_window) == len(long_form) and \
            letters[0] != t[0].lower() and len(long_form[::-1]) > 1) or not matched:
             
@@ -738,21 +727,56 @@ class AcronymFeaturizer(object):
         return Ngram(char_start, char_end-1, sentence, {"short_form":short_form}) 
 
 
-    def get_short_form_index(self, documents):
+    # def get_short_form_index(self, documents):
+    #     '''
+    #     Build a short_form->long_form mapping for each document. Any
+    #     short form (abbreviation, acronym, etc) that appears in parenthetical
+    #     form is considered a "definiton" and added to the index. These candidates
+    #     are then used to augment the features of future mentions with the same
+    #     surface form.
+    #     '''
+    #     sf_index = {}
+    #     for doc in documents:
+    #         for sent in doc.sentences:
+    #             for i in self.get_parenthetical_short_forms(sent):
+    #                 short_form = sent.words[i]
+    #                 long_form_cand = self.extract_long_form(i,sent)
+    #
+    #                 if not long_form_cand:
+    #                     continue
+    #                 if doc.doc_id not in sf_index:
+    #                     sf_index[doc.doc_id] = {}
+    #                 if short_form not in sf_index[doc.doc_id]:
+    #                     sf_index[doc.doc_id][short_form] = []
+    #                 sf_index[doc.doc_id][short_form] += [long_form_cand]
+    #
+    #     return sf_index
+
+
+    def get_short_form_index(self, documents, use_cache=True):
         '''
-        Build a short_form->long_form mapping for each document. Any 
+        Build a short_form->long_form mapping for each document. Any
         short form (abbreviation, acronym, etc) that appears in parenthetical
         form is considered a "definiton" and added to the index. These candidates
         are then used to augment the features of future mentions with the same
         surface form.
         '''
+        module_path = os.path.dirname(__file__)
+
         sf_index = {}
         for doc in documents:
+            # check cache to see if this is already extracted
+            if use_cache:
+                fname = "{}/{}/{}.pkl".format(module_path,self.cache,doc.doc_id)
+                if os.path.exists(fname):
+                    sf_index[doc.doc_id] = cPickle.load(open(fname,"rb"))
+                    continue
+
             for sent in doc.sentences:
                 for i in self.get_parenthetical_short_forms(sent):
                     short_form = sent.words[i]
-                    long_form_cand = self.extract_long_form(i,sent)
-                    
+                    long_form_cand = self.extract_long_form(i, sent)
+
                     if not long_form_cand:
                         continue
                     if doc.doc_id not in sf_index:
@@ -760,38 +784,35 @@ class AcronymFeaturizer(object):
                     if short_form not in sf_index[doc.doc_id]:
                         sf_index[doc.doc_id][short_form] = []
                     sf_index[doc.doc_id][short_form] += [long_form_cand]
-                    
+
+            if doc.doc_id in sf_index:
+                cPickle.dump(sf_index[doc.doc_id], open(fname,"w"))
+
         return sf_index
 
+
     def get_ftrs(self,c):
+        # featurize short form (acronym) candidates
         word = c.get_attrib_span("words")
-        w_ftrs = []
-        if c.doc_id in self.ftr_index and word in self.ftr_index[c.doc_id]:
-            w_ftrs += list(self.ftr_index[c.doc_id][word])
+        if c.doc_id in self.short_form_index and word in self.short_form_index[c.doc_id]:
+            for lf_cand in self.short_form_index[c.doc_id][word]:
+                #print c.get_attrib_span("words"), "-->", lf_cand.get_attrib_span("words")
+                for ftr in self.get_short_form_ftrs(lf_cand):
+                    yield ftr
+                    #print "\t",ftr
+            yield "WS_SHORT_FORM_DEFINED"
+            yield "DDLIB_WORD_SEQ_[{}]".format(c.get_attrib_span("words"))
+            #print "\tDDLIB_WORD_SEQ_[{}]".format(c.get_attrib_span("words"))
 
-        #if w_ftrs:
-        #    print c.get_attrib_span("words"), len(w_ftrs)
-        #    print w_ftrs[0:5]
 
-        for i,ftr in enumerate(w_ftrs):
-            yield ftr
-        
-            
     def get_short_form_ftrs(self,c):
-        '''Hack to filter out some features'''
         ftrs = self.featurizer.get_features_by_candidate(c)
-        f_ftrs = []
-        #rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|TDL_|WS_)" 
-        rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|WS_)" 
+        rgx = "^(DDLIB_(WORD|LEMMA|POS|DEP)_SEQ_|WS_|WORD_CLUSTER_|word[.]dictionary)"
         for f in ftrs:
             if not re.search(rgx,f):
                 continue
             if "WS_LEMMA_" in f:
                 continue
-            f_ftrs += [f]
-            
-        tokens = c.get_attrib_tokens("lemmas")
-        #for t in tokens:
-        #    f_ftrs += ["TDL_LEMMA:MENTION[{}]".format(t)]
-        f_ftrs += ["WS_SHORT_FORM_DEFINED"]
-        return list(set(f_ftrs))
+            yield f
+
+

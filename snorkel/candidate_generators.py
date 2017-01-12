@@ -1020,8 +1020,6 @@ class CdrChemicalGenerator(CandidateGenerator):
                            "l-arginine", "vasopressin", "cyclosporin a", "n-methyl-d-aspartate", "ace inhibitor",
                            "oral contraceptives", "l-name", "alanine", "amino acid", "lisinopril", "tyrosine",
                            "fenfluramines", "beta-carboline", "glutamine", "octreotide", "angiotensin II"]))
-
-
         #
         # 4. Augment with cluster terms
         #
@@ -1045,7 +1043,6 @@ class CdrChemicalGenerator(CandidateGenerator):
 
             expanded_dict = {}
             for cid,freq in sorted(self.cids.items(), key=lambda x: x[1], reverse=1):
-                #print cid,freq
                 if freq < 100:
                     break
 
