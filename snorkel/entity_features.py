@@ -91,27 +91,29 @@ def _get_mention_features(sent, idxs):
 
 
 def _get_seq_features(sent, idxs):
-    if sent.get_attrib_span("words") == " ".join(sent.sentence['words'][i] for i in idxs):
-        stemmer = PorterStemmer()
-        yield "WORD_SEQ_[" + " ".join(sent.sentence['words'][i] for i in idxs) + "]"
-        yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(sent.sentence['words'][i].lower()) for i in idxs) + "]"
-        yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
+    try:
+        if sent.get_attrib_span("words") == " ".join(sent.sentence['words'][i] for i in idxs):
+            stemmer = PorterStemmer()
+            yield "WORD_SEQ_[" + " ".join(sent.sentence['words'][i] for i in idxs) + "]"
+            yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(sent.sentence['words'][i].lower()) for i in idxs) + "]"
+            yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
 
-    # words = " ".join(sent.sentence['words'][i] for i in idxs)
-    #    yield "word.isupper=%s" % words.isupper()
-    #    yield "word.istitle=%s" % words.istitle()
-    #    yield "word.isdigit=%s" % words.isdigit()
+        # words = " ".join(sent.sentence['words'][i] for i in idxs)
+        #    yield "word.isupper=%s" % words.isupper()
+        #    yield "word.istitle=%s" % words.istitle()
+        #    yield "word.isdigit=%s" % words.isdigit()
 
 
-    #    yield "POS_SEQ_[" + " ".join(sent.sentence['poses'][i] for i in idxs) + "]"
-    #    yield "DEP_SEQ_[" + " ".join(sent.sentence['dep_labels'][i] for i in idxs) + "]"
-    else:
-        tokens = sent.get_attrib_span("words").split()
-        stemmer = PorterStemmer()
-        yield "WORD_SEQ_[" + " ".join(i for i in tokens) + "]"
-        yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(i.lower()) for i in tokens) + "]"
-        yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
-
+        #    yield "POS_SEQ_[" + " ".join(sent.sentence['poses'][i] for i in idxs) + "]"
+        #    yield "DEP_SEQ_[" + " ".join(sent.sentence['dep_labels'][i] for i in idxs) + "]"
+        else:
+            tokens = sent.get_attrib_span("words").split()
+            stemmer = PorterStemmer()
+            yield "WORD_SEQ_[" + " ".join(i for i in tokens) + "]"
+            yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(i.lower()) for i in tokens) + "]"
+            yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
+    except Exception as e:
+        print "entity features",e
 
 # words = " ".join(i for i in tokens)
 #    yield "word.isupper=%s" % words.isupper()

@@ -29,6 +29,7 @@ from itertools import combinations
 import itertools
 from scipy.sparse import csc_matrix, csr_matrix, lil_matrix
 
+import networkx
 import codecs
 import cPickle as pickle
 from tokenizer import *
@@ -428,6 +429,135 @@ class SpanLearner(PipelinedLearner):
         for s in spans:
             yield s
 
+
+    # ===============================================================
+
+    def _overlapping_span(self, a, b):
+        return len(set(a).intersection(set(b))) > 0
+
+
+    def _contained_span(self, a, b):
+        v = min(a) >= min(b) and max(a) <= max(b)
+        v |= min(b) >= min(a) and max(b) <= max(a)
+        return v
+
+
+    def _get_span_width(self, candidates):
+        span = list(itertools.chain.from_iterable([c.idxs for c in candidates]))
+        return (min(span), max(span))
+
+
+    def build_spanset_graph(self, candidates, coverage):
+        '''
+        TODO: implement this in a clean way using networkx
+        '''
+        G = nx.Graph()
+        p_nodes, n_nodes = [], []
+        for i in range(len(candidates)):
+            if coverage[i] == 1:
+                p_nodes.append(i)
+            elif coverage[i] == -1:
+                n_nodes.append(i)
+
+        # core nodes (all candidates covered by >= 1 positive LFs)
+        for i in range(len(p_nodes)):
+            G.add_node(p_nodes[i])
+            for j in range(i + 1, len(p_nodes)):
+                if p_nodes[i] == p_nodes[j]:
+                    continue
+                s1 = candidates[p_nodes[i]].idxs
+                s2 = candidates[p_nodes[j]].idxs
+                if self._overlapping_span(s1, s2):
+                    G.add_edge(p_nodes[i], p_nodes[j])
+
+        # fully-contained negative nodes
+        stack = []
+        for i in range(len(n_nodes)):
+            for j in range(len(p_nodes)):
+                if n_nodes[i] == p_nodes[j]:
+                    continue
+                s1 = candidates[n_nodes[i]].idxs
+                s2 = candidates[p_nodes[j]].idxs
+
+                if self._contained_span(s1, s2):
+                    G.add_edge(n_nodes[i], p_nodes[j])
+
+            if n_nodes[i] not in G.nodes():
+                stack.append(n_nodes[i])
+
+        # positive spans
+        pos_spans, pos_nodes = [], []
+        for cc in nx.connected_components(G):
+            pos_nodes.append(cc)
+            span = self._get_span_width([candidates[i] for i in cc])
+            span = range(span[0], span[1] + 1)
+            pos_spans += [span]
+
+        # remove negative bridge nodes between positive spans
+        for i in range(len(stack)):
+            w = 0
+            for j in range(len(pos_spans)):
+                span1 = candidates[stack[i]].idxs
+                span2 = pos_spans[j]
+                if self._overlapping_span(span1, span2):
+                    w += 1
+            if w > 1:
+                print "connection", pos_spans, "|", span1
+                G.remove_node(stack[i])
+
+        coverage = np.array([0] * len(candidates[0].sentence["words"]))
+        for span in pos_spans:
+            coverage[np.array(span)] = 1
+
+        # add candidates sorted by length. greedily add candidates
+        # that do not connect with existing candidate spans
+        rm = []
+        stack = sorted([(i, candidates[i].idxs) for i in stack], key=lambda x: len(x[-1]), reverse=1)
+        for node_idx, span in stack:
+            if sum(coverage[min(span):max(span) + 1]) == 0:
+                G.add_node(node_idx)
+                coverage[np.array(span)] = 1
+            else:
+                rm.append((node_idx, candidates[node_idx].idxs))
+
+        # our core spanset
+        components, component_nodes = [], []
+        for cc in nx.connected_components(G):
+            component_nodes.append(cc)
+            span = self._get_span_width([candidates[i] for i in cc])
+            span = range(span[0], span[1] + 1)
+            components += [(tuple(cc), span)]
+
+        # attempt to add any remaining nodes, ordered by overlap with existing
+        # spans and max border
+        for nodes_i, span_i in rm:
+            edges = []
+            for nodes_j, span_j in components:
+                if self._overlapping_span(span_i, span_j):
+                    edges.append(([nodes_i], nodes_j))
+
+            # don't add candidates that connect components
+            if len(edges) > 1:
+                continue
+
+            for edge in edges:
+                for i in edge[0]:
+                    for k in edge[1]:
+                        if self._overlapping_span(candidates[i].idxs, candidates[k].idxs):
+                            G.add_edge(i, k)
+
+        # create final spanset bags
+        spansets = list(nx.connected_components(G))
+        spansets = [[candidates[i] for i in span] for span in spansets]
+
+        return spansets
+
+    # ===============================================================
+
+
+
+
+
     def _get_bags(self, candidates):
         """
         Create candidate spansets for multinomial classification
@@ -741,7 +871,7 @@ class SpanLearner(PipelinedLearner):
         return Xs, Ys, strs, f_bags, f_instances
 
 
-    def export(self, outfile, marginals=None, num_samples=10,
+    def export(self, outfile, marginals=None, num_samples=10, coverage_threshold=0.9,
                tagname="Disease", fmt="pkl", threshold=0.0, min_coverage=1):
         '''
         Export sample sentences and candidates
@@ -766,6 +896,7 @@ class SpanLearner(PipelinedLearner):
         sentences = {}
         ner_tags = defaultdict(list)
         for i, (sentence, cands) in enumerate(sampler(marginals, num_samples=num_samples,
+                                                      coverage_threshold=coverage_threshold,
                                                       threshold=threshold, min_coverage=min_coverage)):
             sent, tags = tag_sentence(sentence, cands)
             if sent is None:  # HACK sometimes re-tokenization fails due to char offsets.
@@ -856,8 +987,12 @@ class SpanLearner(PipelinedLearner):
         return None
 
 
+
+
+
+
     def mn_sample(self, marginals, num_samples=10, format="conll",
-               threshold=0.0, min_coverage=-1):
+               threshold=0.0, min_coverage=-1, coverage_threshold=0.9):
         '''
         Generate sample sentences using multinomial marginals
         :param marginals:
@@ -869,24 +1004,45 @@ class SpanLearner(PipelinedLearner):
         cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
         sentences = {c.sent_id: c.sentence for c in cands}
 
-        # skip sentences with any uncovered candidates (use thresholding)
-        if min_coverage != -1:
-            # covered candidates
-            span_cand_idx = dict.fromkeys(cands)
-            # sentences with uncovered candidates
-            train_cand_idx = {c:1 for c in self.training_set.training_candidates if c not in span_cand_idx}
-            # allow for sentences with <= min_coverage uncovered candidates
-            sent_freq = defaultdict(int)
-            for c in train_cand_idx:
-                sent_freq[c.sent_id] += 1
-            train_cand_idx = {c.sent_id:1 for c in train_cand_idx if sent_freq[c.sent_id] > min_coverage}
-            n = float(len(sentences))
-            sentences = {sent_id:sent for sent_id,sent in sentences.items() if sent_id not in train_cand_idx}
-        else:
-            n = float(len(sentences))
+        # --------------------------
+        # compute token coverage for each sentence, i.e. the ratio of covered/candidate tokens
+        # drop sentences where some threshold of token percentage isn't covered
+        cand_cover  = {sent_id:np.array([0] * len(sentences[sent_id]["words"])) for sent_id in sentences}
+        total_cover = {sent_id: np.array([0] * len(sentences[sent_id]["words"])) for sent_id in sentences}
 
-        print "%2.1f%% sentences dropped" % ((1.0 - (len(sentences)/n)) * 100)
+        for c in self.training_set.training_candidates:
+            if c.sent_id not in total_cover:
+                continue
+            total_cover[c.sent_id][np.array(c.idxs)] = 1
 
+        for c in cands:
+            if c.sent_id not in cand_cover:
+                continue
+            cand_cover[c.sent_id][np.array(c.idxs)] = 1
+
+        tmp = {}
+        for sent_id in total_cover:
+            if sent_id not in cand_cover:
+                print "MISSING", sent_id
+            a = cand_cover[sent_id]
+            b = total_cover[sent_id]
+
+            coverage = np.logical_and(a,b)
+            coverage = coverage.astype(np.int8)
+
+            n = coverage.nonzero()[0].shape[0]
+            N = float(b.nonzero()[0].shape[0])
+
+            if (n / N) >= coverage_threshold:
+                tmp[sent_id] = sentences[sent_id]
+
+        percent_removed = (1.0 - len(tmp) / float(len(sentences))) * 100
+        print "Dropped %.2f%% (%s/%s) sentences at < %.1f%% coverage theshold" % (percent_removed,
+                                                                                  (len(sentences)-len(tmp)),
+                                                                                  len(sentences),
+                                                                                  coverage_threshold*100)
+        sentences = tmp
+        # --------------------------
 
         sent_bags_idxs = defaultdict(list)
         for i, sent_id in [(i, bag[0].sent_id) for i, bag in enumerate(self.f_bags)]:
@@ -942,14 +1098,6 @@ class SpanLearner(PipelinedLearner):
 def overlaps(c1, c2):
     v = c1.doc_id == c2.doc_id
     return v and max(c1.char_start, c2.char_start) <= min(c1.char_end, c2.char_end)
-
-# def tokenize(s, split_chars):
-#     '''Force tokenization'''
-#     rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
-#     seq = re.sub(rgx, r' \1 ', s)
-#     seq = seq.replace("'s", " 's")
-#     return seq.replace("s'", "s '").split()
-
 
 def disjoint(sent_bags, verbose=False):
     ''' SANITY CHECK -- ensure bags are truly disjoint'''

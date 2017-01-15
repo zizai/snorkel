@@ -178,6 +178,7 @@ def char2idx(sentence, candidate):
 
 
 def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
+
     sent = retokenize_sentence(sentence) if split_chars else sentence
     if sent is None:
         return None,None
@@ -189,6 +190,7 @@ def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
         idxs = char2idx(sent, c)  # convert to new sentence idxs
         if len(idxs) == 0:
             print>>sys.stderr,"ERROR -- no idxs found", c
+            continue
 
         if 'I' in list(ner_tags[idxs]) or 'B' in list(ner_tags[idxs]):
             print>> sys.stderr, "WARNING Double Samples"
