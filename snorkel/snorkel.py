@@ -29,7 +29,7 @@ from itertools import combinations
 import itertools
 from scipy.sparse import csc_matrix, csr_matrix, lil_matrix
 
-import networkx
+import networkx as nx
 import codecs
 import cPickle as pickle
 from tokenizer import *
@@ -232,6 +232,7 @@ class Learner(object):
             self.gold_labels = gold_labels
             self.L_test, self.F_test = self.training_set.transform(test_candidates)
             self.X_test = self._set_model_X(self.L_test, self.F_test)
+
         if display:
             calibration_plots(self.model.marginals(self.X_train), self.model.marginals(self.X_test), gold_labels)
 
@@ -494,6 +495,7 @@ class SpanLearner(PipelinedLearner):
             pos_spans += [span]
 
         # remove negative bridge nodes between positive spans
+        s_rm = []
         for i in range(len(stack)):
             w = 0
             for j in range(len(pos_spans)):
@@ -502,8 +504,10 @@ class SpanLearner(PipelinedLearner):
                 if self._overlapping_span(span1, span2):
                     w += 1
             if w > 1:
-                print "connection", pos_spans, "|", span1
-                G.remove_node(stack[i])
+                #print "connection", pos_spans, "|", span1
+                #G.remove_node(stack[i])
+                s_rm.append(stack[i])
+        stack = [i for i in stack if i not in s_rm]
 
         coverage = np.array([0] * len(candidates[0].sentence["words"]))
         for span in pos_spans:
@@ -603,8 +607,38 @@ class SpanLearner(PipelinedLearner):
 
         return bags
 
-    def generate_span_bags(self, thresh=0.0, break_on=["/"], **model_hyperparams):
-        self.span_bags = self._get_bags(self.training_set.training_candidates)
+    def generate_span_bags(self, thresh=0.0, method="simple",
+                           break_on=["/"],
+                           **model_hyperparams):
+        if method == "simple":
+            self.span_bags = self._get_bags(self.training_set.training_candidates)
+
+        elif method == "graph":
+
+            L = self.training_set.L
+
+            candidates = self.training_set.training_candidates
+
+            # building bags by starting with positive labeled candidates
+            coverage = np.zeros(L.shape[0])
+            coverage[(L < 0).nonzero()[0]] = -1
+            coverage[(L > 0).nonzero()[0]] = 1
+
+            # sentence candidates
+            sent_cands = defaultdict(list)
+            for i, c in enumerate(candidates):
+                if coverage[i] == 0:
+                    continue
+                sent_cands[c.sent_id].append(c)
+
+            ridx = {c:i for i,c in enumerate(candidates)}
+
+            spanbags = []
+            for sent_id in sent_cands:
+                labels = [coverage[ridx[c]] for c in sent_cands[sent_id] ]
+                spanbags.extend( self.build_spanset_graph(sent_cands[sent_id],labels) )
+            self.span_bags = spanbags
+
 
     def _set_span(self, candidates):
         '''
@@ -679,18 +713,8 @@ class SpanLearner(PipelinedLearner):
                     print>>sys.err, "Multinomial Seq Error"
                     marginals.append(0.5)
 
-                #mentions = [self.classes[i][j] for j in self.f_instances[i]]
 
-                # mention = c.get_attrib_span("words").replace(u" ", u"")
-                # classes = [x.replace(u" ", u"") for x in self.classes[i]]
-                # if mention not in classes:
-                #     missing += 1
-                #     marginals.append(0.5)
-                # else:
-                #     k = classes.index(mention)
-                #     marginals.append(mn_marginals[i][k])
-
-            self.marginals = mn_marginals
+            self._marginals = mn_marginals
 
             if missing > 0:
                 print>>sys.stderr, "Skipped {}/{} candidates with no LF coverage".format(missing,len(self.training_set.training_candidates))
@@ -872,7 +896,7 @@ class SpanLearner(PipelinedLearner):
 
 
     def export(self, outfile, marginals=None, num_samples=10, coverage_threshold=0.9,
-               tagname="Disease", fmt="pkl", threshold=0.0, min_coverage=1):
+               tagname="Entity", fmt="pkl", threshold=0.0, min_coverage=1):
         '''
         Export sample sentences and candidates
         :param outfile:
@@ -886,7 +910,7 @@ class SpanLearner(PipelinedLearner):
         # Multinomial-based sampling
         if type(self.gen_model) is MnLogReg:
             if marginals == None:
-                marginals = self.marginals
+                marginals = self._marginals
             sampler = self.mn_sample
         else:
             if marginals == None:
@@ -983,11 +1007,12 @@ class SpanLearner(PipelinedLearner):
                 continue
 
 
+    # --------------
     def predictions(self,threshold=0.5):
         return None
 
 
-
+    # --------------
 
 
 

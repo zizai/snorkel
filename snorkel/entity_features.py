@@ -112,6 +112,7 @@ def _get_seq_features(sent, idxs):
             yield "WORD_SEQ_[" + " ".join(i for i in tokens) + "]"
             yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(i.lower()) for i in tokens) + "]"
             yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
+
     except Exception as e:
         print "entity features",e
 

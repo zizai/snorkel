@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 import lxml.etree as et
 from snorkel.utils import corenlp_cleaner
 
@@ -105,9 +106,14 @@ def corenlp_to_xmltree_sub(s, dep_parents, rid=0):
   # Add all attributes that have the same shape as dep_parents
   if i >= 0:
     for k,v in filter(lambda t : type(t[1]) == list and len(t[1]) == N, s.iteritems()):
+
       if v[i] is not None:
-        content = v[i].encode('ascii','ignore') if hasattr(v[i], 'encode') else str(v[i])
-        attrib[singular(k)] = ''.join(c for c in content if ord(c) < 128)
+        try:
+          content = v[i].encode('ascii','ignore') if hasattr(v[i], 'encode') else str(v[i])
+          attrib[singular(k)] = ''.join(c for c in content if ord(c) < 128)
+        except Exception as e:
+          print>>sys.stderr,"tree_structs parsing ERROR "
+          attrib[singular(k)] = ''.join(c for c in v[i] if valid_xml_char_ordinal(c))
 
     # Add word_idx if not present
     if 'word_idx' not in attrib:
@@ -120,6 +126,18 @@ def corenlp_to_xmltree_sub(s, dep_parents, rid=0):
       root.append(corenlp_to_xmltree_sub(s, dep_parents, i+1))
   return root
 
+
 def singular(s):
   """Get singular form of word s (crudely)"""
   return re.sub(r'e?s$', '', s, flags=re.I)
+
+
+def valid_xml_char_ordinal(c):
+    codepoint = ord(c)
+    # conditions ordered by presumed frequency
+    return (
+        0x20 <= codepoint <= 0xD7FF or
+        codepoint in (0x9, 0xA, 0xD) or
+        0xE000 <= codepoint <= 0xFFFD or
+        0x10000 <= codepoint <= 0x10FFFF
+        )
