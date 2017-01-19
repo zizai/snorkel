@@ -112,19 +112,24 @@ def corenlp_to_xmltree_sub(s, dep_parents, rid=0):
           content = v[i].encode('ascii','ignore') if hasattr(v[i], 'encode') else str(v[i])
           attrib[singular(k)] = ''.join(c for c in content if ord(c) < 128)
         except Exception as e:
-          print>>sys.stderr,"tree_structs parsing ERROR "
-          attrib[singular(k)] = ''.join(c for c in v[i] if valid_xml_char_ordinal(c))
+          try:
+            print>>sys.stderr,"tree_structs parsing ERROR "
+            attrib[singular(k)] = ''.join(c for c in v[i] if valid_xml_char_ordinal(c))
+          except:
+            attrib[singular(k)] = k.encode("utf-8",errors="ignore")
 
     # Add word_idx if not present
     if 'word_idx' not in attrib:
       attrib['word_idx'] = str(i)
-
-  # Build tree recursively
-  root = et.Element('node', attrib=attrib)
-  for i,d in enumerate(dep_parents):
-    if d == rid:
-      root.append(corenlp_to_xmltree_sub(s, dep_parents, i+1))
-  return root
+  try:
+    # Build tree recursively
+    root = et.Element('node', attrib=attrib)
+    for i,d in enumerate(dep_parents):
+      if d == rid:
+        root.append(corenlp_to_xmltree_sub(s, dep_parents, i+1))
+    return root
+  except:
+    return et.Element('node', attrib={})
 
 
 def singular(s):
