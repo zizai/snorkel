@@ -5,10 +5,62 @@ import warnings
 from learning_utils import sparse_abs
 from lstm import LSTMModel
 from sklearn import linear_model
+from collections import defaultdict
 
 DEFAULT_MU = 1e-6
 DEFAULT_RATE = 0.01
 DEFAULT_ALPHA = 0.5
+
+
+def tensor_blocks(Xs):
+    '''
+    Bin LF matrices by class dimension
+    num_lfs X num_classes
+
+    :param Xs:
+    :return:
+    '''
+    blocks = defaultdict(list)
+    for i, x in enumerate(Xs):
+        x = x.todense() if type(x) != np.ndarray else x
+        blocks[x.shape[1]].append(x)
+    for i in blocks:
+        blocks[i] = np.array([x.T for x in blocks[i]])
+    return blocks
+
+
+def block_compute_lf_accs(blocks, w, num_lfs):
+    '''
+    ~10x faster with np.einsum and maxtrix blocking
+     vs python loops
+
+    :param blocks:
+    :param w:
+    :param num_lfs:
+    :return:
+    '''
+    accs = np.zeros(num_lfs)
+    n_pred = np.zeros(num_lfs)
+
+    for i in blocks:
+        X = blocks[i]
+        z = np.exp(X.dot(w))
+        z = (z / z.sum()).T  # exact marginals
+
+        U = np.einsum("abc,ac -> ab", np.transpose(X, (0, 2, 1)), z.T)
+        accs   += np.sum(U.T / np.linalg.norm(z, axis=0), axis=1)
+        n_pred += np.ravel(X.sum(1).T.sum(1))
+
+        # SLOWER
+        # for i in range(X.shape[0]):
+        #    accs   += X[i].T.dot(z[...,i]) / np.linalg.norm(z[...,i])
+        #    n_pred += np.ravel(X[i].T.sum(1))
+
+    p_correct = (1. / (n_pred + 1e-8)) * accs
+    return p_correct, n_pred
+
+
+
 
 def log_odds(p):
     """This is the logit function"""
@@ -123,6 +175,9 @@ class MnLogReg(NoiseAwareModel):
         * mu:          Elastic net penalty
         * tol:         For testing for SGD convergence, i.e. stopping threshold
         """
+        BLOCKS = True
+        print "Using fast mode", BLOCKS
+
         # Set up stuff
         N  = len(Xs)
         M  = Xs[0].shape[0]
@@ -135,20 +190,28 @@ class MnLogReg(NoiseAwareModel):
 
         g_size = 0
 
+        # create blocks
+        blocks = tensor_blocks(Xs)
+
         # Gradient descent
         if verbose:
             print "Begin training for rate={}, mu={}".format(rate, mu)
         for step in range(n_iter):
 
             # Get the expected LF accuracies
-            # ---------------------------------
-            if subsample != 1.0:
-                s_Xs = np.random.choice(range(len(Xs)), int(len(Xs) * subsample))
-                s_Xs = [Xs[i] for i in s_Xs]
-                p_correct, n_pred = compute_lf_accs(s_Xs, w)
-            # ---------------------------------
+            if not BLOCKS:
+                # ---------------------------------
+                if subsample != 1.0:
+                    s_Xs = np.random.choice(range(len(Xs)), int(len(Xs) * subsample))
+                    s_Xs = [Xs[i] for i in s_Xs]
+                    p_correct, n_pred = compute_lf_accs(s_Xs, w)
+                # ---------------------------------
+                else:
+                    p_correct, n_pred = compute_lf_accs(Xs, w)
+
             else:
-                p_correct, n_pred = compute_lf_accs(Xs, w)
+                p_correct, n_pred = block_compute_lf_accs(blocks, w, Xs[0].shape[0])
+
 
             # Get the "empirical log odds"; NB: this assumes one is correct, clamp is for sampling...
             l = np.clip(log_odds(p_correct), -10, 10).flatten()
