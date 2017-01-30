@@ -203,7 +203,7 @@ class NcbiDiseaseGenerator(CandidateGenerator):
     def __init__(self, kgrams, dict_only=False,
                  split_chars=['-', '/', '\+'],
                  longest_match_only=True):
-
+        self.kgrams = kgrams
         self.longest_match_only = longest_match_only
         self.dict_only = dict_only
         self.split_chars = split_chars
