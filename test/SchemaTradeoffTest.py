@@ -3,7 +3,7 @@ import timeit
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-
+rng = np.random.rand
 candidate_count = 10
 
 # Parameter list
@@ -15,8 +15,9 @@ default_inv_density = 100
 default_feat_size = 100
 
 def new_immutable_vec(size):
-    return tuple(range(size))
+    return tuple(rng(size))
 
+# n by m random matrix constructors
 class lil():
     
     def __init__(self, n, m, sparsity = default_inv_density):
@@ -36,7 +37,7 @@ class coo():
     def __init__(self, n, m, sparsity = default_inv_density):
         m/=sparsity
         # Simulate (id, key, val) schema
-        self.data = [(i, j) for i in xrange(n) for j in xrange(m)]
+        self.data = [(i, j, rng()) for i in xrange(n) for j in xrange(m)]
         self.row_count = n
         self.col_count = m
         
@@ -44,7 +45,7 @@ class coo():
         self.col_count += size
         for r in xrange(self.row_count):
             for new_key in xrange(size):
-                self.data.append((r, new_key))
+                self.data.append((r, new_key, rng()))
                 
     def query(self):
         return tuple(self.data[:self.col_count])
@@ -53,7 +54,10 @@ class dense():
     
     def __init__(self, n, m, sparsity = default_inv_density):
         # Simulate (id, key, val) schema
-        self.data = np.random.rand(n, m)
+        self.data = np.zeros([n, m])
+        if m < sparsity:
+            raise ValueError('Sparsity %d too great for columns %d' % (sparsity, m))
+        rng(n, m/sparsity)
         self.n = n
         
     def add_col(self, size):
@@ -124,6 +128,9 @@ def run_benchmark(xaxis, yaxis):
             timings = timeit.Timer(run).repeat(repetition, exeuctions)
             # min timings are indicative of the hardware limitations
             series[mat_name].append(min(timings))
+#             print mat_name, run().data
+        
+        
         plt.plot(real_xs, series[mat_name], label=mat_name)
     
     print 'Benchmark_' + xaxis + '_vs._' + yaxis + '\t' + '\t'.join([str(x) for x in real_xs])
@@ -137,7 +144,7 @@ if __name__ == '__main__':
     yaxis = ['query_time','mat_time']
     for y in yaxis:
         for x in xaxis:
-#             if x == 'iterations' and y == 'mat_time': 
+#             if x == 'feat_size' and y == 'mat_time': 
             run_benchmark(x, y) 
     
     
