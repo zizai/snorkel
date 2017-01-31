@@ -54,7 +54,7 @@ class dense():
     
     def __init__(self, n, m, sparsity = default_inv_density):
         # Simulate (id, key, val) schema
-        self.data = np.zeros([n, m])
+        self.data = np.ones([n, m])
         if m < sparsity:
             raise ValueError('Sparsity %d too great for columns %d' % (sparsity, m))
         rng(n, m/sparsity)
@@ -145,6 +145,6 @@ if __name__ == '__main__':
     for y in yaxis:
         for x in xaxis:
 #             if x == 'feat_size' and y == 'mat_time': 
-            run_benchmark(x, y) 
+            run_benchmark(x, y)
     
     
