@@ -106,6 +106,8 @@ class DictionaryMatch(NgramMatcher):
             return self.stemmer.stem(w)
         except UnicodeDecodeError:
             return w
+        except Exception as e:
+            return w
 
     def _f(self, c):
         p = c.get_attrib_span(self.attrib)

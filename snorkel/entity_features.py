@@ -91,6 +91,7 @@ def _get_mention_features(sent, idxs):
 
 
 def _get_seq_features(sent, idxs):
+
     try:
         if sent.get_attrib_span("words") == " ".join(sent.sentence['words'][i] for i in idxs):
             stemmer = PorterStemmer()
@@ -109,12 +110,12 @@ def _get_seq_features(sent, idxs):
         else:
             tokens = sent.get_attrib_span("words").split()
             stemmer = PorterStemmer()
-            yield "WORD_SEQ_[" + " ".join(i for i in tokens) + "]"
-            yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(i.lower()) for i in tokens) + "]"
+            yield "WORD_SEQ_[" + " ".join(t for t in tokens) + "]"
+            yield "WORD_STEM_SEQ_[" + " ".join(stemmer.stem(t.lower()) for t in tokens) + "]"
             yield "LEMMA_SEQ_[" + " ".join(sent.sentence['lemmas'][i] for i in idxs) + "]"
 
     except Exception as e:
-        print "entity features",e
+        print "entity features ERROR ",sent, idxs
 
 # words = " ".join(i for i in tokens)
 #    yield "word.isupper=%s" % words.isupper()

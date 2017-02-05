@@ -31,7 +31,7 @@ def tensor_blocks(Xs):
 
 def block_compute_lf_accs(blocks, w, num_lfs):
     '''
-    ~10x faster with np.einsum and maxtrix blocking
+    ~10x faster with np.einsum and matrix blocking
      vs python loops
 
     :param blocks:
@@ -211,7 +211,6 @@ class MnLogReg(NoiseAwareModel):
 
             else:
                 p_correct, n_pred = block_compute_lf_accs(blocks, w, Xs[0].shape[0])
-
 
             # Get the "empirical log odds"; NB: this assumes one is correct, clamp is for sampling...
             l = np.clip(log_odds(p_correct), -10, 10).flatten()
