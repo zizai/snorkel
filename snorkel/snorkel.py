@@ -384,14 +384,69 @@ class RepresentationLearner(PipelinedLearner):
         return self.model.predict(self.test_candidates)
 
 
+class SentencePartition(object):
+
+    def __init__(self, sentence, coverage, tokenizer=None, all_combinations=False):
+        pass
+
+    def _build_graph(self, sentence, max_bridge_length=0):
+        '''
+
+        :param max_bridge_length:
+        :return:
+        '''
+        G = nx.Graph()
+
+    def spansets(self):
+        for i in range(10):
+            yield i
+
+
+class SpanSet(object):
+    '''
+
+    '''
+    def __init__(self, candidates):
+        pass
+
+    def prob(self):
+        pass
+
+    def candidates(self):
+        pass
+
+
+class SpanLearnerV2(PipelinedLearner):
+
+    def __init__(self, training_set, model, gen_model , split_chars=[]):
+        super(SpanLearner,self).__init__(training_set, model, gen_model)
+        self.split_chars = split_chars
+
+
+    def train_gen_model(self, lf_w0=5.0, **model_hyperparams):
+        self.training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+
+
+    def train_disc_model(self, feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
+        if self.model:
+            self.train_model(self.training_marginals, w0=feat_w0, **model_hyperparams)
+
+
+
+
+
+
 class SpanLearner(PipelinedLearner):
-    # def __init__(self,split_chars=[]):
-    #    self.split_chars=split_chars
-    #    pass
+
+    def __init__(self, training_set, model, gen_model , split_chars=["/", "-", "+"]):
+        super(SpanLearner,self).__init__(training_set, model, gen_model)
+        self.split_chars = split_chars
+
 
     def train_gen_model(self, lf_w0=5.0, **model_hyperparams):
         print "\nTraining generative model..."
         self.training_marginals = self.train_lf_model(w0=lf_w0, **model_hyperparams)
+
 
     def train_disc_model(self, feat_w0=0.0, lf_w0=5.0, **model_hyperparams):
         if self.model:
@@ -673,6 +728,7 @@ class SpanLearner(PipelinedLearner):
         if type(self.gen_model) is MnLogReg:
 
             missing = 0
+            #if self.span_bags == None:
             self.generate_span_bags()
 
             Xs, Ys, classes, f_bags, f_instances = self.lf_prob(include_neg=True)
@@ -742,7 +798,7 @@ class SpanLearner(PipelinedLearner):
         candidates = [c for c in bag if c != None]
 
         # generate class space and candidate instances
-        seq, instances = self.candidate_multinomials(candidates)
+        seq, instances = self.candidate_multinomials(candidates,self.split_chars)
         P = np.zeros((num_lfs, 2 ** len(seq)))  # M x D_i probabilty distrib
 
         # HACK
@@ -752,8 +808,8 @@ class SpanLearner(PipelinedLearner):
         idxs = range(0, len(seq))
         classes = sum([map(list, combinations(idxs, i)) for i in range(len(idxs) + 1)], [])
 
-        if len(instances) != len({s: 1 for s in instances}):
-            print "ERROR!!"
+        #if len(instances) != len({s: 1 for s in instances}):
+        #    print "ERROR!!"
 
         classes = {cls: i for i, cls in enumerate(sorted([tuple(x) for x in classes]))}
 
@@ -791,8 +847,8 @@ class SpanLearner(PipelinedLearner):
             class_names += [" ".join(seq[np.array(key)])]
 
         # HACK -- use sparse format for large P matrices
-        if (2 ** len(seq)) > sparsity_threshold:
-            P = csr_matrix(P)
+        #if (2 ** len(seq)) > sparsity_threshold:
+        #    P = csr_matrix(P)
 
         # specific instance indices
         instances = [classes.index(idxs) for idxs in instances]
@@ -800,7 +856,7 @@ class SpanLearner(PipelinedLearner):
         return P, classes, class_names, instances
 
 
-    def candidate_multinomials(self, candidates, split_chars=["/", "-", "+"]):
+    def candidate_multinomials(self, candidates, split_chars):
         '''
         Decompose candidate spanset into corresponding sequence instances
         :param candidates:  spanset candidates
@@ -873,7 +929,7 @@ class SpanLearner(PipelinedLearner):
         for i, bag in enumerate(self.span_bags):
 
             # Filer pathologically long cases
-            seq, instances = self.candidate_multinomials(bag)
+            seq, instances = self.candidate_multinomials(bag,self.split_chars)
             k = 2 ** len(seq)
             if k > class_threshold:
                 print "SKIPPING", class_threshold, k, seq
@@ -910,18 +966,20 @@ class SpanLearner(PipelinedLearner):
         # Multinomial-based sampling
         if type(self.gen_model) is MnLogReg:
             if marginals == None:
-                marginals = self._marginals
+                marginals = self._marginals(marginals, num_samples=num_samples,
+                                        coverage_threshold=coverage_threshold,
+                                        threshold=threshold, min_coverage=min_coverage)
             sampler = self.mn_sample
         else:
             if marginals == None:
                 marginals = self.training_marginals
-            sampler = self.bin_sample
+            sampler = self.bin_sample(marginals, num_samples=num_samples,
+                                        #coverage_threshold=coverage_threshold,
+                                        threshold=threshold, min_coverage=min_coverage)
 
         sentences = {}
         ner_tags = defaultdict(list)
-        for i, (sentence, cands) in enumerate(sampler(marginals, num_samples=num_samples,
-                                                      coverage_threshold=coverage_threshold,
-                                                      threshold=threshold, min_coverage=min_coverage)):
+        for i, (sentence, cands) in enumerate(sampler):
             sent, tags = tag_sentence(sentence, cands)
             if sent is None:  # HACK sometimes re-tokenization fails due to char offsets.
                 print "ERROR"
@@ -1007,13 +1065,8 @@ class SpanLearner(PipelinedLearner):
                 continue
 
 
-    # --------------
     def predictions(self,threshold=0.5):
         return None
-
-
-    # --------------
-
 
 
     def mn_sample(self, marginals, num_samples=10, format="conll",
@@ -1026,6 +1079,7 @@ class SpanLearner(PipelinedLearner):
         :param threshold:
         :return:
         '''
+        # only look at covered candidates
         cands = list(itertools.chain.from_iterable([bag for bag in self.f_bags]))
         sentences = {c.sent_id: c.sentence for c in cands}
 
@@ -1058,12 +1112,13 @@ class SpanLearner(PipelinedLearner):
             n = coverage.nonzero()[0].shape[0]
             N = float(b.nonzero()[0].shape[0])
 
+            #print sent_id, n, N
             if (n / N) >= coverage_threshold:
                 tmp[sent_id] = sentences[sent_id]
 
-        percent_removed = (1.0 - len(tmp) / float(len(sentences))) * 100
-        print "Dropped %.2f%% (%s/%s) sentences at < %.1f%% coverage theshold" % (percent_removed,
-                                                                                  (len(sentences)-len(tmp)),
+        percent_retained =  (len(tmp) / float(len(sentences))) * 100
+        print "Retained %.2f%% (%s/%s) sentences at < %.1f%% coverage theshold" % (percent_retained,
+                                                                                  len(tmp),
                                                                                   len(sentences),
                                                                                   coverage_threshold*100)
         sentences = tmp
