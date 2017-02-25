@@ -129,7 +129,6 @@ class NounPhraseGenerator(CandidateGenerator):
         self.skipwords = set(skipwords)
         self.tfidf = tfidf
 
-        #self.rgx_np = re.compile("^((JJ[S]*|NN[PS]*|FW)\s*){1,}$")
         self.np_tags = set(['NN', 'NNP', 'NNS', 'NNPS', 'FW', 'JJ', 'JJS'])
 
     def get_candidates(self, sentences, min_tfidf=1.0,
@@ -150,7 +149,10 @@ class NounPhraseGenerator(CandidateGenerator):
             if self.tfidf != None:
                 candidates = self._tfidf_filter(candidates, self.tfidf, threshold=min_tfidf)
         else:
-            candidates = [c for c in candidates if self._is_noun_phrase(c) or self._is_bookended_noun_phrase(c)]
+            candidates = [c for c in candidates if self._is_noun_phrase(c) \
+                          or self._is_noun_phrase_conjunction(c) \
+                          or self._is_noun_phrase_number(c)]
+            #candidates = [c for c in candidates if self._is_noun_phrase(c) or self._is_bookended_noun_phrase(c)]
         return candidates
 
     def _tfidf_filter(self,candidates, tfidf, threshold=1.0):
@@ -175,20 +177,78 @@ class NounPhraseGenerator(CandidateGenerator):
         v = [1 for t,w in zip(pos_tags ,words) if t in self.np_tags or (w in self.skipwords and len(pos_tags) > 2)]
         return len(v) == len(pos_tags)
 
+    def _is_noun_phrase_number(self,c):
+        pos_tags = c.get_attrib_tokens("poses")
+        words = c.get_attrib_tokens("words")
+        v = [1 for t, w in zip(pos_tags, words) if t in self.np_tags or (w in self.skipwords and len(pos_tags) > 2)]
+        return len(v) == len(pos_tags) or ((len(v) == len(pos_tags) - 1 and pos_tags[-1] == "CD"))
+
+    def _is_noun_phrase_conjunction(self,c):
+        pos_tags = c.get_attrib_tokens("poses")
+        cnp_rgx = "^(JJ[S]* )*NN[PS]* (CC|IN DT) (JJ[S]* )*NN[PS]*$"
+        v = re.search(cnp_rgx," ".join(pos_tags)) != None
+        return v
+
     def _is_bookended_noun_phrase(self,c):
         '''
         Fuzzy noun phrase matching (allow some tags between NN[PS]* tags)
         :param c: candidate
         :return: boolean
         '''
+
+        words    = c.get_attrib_tokens("words")
         pos_tags = c.get_attrib_tokens("poses")
+
         head = pos_tags[0]
         tail = pos_tags[-1]
         v = re.search("(VBN|JJ|NN[PS]*)", head) != None
         v &= re.search("NN[PS]*", tail) != None
+
+        if not v:
+            return False
+
+        np_tags = set(["VBN", "JJ", "NNS", "NNP", "NN", "JJS"])
+        join_tags = set(["CC"])
+
+        n = sum([1 for t in pos_tags[1:-1] if t in np_tags])
+        m = sum([1 for t in pos_tags[1:-1] if t in join_tags])
+
+        if " ".join(words).lower() == "cancer of the fallopian tube":
+            print words
+            print pos_tags
+
+        if m != 1:
+            return False
+
+
+        return len(pos_tags) - n == m
+
+
+
+
+
+
+
+
+
+
+
+
+        tags = " ".join(pos_tags)
+
+        skip_tags = set(["DT","IN","CC"])
+
+
+        head = pos_tags[0]
+        tail = pos_tags[-1]
+        # if head and tail aren't NP, skip
+        v = re.search("(VBN|JJ|NN[PS]*)", head) != None
+        v &= re.search("NN[PS]*", tail) != None
         if len(pos_tags) <= 3:
             return v
-        v &= len(self.np_tags.intersection(pos_tags[1:-1]))
+
+        v &= len(skip_tags.intersection(pos_tags[1:-1])) > 0
+
         return v
 
 
@@ -210,7 +270,7 @@ class NcbiDiseaseGenerator(CandidateGenerator):
         self._init_deps()
         self.cand_space = Ngrams(n_max=kgrams, split_tokens=self.split_chars)
 
-    def get_candidates(self, sentences, nprocs=1):
+    def get_candidates(self, sentences, fuzzy_match=False, nprocs=1):
         '''
         Extract candidates
         :param sentences:  sentences to parse

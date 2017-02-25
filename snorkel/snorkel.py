@@ -966,15 +966,17 @@ class SpanLearner(PipelinedLearner):
         # Multinomial-based sampling
         if type(self.gen_model) is MnLogReg:
             if marginals == None:
-                marginals = self._marginals(marginals, num_samples=num_samples,
+                marginals = self._marginals
+
+            sampler = self.mn_sample(marginals, num_samples=num_samples,
                                         coverage_threshold=coverage_threshold,
                                         threshold=threshold, min_coverage=min_coverage)
-            sampler = self.mn_sample
         else:
             if marginals == None:
                 marginals = self.training_marginals
+
             sampler = self.bin_sample(marginals, num_samples=num_samples,
-                                        #coverage_threshold=coverage_threshold,
+                                        coverage_threshold=coverage_threshold,
                                         threshold=threshold, min_coverage=min_coverage)
 
         sentences = {}
