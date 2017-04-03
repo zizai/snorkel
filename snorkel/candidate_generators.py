@@ -37,6 +37,53 @@ def get_umls_stopwords(n_max=1, keep_words={}):
     return d
 
 
+class IDF(object):
+    def __init__(self, docs):
+
+        self.min_occur = 1
+        self._init(docs)
+
+    def _init(self, docs):
+        self.df, self.num_docs = self._compute_doc_freq(docs)
+
+    def _compute_doc_freq(self, docs):
+        # compute term df using the *training set* for 1-2grams
+        df = defaultdict(float)
+        n = 0
+        for doc in docs:
+            doc_tf = self.term_freq(doc)
+            for t in doc_tf:
+                df[t] += 1
+            n += 1
+        return df, n
+
+    def term_freq(self, doc):
+
+        doc_tf = defaultdict(float)
+        for sentence in doc.sentences:
+            tokens = map(lambda x: x.lower(), sentence.lemmas)
+            for t in tokens:
+                doc_tf[t] += 1
+            for t in ngrams(tokens, 2, pad_left=False, pad_right=False):
+                t = " ".join(t)
+                doc_tf[t] += 1
+
+        return doc_tf
+
+    def get_idf(self, term, weighting="avg", normalize=True):
+        term = term.lower() if normalize else term
+        w = []
+        for t in term.split():
+            if t in self.df:
+                w.append(math.log(self.num_docs / self.df[t]))
+            else:
+                w.append(math.log(self.num_docs / self.min_occur))
+        return np.mean(w) if weighting == 'avg' else np.max(w)
+
+    def get_weight(self, doc_id, mention):
+        return self.get_idf(mention)
+
+
 class Tfidf(object):
 
     def __init__(self,corpus,idf_set):
@@ -75,9 +122,14 @@ class Tfidf(object):
         idf = math.log(self.num_docs / float(self.df[mention])) if mention in self.df else math.log(self.num_docs / 1.0)
 
         # augmented tf
-        tf = doc_tf[mention] / max(doc_tf.values()) if mention in doc_tf else 1.0 / max(doc_tf.values())
+        max_doc_tf = max(doc_tf.values())
+        tf = doc_tf[mention] / max_doc_tf if mention in doc_tf else 1.0 / max_doc_tf
         tf = 0.5 + (0.5 * tf)  # weighted
         return tf * idf
+
+
+    def get_weight(self, doc_id, mention):
+        return self.get_tf_idf(doc_id, mention)
 
 
 class CandidateGenerator(object):
@@ -121,18 +173,27 @@ class NounPhraseGenerator(CandidateGenerator):
     '''
     Restrict candidates to heuristically identified noun phrases
     '''
-    def __init__(self, kgrams, split_chars=['-', '/', '\+'],
-                 skipwords = ["'" ,"'s" ,"de" ,"von"], tfidf=None):
+    def __init__(self, kgrams,
+                 split_chars=['-', '/', '\+'],
+                 skipwords = ["'" ,"'s" ,"de" ,"von"],
+                 tfidf=None):
+
         super(NounPhraseGenerator, self).__init__(kgrams,split_chars)
         self.cand_space = Ngrams(n_max=self.kgrams, split_tokens=self.split_chars)
         self.matcher = KgramMatcher(k=self.kgrams)
         self.skipwords = set(skipwords)
+
         self.tfidf = tfidf
 
         self.np_tags = set(['NN', 'NNP', 'NNS', 'NNPS', 'FW', 'JJ', 'JJS'])
+        self.parans_tags = set(['-LRB-', '-RRB-','-LSB-','-RSB-','-LCB-','-RCB-'])
 
     def get_candidates(self, sentences, min_tfidf=1.0,
-                       fuzzy_match=False, nprocs=1):
+                       fuzzy_match=False,
+                       nprocs=1,
+                       allow_balanced_parantheses=False,
+                       allow_conjuctions=False,
+                       allow_numbers=False):
         '''
         Extract candidates
         :param sentences:  sentences to parse
@@ -144,27 +205,55 @@ class NounPhraseGenerator(CandidateGenerator):
         candidates = cs.get_candidates()
 
         # filter to noun phrases
+        filters = [self._is_noun_phrase]
+
+        if allow_balanced_parantheses:
+            filters.append(self._is_balanced_parans_noun_phrase)
+
+        if allow_conjuctions:
+            filters.append(self._is_noun_phrase_conjunction)
+
+        if allow_numbers:
+            filters.append(self._is_noun_phrase_number)
+
+        # filter to noun phrases
         if not fuzzy_match:
             candidates = [c for c in candidates if self._is_noun_phrase(c)]
-            if self.tfidf != None:
-                candidates = self._tfidf_filter(candidates, self.tfidf, threshold=min_tfidf)
+
         else:
-            candidates = [c for c in candidates if self._is_noun_phrase(c) \
-                          or self._is_noun_phrase_conjunction(c) \
-                          or self._is_noun_phrase_number(c)]
-            #candidates = [c for c in candidates if self._is_noun_phrase(c) or self._is_bookended_noun_phrase(c)]
+            # candidates = [c for c in candidates if self._is_noun_phrase(c) \
+            #               or self._is_noun_phrase_conjunction(c) \
+            #               or self._is_noun_phrase_number(c)]
+
+            # candidates = [c for c in candidates if self._is_noun_phrase(c) \
+            #               or self._is_balanced_parans_noun_phrase(c) \
+            #               or self._is_noun_phrase_number(c) ]
+
+            def conjuction(c):
+                for f in filters:
+                    if f(c):
+                        return True
+                return False
+
+            candidates = [c for c in candidates if conjuction(c)]
+
+        if self.tfidf != None:
+            candidates = self._tfidf_filter(candidates, self.tfidf, threshold=1.0)
+
         return candidates
 
     def _tfidf_filter(self,candidates, tfidf, threshold=1.0):
 
         f_candidates = []
+        print len(candidates)
         for i, c in enumerate(candidates):
             mention = " ".join(c.get_attrib_tokens("words"))
-            w = tfidf.get_tf_idf(c.doc_id, mention)
+            w = tfidf.get_weight(c.doc_id, mention)
             if w > threshold:
                 f_candidates += [c]
 
         return f_candidates
+
 
     def _is_noun_phrase(self,c):
         '''
@@ -174,20 +263,70 @@ class NounPhraseGenerator(CandidateGenerator):
         '''
         pos_tags = c.get_attrib_tokens("poses")
         words = c.get_attrib_tokens("words")
-        v = [1 for t,w in zip(pos_tags ,words) if t in self.np_tags or (w in self.skipwords and len(pos_tags) > 2)]
+        v = [1 for t,w in zip(pos_tags, words) if t in self.np_tags or (w in self.skipwords and len(pos_tags) > 2)]
+
         return len(v) == len(pos_tags)
+
 
     def _is_noun_phrase_number(self,c):
         pos_tags = c.get_attrib_tokens("poses")
         words = c.get_attrib_tokens("words")
         v = [1 for t, w in zip(pos_tags, words) if t in self.np_tags or (w in self.skipwords and len(pos_tags) > 2)]
-        return len(v) == len(pos_tags) or ((len(v) == len(pos_tags) - 1 and pos_tags[-1] == "CD"))
+        return len(v) == len(pos_tags) or (len(v) == len(pos_tags) - 1 and (pos_tags[-1] == "CD"  or pos_tags[0] == "CD"))
+
 
     def _is_noun_phrase_conjunction(self,c):
         pos_tags = c.get_attrib_tokens("poses")
         cnp_rgx = "^(JJ[S]* )*NN[PS]* (CC|IN DT) (JJ[S]* )*NN[PS]*$"
         v = re.search(cnp_rgx," ".join(pos_tags)) != None
         return v
+
+
+    def _is_balanced_parans_noun_phrase(self,c):
+        '''
+
+        All for noun phrases of the form:
+
+        p56 ( lck )
+        nuclear factor (NF)-kappa B
+
+        :param c:
+        :return:
+        '''
+        mention = c.get_attrib_span("words")
+        words = c.get_attrib_tokens("words")
+        pos_tags = c.get_attrib_tokens("poses")
+
+        t_tags = [t for t in pos_tags if t in self.np_tags]
+        p_tags = [t for t in pos_tags if t in self.parans_tags]
+
+        rgx = re.search("[(\[{].+?[)\]}]", mention)
+
+        v = len(p_tags) % 2 == 0
+        v &= (len(t_tags) + len(p_tags) == len(pos_tags))
+        v &= rgx != None
+
+        # if rgx:
+        #     print mention
+        #     print "parans tags", len(p_tags)
+        #     print len(p_tags) % 2.0 == 0
+        #     print 2 / 2.0
+        #     print (len(t_tags) + len(p_tags) == len(pos_tags))
+        #     print "---"
+
+        # if mention == "Tylenol #3":
+        #     print mention
+        #     print pos_tags
+        #     print len(p_tags) % 2 == 0
+        #     print len(t_tags)
+        #     print len(p_tags)
+        #     print len(pos_tags)
+        #     print (len(t_tags) + len(p_tags) == len(pos_tags))
+        #     print rgx != None
+        #     print "FLAG", v
+        #     print "---"
+
+        return True if v else False
 
     def _is_bookended_noun_phrase(self,c):
         '''
@@ -213,43 +352,11 @@ class NounPhraseGenerator(CandidateGenerator):
         n = sum([1 for t in pos_tags[1:-1] if t in np_tags])
         m = sum([1 for t in pos_tags[1:-1] if t in join_tags])
 
-        if " ".join(words).lower() == "cancer of the fallopian tube":
-            print words
-            print pos_tags
-
         if m != 1:
             return False
 
-
         return len(pos_tags) - n == m
 
-
-
-
-
-
-
-
-
-
-
-
-        tags = " ".join(pos_tags)
-
-        skip_tags = set(["DT","IN","CC"])
-
-
-        head = pos_tags[0]
-        tail = pos_tags[-1]
-        # if head and tail aren't NP, skip
-        v = re.search("(VBN|JJ|NN[PS]*)", head) != None
-        v &= re.search("NN[PS]*", tail) != None
-        if len(pos_tags) <= 3:
-            return v
-
-        v &= len(skip_tags.intersection(pos_tags[1:-1])) > 0
-
-        return v
 
 
 # ------------------------------------------------
@@ -262,8 +369,10 @@ class NcbiDiseaseGenerator(CandidateGenerator):
 
     def __init__(self, kgrams, dict_only=False,
                  split_chars=['-', '/', '\+'],
+                 stopwords=[],
                  longest_match_only=True):
         self.kgrams = kgrams
+        self.stopwords = stopwords
         self.longest_match_only = longest_match_only
         self.dict_only = dict_only
         self.split_chars = split_chars
@@ -525,21 +634,34 @@ class NcbiDiseaseGenerator(CandidateGenerator):
         # "early-onset" is an incorrect prefix, but "sporadic" is not
         # sometimes "hereditary", "autosomal dominant", etc is a valid prefix; sometimes not
 
-        # Filter out stopwords, single char terms, and digits
-        dict_diseases = filter_dictionary(dict_diseases, dict_stopwords)
-        dict_disease_abbrvs = filter_dictionary(dict_disease_abbrvs, dict_stopwords)
+        #
+        # stopwords
+        #
 
-        dict_molecular_seq = filter_dictionary(dict_molecular_seq, dict_stopwords)
-        dict_disease_syndrome = filter_dictionary(dict_disease_syndrome, dict_stopwords)
-        dict_body_part = filter_dictionary(dict_body_part, dict_stopwords)
-        dict_neoplastic_process = filter_dictionary(dict_neoplastic_process, dict_stopwords)
-        dict_temporal = filter_dictionary(dict_temporal, dict_stopwords)
-        dict_func_concept = filter_dictionary(dict_func_concept, dict_stopwords)
-        dict_finding = filter_dictionary(dict_finding, dict_stopwords)
-        dict_cell = filter_dictionary(dict_cell, dict_stopwords)
+        if self.stopwords:
+            print "using provided stopword list..."
+            #dict_diseases = {t.lower().strip():1 for t in dict_diseases if t.lower().strip() not in self.stopwords}
+            #dict_disease_abbrvs = {t: 1 for t in dict_disease_abbrvs if t.lower().strip() not in self.stopwords}
+            dict_diseases = filter_dictionary(dict_diseases, self.stopwords)
+            dict_disease_abbrvs = filter_dictionary(dict_disease_abbrvs, self.stopwords)
 
-        # Manual Tweaks
-        dict_cell.remove("cell")
+        else:
+
+            # Filter out stopwords, single char terms, and digits
+            dict_diseases = filter_dictionary(dict_diseases, dict_stopwords)
+            dict_disease_abbrvs = filter_dictionary(dict_disease_abbrvs, dict_stopwords)
+
+            dict_molecular_seq = filter_dictionary(dict_molecular_seq, dict_stopwords)
+            dict_disease_syndrome = filter_dictionary(dict_disease_syndrome, dict_stopwords)
+            dict_body_part = filter_dictionary(dict_body_part, dict_stopwords)
+            dict_neoplastic_process = filter_dictionary(dict_neoplastic_process, dict_stopwords)
+            dict_temporal = filter_dictionary(dict_temporal, dict_stopwords)
+            dict_func_concept = filter_dictionary(dict_func_concept, dict_stopwords)
+            dict_finding = filter_dictionary(dict_finding, dict_stopwords)
+            dict_cell = filter_dictionary(dict_cell, dict_stopwords)
+
+            # Manual Tweaks
+            dict_cell.remove("cell")
 
 
         # ==================================================================
@@ -555,6 +677,7 @@ class NcbiDiseaseGenerator(CandidateGenerator):
         # 7652577    tumor-specific
         ngrams = Ngrams(n_max=self.kgrams)
         longest_match_only = True
+
 
         # ------------------------------------------------------------------
         # Matchers: Dictionaries
@@ -860,6 +983,10 @@ class NcbiDiseaseGenerator(CandidateGenerator):
             longest_match_only=self.longest_match_only
         )
 
+
+
+
+
         dict_matcher = Union(
             MF_dict_diseases,
             MF_dict_abbrvs,
@@ -890,6 +1017,10 @@ class CdrChemicalDictGenerator(CandidateGenerator):
         super(CdrChemicalDictGenerator, self).__init__(kgrams, split_chars)
         self.stopwords = stopwords
         self._init_deps()
+
+        # filter stopwords
+        self.chemicals = {t:1 for t in self.chemicals if t.lower() not in self.stopwords}
+        self.chemical_acronyms = {t: 1 for t in self.chemical_acronyms if t.lower() not in self.stopwords}
 
         dict_chemicals = DictionaryMatch(d=self.chemicals, ignore_case=True,
                                          longest_match_only=longest_match_only)
@@ -947,6 +1078,10 @@ class CdrChemicalGenerator(CandidateGenerator):
         self.stopwords = stopwords
         self.clusters = clusters
         self._init_deps()
+
+        # filter stopwords
+        self.chemicals = {t: 1 for t in self.chemicals if t.lower() not in self.stopwords}
+        self.chemical_acronyms = {t: 1 for t in self.chemical_acronyms if t.lower() not in self.stopwords}
 
         dict_chemicals = DictionaryMatch(d=self.chemicals, ignore_case=True,
                                          longest_match_only=longest_match_only)
@@ -1268,9 +1403,17 @@ class CdrDiseaseDictGenerator(CandidateGenerator):
 
         abbrvs.update(dict.fromkeys(dict_common_disease_acronyms))
 
-        # remove stopwords
-        diseases = {t.lower().strip(): 1 for t in diseases if t.lower().strip() not in stopwords and len(t) > 1}
-        abbrvs = {t: 1 for t in abbrvs if len(t) > 1 and t not in stopwords}
+        #remove_domain_stopwords = False
+
+        if self.stopwords:
+            print "using provided stopword list..."
+            diseases = {t.lower().strip():1 for t in diseases if t.lower().strip() not in self.stopwords}
+            abbrvs = {t: 1 for t in abbrvs if t.lower().strip() not in self.stopwords}
+
+        # remove domain stopwords
+        else:
+            diseases = {t.lower().strip(): 1 for t in diseases if t.lower().strip() not in stopwords and len(t) > 1}
+            abbrvs = {t: 1 for t in abbrvs if len(t) > 1 and t not in stopwords}
 
 
         #
@@ -1610,3 +1753,86 @@ class CdrDiseaseGenerator(CandidateGenerator):
             longest_match_only=longest_match_only)
 
         print "CdrDiseaseDictGenerator initialized..."
+
+
+
+
+# ------------------------------------------------
+#
+#  i2b2 Medications
+#
+# ------------------------------------------------
+class i2b2MedsDictGenerator(CandidateGenerator):
+
+    def __init__(self, kgrams, split_chars=[],
+                 stopwords=[], longest_match_only=True):
+        '''
+        :param kgrams:
+        :param split_chars:
+        :param stopwords:
+        :param longest_match_only:
+        '''
+        super(i2b2MedsDictGenerator, self).__init__(kgrams, split_chars)
+        self.stopwords = stopwords
+        self._init_deps()
+
+        # filter stopwords
+        self.dict_drugs = {t:1 for t in self.dict_drugs if t.lower() not in self.stopwords}
+        self.dict_drug_abbrvs = {t: 1 for t in self.dict_drug_abbrvs if t.lower() not in self.stopwords}
+
+        mf_drug_name = DictionaryMatch(d=self.dict_drugs, ignore_case=True,
+                                         longest_match_only=longest_match_only)
+        mf_drug_abbrvs = DictionaryMatch(d=self.dict_drug_abbrvs, ignore_case=False,
+                                        longest_match_only=longest_match_only)
+
+        self.matcher = Union(
+            mf_drug_name,
+            mf_drug_abbrvs,
+            longest_match_only=longest_match_only)
+
+        self.cand_space = Ngrams(n_max=self.kgrams, split_tokens=self.split_chars)
+
+    def get_candidates(self, sentences, nprocs=1):
+
+        cs = Candidates(self.cand_space, self.matcher, sentences, parallelism=nprocs)
+        return cs.get_candidates()
+
+    def _init_deps(self):
+
+        #
+        # SPECIALIST Lexicon
+        #
+        chemnames = []
+        with codecs.open("../data/dicts/chemicals/LRTRM.txt", "rU", "utf-8") as fp:
+            for line in fp:
+                row = line.strip()
+                brand, generic = row.split("|")[1:3]
+                chemnames.append(brand)
+                chemnames.append(generic)
+        dict_brand_names = dict.fromkeys(chemnames)
+
+        #
+        # CTD Chemicals
+        #
+        dict_ctd = load_ctd_dictionary("../data/dicts/chemicals/CTD_chemicals.tsv", ignore_case=0)
+
+        #
+        # UMLS
+        #
+        drug_entities = ["Pharmacologic Substance", "Antibiotic", "Clinical Drug"]
+        drugs = UmlsNoiseAwareDict(positive=drug_entities, name="terms", ignore_case=True)
+        drug_abbrvs = UmlsNoiseAwareDict(positive=drug_entities, name="abbrvs", ignore_case=False)
+        dict_drug_terms  = drugs.get_dictionary()
+        dict_drug_abbrvs = drug_abbrvs.get_dictionary()
+
+        # create union of all dictionaries
+        dict_drugs = {}
+        dict_drugs.update(dict_drug_terms)
+        dict_drugs.update(dict_brand_names)
+        dict_drugs.update(dict_ctd)
+
+        dict_drug_lemmas = {t.rstrip("s") if t[-1] == "s" else t: 1 for t in dict_drugs}
+        dict_drugs.update(dict_drug_lemmas)
+
+        self.dict_drugs = dict_drugs
+        self.dict_drug_abbrvs = dict_drug_abbrvs
