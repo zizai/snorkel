@@ -884,8 +884,11 @@ class SpanLearner(PipelinedLearner):
         t_tokens = []
         for t in tokens:
             term, span = t
-            rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
-            t_term = re.sub(rgx, r' \1 ', term)
+            if len(split_chars) > 0:
+                rgx = r'([{}]+)+'.format("".join(sorted(split_chars)))
+                t_term = re.sub(rgx, r' \1 ', term)
+            else:
+                t_term = term
 
             if t_term != term:
                 t_spans = []
