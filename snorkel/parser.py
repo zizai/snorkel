@@ -135,7 +135,9 @@ PTB = {'-RRB-': ')', '-LRB-': '(', '-RCB-': '}', '-LCB-': '{',
 CORE_ANNOTATORS = ['tokenize', 'ssplit']
 
 class SentenceParser:
-    def __init__(self, tok_whitespace=False, disable_ptb=False, annotators=['pos', 'lemma', 'depparse', 'ner']):
+    def __init__(self, tok_whitespace=False, disable_ptb=False,
+                 newline_sentence_breaks=False,
+                 annotators=['pos', 'lemma', 'depparse', 'ner']):
         self.annotators = CORE_ANNOTATORS + annotators
 
         # http://stanfordnlp.github.io/CoreNLP/corenlp-server.html
@@ -156,7 +158,7 @@ class SentenceParser:
 
         # disable all the penn tree bank replacement tokens
         # nlp.stanford.edu/software/tokenizer.html
-        tokenizer_options = {"normalizeParentheses": False,
+        tokenizer_opts = {"normalizeParentheses": False,
                              "normalizeCurrency": False,
                              "normalizeFractions": False,
                              "normalizeParentheses": False,
@@ -168,10 +170,19 @@ class SentenceParser:
                              "escapeForwardSlashAsterisk": False,
                              "strictTreebank3": True}
 
-        opts = ["{}={}".format(key, str(value).lower()) for key, value in tokenizer_options.items()]
-        tokenizer_options = "," + '"tokenize.options":"{}"'.format(",".join(opts)) if disable_ptb else ""
-        self.endpoint = 'http://127.0.0.1:%d/?properties={%s"annotators": "%s", "outputFormat": "json" %s}' % (
-        self.port, props, ','.join(self.annotators), tokenizer_options)
+        t_opts = ["{}={}".format(key, str(value).lower()) for key, value in tokenizer_opts.items()]
+        tokenizer_options = "," + '"tokenize.options":"{}"'.format(",".join(t_opts)) if disable_ptb else ""
+
+        if newline_sentence_breaks:
+            sentence_options = "," + '"ssplit.newlineIsSentenceBreak":"always"'
+            # sentence_options = ', "ssplit.eolonly"="true"'
+        else:
+            sentence_options = ""
+
+        self.endpoint = 'http://127.0.0.1:%d/?properties={%s"annotators": "%s", "outputFormat": "json" %s %s}' % (
+        self.port, props, ','.join(self.annotators), tokenizer_options, sentence_options)
+
+        print "CoreNLP properies", self.endpoint
 
         # Following enables retries to cope with CoreNLP server boot-up latency
         # See: http://stackoverflow.com/a/35504626
