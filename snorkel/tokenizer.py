@@ -163,18 +163,35 @@ def retokenize_sentence(sentence, split_chars=[u"/", u"-", u"+"]):
 def char2idx(sentence, candidate):
     '''char_offsets converted to word idxs'''
     idxs = []
-    for idx in range(len(sentence.char_offsets) - 1):
-        i, j = sentence.char_offsets[idx], sentence.char_offsets[idx + 1]
-        #if max(candidate.char_start, i) <= min(candidate.char_end, j):
-        #    idxs += [idx]
+
+    try:
+        N = len(sentence.char_offsets)
+    except:
+        N = len(sentence['char_offsets'])
+
+    for idx in range(N - 1):
+        try:
+            i, j = sentence.char_offsets[idx], sentence.char_offsets[idx + 1]
+        except:
+            i, j = sentence['char_offsets'][idx], sentence['char_offsets'][idx + 1]
+
         if set(range(i,j)).intersection(range(candidate.char_start,candidate.char_end+1)):
             idxs += [idx]
 
-    i,j = sentence.char_offsets[-1],len(sentence.text) + sentence.char_offsets[0]
+    try:
+        i,j = sentence.char_offsets[-1],len(sentence.text) + sentence.char_offsets[0]
+    except:
+        i, j = sentence['char_offsets'][-1], len(sentence['text']) + sentence['char_offsets'][0]
+
     if set(range(i, j)).intersection(range(candidate.char_start, candidate.char_end + 1)):
-        idxs += [len(sentence.char_offsets) - 1]
+        try:
+            idxs += [len(sentence.char_offsets) - 1]
+        except:
+            idxs += [len(sentence['char_offsets']) - 1]
 
     return idxs
+
+
 
 
 def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
@@ -183,7 +200,10 @@ def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
     if sent is None:
         return None,None
 
-    ner_tags = np.array([u'O'] * len(sent.words))
+    try:
+        ner_tags = np.array([u'O'] * len(sent.words))
+    except:
+        ner_tags = np.array([u'O'] * len(sent['words']))
 
     c_idx = {}
     for c in candidates:
@@ -195,7 +215,7 @@ def tag_sentence(sentence, candidates, tag_fmt="IOB2", split_chars=["/", "-"]):
         if 'I' in list(ner_tags[idxs]) or 'B' in list(ner_tags[idxs]):
             print>> sys.stderr, "WARNING Double Samples"
             print>> sys.stderr, c
-            print>> sys.stderr, zip(sent.words,ner_tags),"\n"
+            # print>> sys.stderr, zip(sent.words,ner_tags),"\n"
             continue
 
         if tag_fmt == "IOB2":

@@ -29,6 +29,8 @@ def tensor_blocks(Xs):
     return blocks
 
 
+DEBUG = True
+
 def block_compute_lf_accs(blocks, w, num_lfs):
     '''
     ~10x faster with np.einsum and matrix blocking
@@ -51,12 +53,35 @@ def block_compute_lf_accs(blocks, w, num_lfs):
         accs   += np.sum(U.T / np.linalg.norm(z, axis=0), axis=1)
         n_pred += np.ravel(X.sum(1).T.sum(1))
 
+        if DEBUG:
+            if np.isnan(np.sum(U)) or np.isnan(np.sum(accs)) or np.isnan(np.sum(n_pred)):
+                print "blocks", len(blocks)
+                print "U:", U.shape, np.isnan(np.sum(U))
+                print "accs:", accs.shape, np.isnan(np.sum(accs))
+                print "n_pred:", n_pred.shape, np.isnan(np.sum(n_pred))
+                print
+
         # SLOWER
         # for i in range(X.shape[0]):
         #    accs   += X[i].T.dot(z[...,i]) / np.linalg.norm(z[...,i])
         #    n_pred += np.ravel(X[i].T.sum(1))
+    #
+    # print "block_compute_lf_accs"
+    # print n_pred
+    # print accs
+    # print "---"
 
     p_correct = (1. / (n_pred + 1e-8)) * accs
+
+    # if DEBUG:
+    #     if np.isnan(np.sum(accs)) or np.isnan(np.sum(n_pred)) or np.isnan(np.sum(p_correct)):
+    #         print "ERROR"
+    #         print "accs NaN", np.isnan(np.sum(accs))
+    #         print "n_pred NaN", np.isnan(np.sum(n_pred))
+    #         print "p_correct NaN", np.isnan(np.sum(p_correct))
+    #         print
+
+
     return p_correct, n_pred
 
 
@@ -212,11 +237,17 @@ class MnLogReg(NoiseAwareModel):
             else:
                 p_correct, n_pred = block_compute_lf_accs(blocks, w, Xs[0].shape[0])
 
+            #print p_correct
+            #print n_pred
             # Get the "empirical log odds"; NB: this assumes one is correct, clamp is for sampling...
             l = np.clip(log_odds(p_correct), -10, 10).flatten()
 
+            #print "l", l
+
             # SGD step with normalization by the number of samples
             g0 = (n_pred * (w - l)) / np.sum(n_pred)
+
+            #print "g0", g0
 
             # Momentum term for faster training
             g = 0.95*g0 + 0.05*g
@@ -224,6 +255,10 @@ class MnLogReg(NoiseAwareModel):
             # Check for convergence
             wn     = np.linalg.norm(w, ord=2)
             g_size = np.linalg.norm(g, ord=2)
+
+            #print "g", g
+            #print g_size
+
             if step % 100 == 0 and verbose:
                 print "\tLearning epoch = {}\tGradient mag. = {:.6f}".format(step, g_size)
             if (wn < 1e-12 or g_size / wn < tol) and step >= 10:
