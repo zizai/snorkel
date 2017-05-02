@@ -12,5 +12,6 @@ from .gen_learning import (
     GenerativeModelWeights,
     NaiveBayes,
 )
+from .coral_learning import CoralModel
 from .logistic_regression import LogisticRegression, SparseLogisticRegression
 from .utils import *
