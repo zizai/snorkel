@@ -153,7 +153,7 @@ class CoralModel(object):
         n_weights = n_lf
         n_vars = n_data * (n_vocab + 1)
         n_factors = n_data * n_weights
-        n_edges = n_data * (sum([len(l) for l in L]) + 1)
+        n_edges = n_data * (sum([len(l) + 1 for l in L]))
 
         weight = np.zeros(n_weights, Weight)
         variable = np.zeros(n_vars, Variable)
@@ -183,9 +183,9 @@ class CoralModel(object):
         for i in range(n_data):
             for j in range(n_vocab):
                 variable[n_data + i * n_vocab + j]["isEvidence"] = True
-                variable[n_data + i * n_vocab + j]["initialValue"] = 1
-                variable[n_data + i * n_vocab + j]["dataType"] = V[i, j]
-                variable[n_data + i * n_vocab + j]["cardinality"] = 3
+                variable[n_data + i * n_vocab + j]["initialValue"] = V[i, j]
+                variable[n_data + i * n_vocab + j]["dataType"] = 0
+                variable[n_data + i * n_vocab + j]["cardinality"] = cardinality[j]
 
         #
         # Compiles factor and ftv matrices
@@ -196,13 +196,22 @@ class CoralModel(object):
                 factor[i * n_lf + j]["factorFunction"] = L_offset + j
                 factor[i * n_lf + j]["weightId"] = j
                 factor[i * n_lf + j]["featureValue"] = 1.0
-                factor[i * n_lf + j]["arity"] = len(L[j])
+                factor[i * n_lf + j]["arity"] = len(L[j]) + 1
                 factor[i * n_lf + j]["ftv_offset"] = index
-                index += factor[i * n_lf + j]["arity"]
                 for k in range(len(L[j])):
-                    ftv[index]["vid"] = L[j][k]
+                    ftv[index]["vid"] = n_data + i * n_vocab + L[j][k]
                     ftv[index]["dense_equal_to"] = 0 # not actually used
+                    index += 1
+                ftv[index]["vid"] = i
+                ftv[index]["dense_equal_to"] = 0 # not actually used
+                index += 1
 
+        print(weight)
+        print(variable)
+        print(factor)
+        print(ftv)
+        print(domain_mask)
+        print(n_edges)
         return weight, variable, factor, ftv, domain_mask, n_edges
 
     def _compile_output_factors(self, L, factors, factors_offset, ftv, ftv_offset, weight_offset, factor_name, vid_funcs):
