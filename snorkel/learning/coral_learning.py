@@ -41,7 +41,7 @@ class CoralModel(object):
         if timer is not None:
             timer.end()
 
-        print fg.factorGraphs[0].weight
+        print fg.factorGraphs[0].weight_value
         # self._process_learned_weights(L, fg)
 
     def marginals(self, L):
@@ -144,6 +144,8 @@ class CoralModel(object):
         Compiles a generative model based on L and the current labeling function dependencies.
         """
 
+        # TODO: error checking
+
         n_data = V.shape[0]
         n_vocab = V.shape[1]
         n_lf = len(L)
@@ -180,10 +182,10 @@ class CoralModel(object):
         # Vocabulary
         for i in range(n_data):
             for j in range(n_vocab):
-                variable[n_data + i * n_data + j]["isEvidence"] = True
-                variable[n_data + i * n_data + j]["initialValue"] = 1
-                variable[n_data + i * n_data + j]["dataType"] = V[i, j]
-                variable[n_data + i * n_data + j]["cardinality"] = 3
+                variable[n_data + i * n_vocab + j]["isEvidence"] = True
+                variable[n_data + i * n_vocab + j]["initialValue"] = 1
+                variable[n_data + i * n_vocab + j]["dataType"] = V[i, j]
+                variable[n_data + i * n_vocab + j]["cardinality"] = 3
 
         #
         # Compiles factor and ftv matrices
@@ -191,12 +193,12 @@ class CoralModel(object):
         index = 0
         for i in range(n_data):
             for j in range(n_lf):
-                factor[i * n_data + j]["factorFunction"] = L_offset + j
-                factor[i * n_data + j]["weightId"] = j
-                factor[i * n_data + j]["featureValue"] = 1.0
-                factor[i * n_data + j]["arity"] = len(L[j])
-                factor[i * n_data + j]["ftv_offset"] = index
-                index += factor[i * n_data + j]["arity"]
+                factor[i * n_lf + j]["factorFunction"] = L_offset + j
+                factor[i * n_lf + j]["weightId"] = j
+                factor[i * n_lf + j]["featureValue"] = 1.0
+                factor[i * n_lf + j]["arity"] = len(L[j])
+                factor[i * n_lf + j]["ftv_offset"] = index
+                index += factor[i * n_lf + j]["arity"]
                 for k in range(len(L[j])):
                     ftv[index]["vid"] = L[j][k]
                     ftv[index]["dense_equal_to"] = 0 # not actually used
