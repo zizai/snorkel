@@ -43,6 +43,7 @@ class CoralModel(object):
             timer.end()
 
         self.weights = fg.factorGraphs[0].weight_value[0]
+        self.lf_accuracy = 1. / (1. + np.exp(-self.weights[:len(L)]))
         # self._process_learned_weights(L, fg)
 
     def marginals(self, V, cardinality, L, L_offset, deps=(), init_acc = 1.0, init_deps=1.0, init_class_prior=-1.0, epochs=100, step_size=None, decay=0.99, verbose=False,
@@ -54,8 +55,10 @@ class CoralModel(object):
         weight, variable, factor, ftv, domain_mask, n_edges = self._compile(V, cardinality, L, L_offset, y, self.weights)
 
         fg = NumbSkull(n_inference_epoch=epochs, n_learning_epoch=0, stepsize=step_size, decay=decay,
-                       quiet=(not verbose), verbose=verbose, learn_non_evidence=True, burn_in=burn_in)
+                       quiet=(not verbose), verbose=verbose, learn_non_evidence=True, burn_in=burn_in,
+                       sample_evidence=False)
         fg.loadFactorGraph(weight, variable, factor, ftv, domain_mask, n_edges)
+
 
         fg.inference(out=False)
         marginals = fg.factorGraphs[0].marginals[:V.shape[0]]
@@ -189,6 +192,8 @@ class CoralModel(object):
                 variable[n_data + i * n_vocab + j]["initialValue"] = V[i, j]
                 variable[n_data + i * n_vocab + j]["dataType"] = 0
                 variable[n_data + i * n_vocab + j]["cardinality"] = cardinality[j]
+                if V[i, j] >= cardinality[j]:
+                    raise ValueError("Vocab " + str(j) + " contains " + str(V[i, j]) + " even though it has a cardinality of " + str(cardinality[j]))
 
         #
         # Compiles factor and ftv matrices
