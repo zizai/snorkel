@@ -4,6 +4,7 @@ from .utils import MentionScorer
 from numbskull import NumbSkull
 from numbskull.inference import FACTORS
 from numbskull.numbskulltypes import Weight, Variable, Factor, FactorToVar
+from numbskull.udf import *
 import numpy as np
 import random
 import scipy.sparse as sparse
@@ -144,7 +145,24 @@ class CoralModel(object):
         Compiles a generative model based on L and the current labeling function dependencies.
         """
 
-        # TODO: error checking
+        ### Error Checking ###
+
+        # Check L_offset is valid
+        index = np.flatnonzero(UdfStart == L_offset)
+        if len(index) == 0:
+            raise ValueError("L_offset " + str(L_offset) + " does not correspond to a known application")
+        if len(index) > 1:
+            raise ValueError("L_offset " + str(L_offset) + " found multiple times")
+        index = index[0]
+
+        # Check L is the right size
+        if len(L) != LfCount[index]:
+            raise ValueError("Wrong number of LFs passed: (" + str(len(L)) + " given and " + str(LfCount[index]) + " in udf.py)")
+
+        # Check cardinality of each LF is right
+        for i in range(len(L)):
+            if len(L[i]) != UdfCardinality[UdfCardinalityStart[index] + i]:
+                raise ValueError("LF " + str(i) + " has the wrong cardinality: (" + str(len(L[i])) + " given and " + str(UdfCardinality[UdfCardinalityStart[index] + i]) + " in udf.py)")
 
         n_data = V.shape[0]
         n_vocab = V.shape[1]
