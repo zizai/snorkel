@@ -42,50 +42,23 @@ class CoralModel(object):
         if timer is not None:
             timer.end()
 
-        print fg.factorGraphs[0].weight_value
+        self.weights = fg.factorGraphs[0].weight_value[0]
         # self._process_learned_weights(L, fg)
 
-    def marginals(self, L):
+    def marginals(self, V, cardinality, L, L_offset, deps=(), init_acc = 1.0, init_deps=1.0, init_class_prior=-1.0, epochs=100, step_size=None, decay=0.99, verbose=False,
+              burn_in=50, timer=None):
         if self.weights is None:
             raise ValueError("Must fit model with train() before computing marginal probabilities.")
 
-        marginals = np.ndarray(L.shape[0], dtype=np.float64)
+        y = None
+        weight, variable, factor, ftv, domain_mask, n_edges = self._compile(V, cardinality, L, L_offset, y, self.weights)
 
-        for i in range(L.shape[0]):
-            logp_true = self.weights.class_prior
-            logp_false = -1 * self.weights.class_prior
+        fg = NumbSkull(n_inference_epoch=epochs, n_learning_epoch=0, stepsize=step_size, decay=decay,
+                       quiet=(not verbose), verbose=verbose, learn_non_evidence=True, burn_in=burn_in)
+        fg.loadFactorGraph(weight, variable, factor, ftv, domain_mask, n_edges)
 
-            l_i = L[i].tocoo()
-
-            for l_index1 in range(l_i.nnz):
-                data_j, j = l_i.data[l_index1], l_i.col[l_index1]
-                if data_j == 1:
-                    logp_true  += self.weights.lf_accuracy_log_odds[j]
-                    logp_false -= self.weights.lf_accuracy_log_odds[j]
-                    logp_true  += self.weights.lf_class_propensity[j]
-                    logp_false -= self.weights.lf_class_propensity[j]
-                elif data_j == -1:
-                    logp_true  -= self.weights.lf_accuracy_log_odds[j]
-                    logp_false += self.weights.lf_accuracy_log_odds[j]
-                    logp_true  += self.weights.lf_class_propensity[j]
-                    logp_false -= self.weights.lf_class_propensity[j]
-                else:
-                    ValueError("Illegal value at %d, %d: %d. Must be in {-1, 0, 1}." % (i, j, data_j))
-
-                for l_index2 in range(l_i.nnz):
-                    data_k, k = l_i.data[l_index2], l_i.col[l_index2]
-                    if j != k:
-                        if data_j == -1 and data_k == 1:
-                            logp_true += self.weights.dep_fixing[j, k]
-                        elif data_j == 1 and data_k == -1:
-                            logp_false += self.weights.dep_fixing[j, k]
-
-                        if data_j == 1 and data_k == 1:
-                            logp_true += self.weights.dep_reinforcing[j, k]
-                        elif data_j == -1 and data_k == -1:
-                            logp_false += self.weights.dep_reinforcing[j, k]
-
-            marginals[i] = 1 / (1 + np.exp(logp_false - logp_true))
+        fg.inference(out=False)
+        marginals = fg.factorGraphs[0].marginals[:V.shape[0]]
 
         return marginals
 
@@ -184,7 +157,10 @@ class CoralModel(object):
         #
         for i in range(n_weights):
             weight[i]['isFixed'] = False
-            weight[i]['initialValue'] = np.float64(init_acc)
+            if type(init_acc) == int or type(init_acc) == float:
+                weight[i]['initialValue'] = np.float64(init_acc)
+            else:
+                weight[i]['initialValue'] = init_acc[i]
 
         #
         # Compiles variable matrix
