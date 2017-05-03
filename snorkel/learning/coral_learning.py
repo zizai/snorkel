@@ -137,6 +137,15 @@ class CoralModel(object):
             if len(L[i]) != UdfCardinality[UdfCardinalityStart[index] + i]:
                 raise ValueError("LF " + str(i) + " has the wrong cardinality: (" + str(len(L[i])) + " given and " + str(UdfCardinality[UdfCardinalityStart[index] + i]) + " in udf.py)")
 
+        # Check that there are enough vocab terms
+        for i in range(len(L)):
+            for j in range(len(L[i])):
+                if L[i][j] >= V.shape[1]:
+                    raise ValueError("LF " + str(i) + " uses vocab " + str(L[i][j]) + " when there are only " + str(V.shape[1]) + " terms")
+
+
+        ### Set up factor graph ###
+
         n_data = V.shape[0]
         n_vocab = V.shape[1]
         n_lf = len(L)
