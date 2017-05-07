@@ -70,7 +70,7 @@ class CoralDependencySelector(object):
         return deps
 
 
-#@jit(nopython=True, cache=True, nogil=True)
+@jit(nopython=True, cache=True, nogil=True)
 def eval_udf(i, udf_index, V, L, var_samp, value):
     var_copy = 0
     var_value = V[i:(i + 1), :]
@@ -82,7 +82,7 @@ def eval_udf(i, udf_index, V, L, var_samp, value):
     return udf(udf_index, var_samp, value, var_copy, var_value, fmap, ftv_start)
 
 
-#@jit(nopython=True, cache=True, nogil=True)
+@jit(nopython=True, cache=True, nogil=True)
 def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights, joint, regularization, truncation):
     step_size = 1.0 / n_data
     epochs = 10
@@ -91,15 +91,18 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
     for t in range(epochs):
         for i in range(n_data):
             # Processes a training example
+            weights[0] = 1.
+            weights[1] = 0.5
+            weights[2] = 0.5
 
             # First, computes joint and conditional distributions
             joint[:] = 0, 0, 0, 0, 0, 0
             for k in range(n_lf):
                 # Accuracy
                 for value in range(cardinality[j]):
-                    u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], k, value)
-                    joint[0 + value] = weights[k] * -1 * u
-                    joint[3 + value] = weights[k] * +1 * u
+                    u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], j, value)
+                    joint[0 + value] += weights[k] * -1 * u
+                    joint[3 + value] += weights[k] * +1 * u
             for k in range(n_vocab):
                 # Similarity
                 if j != k:
@@ -131,9 +134,6 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
 
             joint = np.exp(joint)
             joint /= np.sum(joint)
-            # print(weights)
-            # print(joint)
-            # print
 
             marginal_pos = np.sum(joint[3:6])
             marginal_neg = np.sum(joint[0:3])
@@ -175,20 +175,28 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
             #            weights[n + k] -= step_size * (joint[1] + joint[4])
             #            if L[i, j] == 0:
             #                weights[n + k] += step_size
-            weights[0] = 1.
-            weights[1] = 0.5
-            weights[2] = 0.5
             for k in range(n_vocab):
                 # Similarity
                 if j != k:
-                    weights[n_lf + k] -= step_size * (joint[0 + V[i, k]] + joint[3 + V[i, k]])
                     if cardinality[j] == cardinality[k]:
+                        weights[n_lf + k] -= step_size * (joint[0 + V[i, k]] + joint[3 + V[i, k]])
+
                         if V[i, j] == V[i, k]:
                             weights[n_lf + k] += step_size
                     elif cardinality[j] == 2 and cardinality[k] == 3:
+                        if V[i, k] == 0:
+                            weights[n_lf + k] -= step_size * (joint[0] + joint[3])
+                        if V[i, k] == 2:
+                            weights[n_lf + k] -= step_size * (joint[1] + joint[4])
+
                         if (V[i, j] == 0 and V[i, k] == 0) or (V[i, j] == 1 and V[i, k] == 2):
                             weights[n_lf + k] += step_size
                     elif cardinality[j] == 3 and cardinality[k] == 2:
+                        if V[i, k] == 0:
+                            weights[n_lf + k] -= step_size * (joint[0] + joint[3])
+                        if V[i, k] == 1:
+                            weights[n_lf + k] -= step_size * (joint[2] + joint[5])
+
                         if (V[i, j] == 0 and V[i, k] == 0) or (V[i, j] == 2 and V[i, k] == 1):
                             weights[n_lf + k] += step_size
                     else:
