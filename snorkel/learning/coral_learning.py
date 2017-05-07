@@ -186,6 +186,4 @@ class CoralModel(object):
                 ftv[index + 1]["dense_equal_to"] = 0 # not actually used
                 index += 2
 
-        print(index)
-        print(n_edges)
         return weight, variable, factor, ftv, domain_mask, n_edges
