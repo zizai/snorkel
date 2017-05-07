@@ -2,6 +2,8 @@ from ..constants import *
 from numba import jit
 import numpy as np
 import random
+from numbskull.udf import *
+from numbskull.numbskulltypes import *
 
 
 class CoralDependencySelector(object):
@@ -14,7 +16,7 @@ class CoralDependencySelector(object):
         self.rng = random.Random()
         self.rng.seed(seed)
 
-    def select(self, L, threshold=0.05, truncation=10):
+    def select(self, V, cardinality, L, UDF_SET, threshold=0.05, truncation=10):
         """
         Identifies a dependency structure among labeling functions for a given data set.
 
@@ -31,265 +33,169 @@ class CoralDependencySelector(object):
                  see snorkel.learning.constants
         """
 
-        m, n = L.shape
+        n_data = V.shape[0]
+        n_vocab = V.shape[1]
+        n_lf = len(L)
 
         # Initializes data structures
         deps = set()
-        n_weights = 2 * n
-        if higher_order:
-            n_weights += 4 * n
-        if propensity:
-            n_weights += 1
+        n_weights = n_lf + n_vocab
         weights = np.zeros((n_weights,))
         joint = np.zeros((6,))
-        # joint[0] = P(Y = -1, L_j = -1)
-        # joint[1] = P(Y = -1, L_j =  0)
-        # joint[2] = P(Y = -1, L_j =  1)
-        # joint[3] = P(Y =  1, L_j = -1)
-        # joint[4] = P(Y =  1, L_j =  0)
-        # joint[5] = P(Y =  1, L_j =  1)
+        # joint[0] = P(Y = -1, V_j = 0)
+        # joint[1] = P(Y = -1, V_j = 1)
+        # joint[2] = P(Y = -1, V_j = 2)
+        # joint[3] = P(Y =  1, V_j = 0)
+        # joint[4] = P(Y =  1, V_j = 1)
+        # joint[5] = P(Y =  1, V_j = 2)
 
-        for j in range(n):
-            # Initializes weights
-            for k in range(n):
+        Lstart = np.cumsum(np.array([0] + [len(l) for l in L]))
+        L = [item for sublist in L for item in sublist]
+        for j in range(n_vocab):
+            ## Initializes weights
+            # Accuracy
+            for k in range(n_lf):
                 weights[k] = 1.1 - .2 * self.rng.random()
-            for k in range(n, len(weights)):
+            # Similarity
+            for k in range(n_lf, len(weights)):
                 weights[k] = 0.0
-            if propensity:
-                weights[5 * n] = -2.0
 
-            _fit_deps(m, n, j, L, weights, joint, higher_order, propensity,  threshold, truncation)
+            _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, UDF_USAGE[UDF_SET], weights, joint, threshold, truncation)
 
-            for k in range(n):
-                if abs(weights[n + k]) > threshold:
-                    deps.add((j, k, DEP_SIMILAR) if j < k else (k, j, DEP_SIMILAR))
-                if higher_order:
-                    if abs(weights[2 * n + k]) > threshold:
-                        deps.add((j, k, DEP_REINFORCING))
-                    if abs(weights[3 * n + k]) > threshold:
-                        deps.add((k, j, DEP_REINFORCING))
-                    if abs(weights[4 * n + k]) > threshold:
-                        deps.add((j, k, DEP_FIXING))
-                    if abs(weights[5 * n + k]) > threshold:
-                        deps.add((k, j, DEP_FIXING))
+            print(weights)
+            for k in range(n_vocab):
+                if abs(weights[n_lf + k]) > threshold:
+                    deps.add((j, k) if j < k else (k, j))
 
         return deps
 
 
-@jit(nopython=True, cache=True, nogil=True)
-def _fit_deps(m, n, j, L, weights, joint, higher_order, propensity, regularization, truncation):
-    step_size = 1.0 / m
+#@jit(nopython=True, cache=True, nogil=True)
+def eval_udf(i, udf_index, V, L, var_samp, value):
+    var_copy = 0
+    var_value = V[i:(i + 1), :]
+    fmap = np.empty(len(L), FactorToVar)
+    for i in range(len(L)):
+        fmap[i]["vid"] = L[i]
+        fmap[i]["dense_equal_to"] = 0 # not used
+    ftv_start = 0
+    return udf(udf_index, var_samp, value, var_copy, var_value, fmap, ftv_start)
+
+
+#@jit(nopython=True, cache=True, nogil=True)
+def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights, joint, regularization, truncation):
+    step_size = 1.0 / n_data
     epochs = 10
     l1delta = regularization * step_size * truncation
 
     for t in range(epochs):
-        for i in range(m):
+        for i in range(n_data):
             # Processes a training example
 
             # First, computes joint and conditional distributions
             joint[:] = 0, 0, 0, 0, 0, 0
-            for k in range(n):
-                if j == k:
-                    # Accuracy
-                    joint[0] += weights[j]
-                    joint[5] += weights[j]
-                    joint[2] -= weights[j]
-                    joint[3] -= weights[j]
-                else:
-                    if L[i, k] == 1:
-                        # Accuracy
-                        joint[0] -= weights[k]
-                        joint[1] -= weights[k]
-                        joint[2] -= weights[k]
-                        joint[3] += weights[k]
-                        joint[4] += weights[k]
-                        joint[5] += weights[k]
-
-                        # Similar
-                        joint[2] += weights[n + k]
-                        joint[5] += weights[n + k]
-
-                        if higher_order:
-                            # Reinforcement
-                            joint[5] += weights[2 * n + k] + weights[3 * n + k]
-                            joint[1] -= weights[2 * n + k]
-                            joint[4] -= weights[2 * n + k]
-
-                            # Fixing
-                            joint[3] += weights[4 * n + k]
-                            joint[1] -= weights[4 * n + k]
-                            joint[4] -= weights[4 * n + k]
-                            joint[0] += weights[5 * n + k]
-
-                    elif L[i, k] == -1:
-                        # Accuracy
-                        joint[0] += weights[k]
-                        joint[1] += weights[k]
-                        joint[2] += weights[k]
-                        joint[3] -= weights[k]
-                        joint[4] -= weights[k]
-                        joint[5] -= weights[k]
-
-                        # Similar
-                        joint[0] += weights[n + k]
-                        joint[3] += weights[n + k]
-
-                        if higher_order:
-                            # Reinforcement
-                            joint[0] += weights[2 * n + k] + weights[3 * n + k]
-                            joint[1] -= weights[2 * n + k]
-                            joint[4] -= weights[2 * n + k]
-
-                            # Fixing
-                            joint[2] += weights[4 * n + k]
-                            joint[1] -= weights[4 * n + k]
-                            joint[4] -= weights[4 * n + k]
-                            joint[5] += weights[5 * n + k]
-
+            for k in range(n_lf):
+                # Accuracy
+                for value in range(cardinality[j]):
+                    u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], k, value)
+                    joint[0 + value] = weights[k] * -1 * u
+                    joint[3 + value] = weights[k] * +1 * u
+            for k in range(n_vocab):
+                # Similarity
+                if j != k:
+                    if cardinality[j] == cardinality[k]:
+                        joint[0 + V[i, k]] += weights[n_lf + k]
+                        joint[3 + V[i, k]] += weights[n_lf + k]
+                    elif cardinality[j] == 2 and cardinality[k] == 3:
+                        if V[i, k] == 0:
+                            joint[0] += weights[n_lf + k]
+                            joint[3] += weights[n_lf + k]
+                        elif V[i, k] == 1:
+                            pass
+                        elif V[i, k] == 2:
+                            joint[1] += weights[n_lf + k]
+                            joint[4] += weights[n_lf + k]
+                    elif cardinality[j] == 3 and cardinality[k] == 2:
+                        if V[i, k] == 0:
+                            joint[0] += weights[n_lf + k]
+                            joint[3] += weights[n_lf + k]
+                        elif V[i, k] == 1:
+                            joint[2] += weights[n_lf + k]
+                            joint[5] += weights[n_lf + k]
                     else:
-                        # Similar
-                        joint[1] += weights[n + k]
-                        joint[4] += weights[n + k]
+                        raise ValueError("cardinality not valid")
+            if cardinality[j] == 2:
+                joint[2] = -np.inf
+                joint[5] = -np.inf
 
-                        if higher_order:
-                            # Reinforcement
-                            joint[0] -= weights[3 * n + k]
-                            joint[2] -= weights[3 * n + k]
-                            joint[3] -= weights[3 * n + k]
-                            joint[5] -= weights[3 * n + k]
-
-                            # Fixing
-                            joint[0] -= weights[5 * n + k]
-                            joint[2] -= weights[5 * n + k]
-                            joint[3] -= weights[5 * n + k]
-                            joint[5] -= weights[5 * n + k]
-
-            if propensity:
-                joint[0] += weights[6 * n]
-                joint[2] += weights[6 * n]
-                joint[3] += weights[6 * n]
-                joint[5] += weights[6 * n]
 
             joint = np.exp(joint)
             joint /= np.sum(joint)
+            # print(weights)
+            # print(joint)
+            # print
 
             marginal_pos = np.sum(joint[3:6])
             marginal_neg = np.sum(joint[0:3])
 
-            if L[i, j] == 1:
-                conditional_pos = joint[5] / (joint[2] + joint[5])
-                conditional_neg = joint[2] / (joint[2] + joint[5])
-            elif L[i, j] == -1:
-                conditional_pos = joint[3] / (joint[0] + joint[3])
-                conditional_neg = joint[0] / (joint[0] + joint[3])
-            else:
-                conditional_pos = joint[4] / (joint[1] + joint[4])
-                conditional_neg = joint[1] / (joint[1] + joint[4])
+            conditional_pos = joint[3 + V[i, j]] / (joint[0 + V[i, j]] + joint[3 + V[i, j]])
+            conditional_neg = joint[0 + V[i, j]] / (joint[0 + V[i, j]] + joint[3 + V[i, j]])
 
             # Second, takes likelihood gradient step
 
-            for k in range(n):
-                if j == k:
-                    # Accuracy
-                    weights[j] -= step_size * (joint[5] + joint[0] - joint[2] - joint[3])
-                    if L[i, j] == 1:
-                        weights[j] += step_size * (conditional_pos - conditional_neg)
-                    elif L[i, j] == -1:
-                        weights[j] += step_size * (conditional_neg - conditional_pos)
-                else:
-                    if L[i, k] == 1:
-                        # Accuracy
-                        weights[k] -= step_size * (marginal_pos - marginal_neg - conditional_pos + conditional_neg)
+            #for k in range(n):
+            #    if j == k:
+            #        # Accuracy
+            #        weights[j] -= step_size * (joint[5] + joint[0] - joint[2] - joint[3])
+            #        if L[i, j] == 1:
+            #            weights[j] += step_size * (conditional_pos - conditional_neg)
+            #        elif L[i, j] == -1:
+            #            weights[j] += step_size * (conditional_neg - conditional_pos)
+            #    else:
+            #        if L[i, k] == 1:
+            #            # Accuracy
+            #            weights[k] -= step_size * (marginal_pos - marginal_neg - conditional_pos + conditional_neg)
 
-                        # Similar
-                        weights[n + k] -= step_size * (joint[2] + joint[5])
-                        if L[i, j] == 1:
-                            weights[n + k] += step_size
+            #            # Similar
+            #            weights[n + k] -= step_size * (joint[2] + joint[5])
+            #            if L[i, j] == 1:
+            #                weights[n + k] += step_size
 
-                        if higher_order:
-                            # Incoming reinforcement
-                            weights[2 * n + k] -= step_size * (joint[5] - joint[1] - joint[4])
-                            if L[i, j] == 1:
-                                weights[2 * n + k] += step_size * conditional_pos
-                            elif L[i, j] == 0:
-                                weights[2 * n + k] += step_size * -1
+            #        elif L[i, k] == -1:
+            #            # Accuracy
+            #            weights[k] -= step_size * (marginal_neg - marginal_pos - conditional_neg + conditional_pos)
 
-                            # Outgoing reinforcement
-                            weights[3 * n + k] -= step_size * joint[5]
-                            if L[i, j] == 1:
-                                weights[3 * n + k] += step_size * conditional_pos
+            #            # Similar
+            #            weights[n + k] -= step_size * (joint[0] + joint[3])
+            #            if L[i, j] == -1:
+            #                weights[n + k] += step_size
 
-                            # Incoming fixing
-                            weights[4 * n + k] -= step_size * (joint[3] - joint[1] - joint[4])
-                            if L[i, j] == -1:
-                                weights[4 * n + k] += step_size * conditional_pos
-                            elif L[i, j] == 0:
-                                weights[4 * n + k] += step_size * -1
-
-                            # Outgoing fixing
-                            weights[5 * n + k] -= step_size * joint[0]
-                            if L[i, j] == -1:
-                                weights[5 * n + k] += step_size * conditional_neg
-                    elif L[i, k] == -1:
-                        # Accuracy
-                        weights[k] -= step_size * (marginal_neg - marginal_pos - conditional_neg + conditional_pos)
-
-                        # Similar
-                        weights[n + k] -= step_size * (joint[0] + joint[3])
-                        if L[i, j] == -1:
-                            weights[n + k] += step_size
-
-                        if higher_order:
-                            # Incoming reinforcement
-                            weights[2 * n + k] -= step_size * (joint[0] - joint[1] - joint[4])
-                            if L[i, j] == -1:
-                                weights[2 * n + k] += step_size * conditional_neg
-                            elif L[i, j] == 0:
-                                weights[2 * n + k] += step_size * -1
-
-                            # Outgoing reinforcement
-                            weights[3 * n + k] -= step_size * joint[0]
-                            if L[i, j] == -1:
-                                weights[3 * n + k] += step_size * conditional_neg
-
-                            # Incoming fixing
-                            weights[4 * n + k] -= step_size * (joint[2] - joint[1] - joint[4])
-                            if L[i, j] == 1:
-                                weights[4 * n + k] += step_size * conditional_neg
-                            elif L[i, j] == 0:
-                                weights[4 * n + k] += step_size * -1
-
-                            # Outgoing fixing
-                            weights[5 * n + k] -= step_size * joint[5]
-                            if L[i, j] == 1:
-                                weights[5 * n + k] += step_size * conditional_pos
+            #        else:
+            #            # Similar
+            #            weights[n + k] -= step_size * (joint[1] + joint[4])
+            #            if L[i, j] == 0:
+            #                weights[n + k] += step_size
+            weights[0] = 1.
+            weights[1] = 0.5
+            weights[2] = 0.5
+            for k in range(n_vocab):
+                # Similarity
+                if j != k:
+                    weights[n_lf + k] -= step_size * (joint[0 + V[i, k]] + joint[3 + V[i, k]])
+                    if cardinality[j] == cardinality[k]:
+                        if V[i, j] == V[i, k]:
+                            weights[n_lf + k] += step_size
+                    elif cardinality[j] == 2 and cardinality[k] == 3:
+                        if (V[i, j] == 0 and V[i, k] == 0) or (V[i, j] == 1 and V[i, k] == 2):
+                            weights[n_lf + k] += step_size
+                    elif cardinality[j] == 3 and cardinality[k] == 2:
+                        if (V[i, j] == 0 and V[i, k] == 0) or (V[i, j] == 2 and V[i, k] == 1):
+                            weights[n_lf + k] += step_size
                     else:
-                        # Similar
-                        weights[n + k] -= step_size * (joint[1] + joint[4])
-                        if L[i, j] == 0:
-                            weights[n + k] += step_size
+                        raise ValueError("cardinality not valid")
 
-                        if higher_order:
-                            # No effect of incoming reinforcement
-
-                            # Outgoing reinforcement
-                            weights[3 * n + k] -= step_size * (-1 * joint[0] - joint[2] - joint[3] - joint[5])
-                            if L[i, j] != 0:
-                                weights[3 * n + k] += step_size * -1
-
-                            # No effect of incoming fixing
-
-                            # Outgoing fixing
-                            weights[5 * n + k] -= step_size * (-1 * joint[0] - joint[2] - joint[3] - joint[5])
-                            if L[i, j] != 0:
-                                weights[5 * n + k] += step_size * -1
-
-            if propensity:
-                weights[6 * n] -= step_size * (joint[0] + joint[2] + joint[3] + joint[5])
-                if L[i, j] != 0:
-                    weights[6 * n] += step_size
 
             # Third, takes regularization gradient step
-            if (t * m + i) % truncation == 0:
+            if (t * n_data + i) % truncation == 0:
                 for k in range(len(weights)):
                     weights[k] = max(0, weights[k] - l1delta) if weights[k] > 0 else min(0, weights[k] + l1delta)
