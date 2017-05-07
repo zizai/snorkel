@@ -30,12 +30,6 @@ class CoralModel(object):
         reg_param_scaled = reg_param / n_data
         # self._process_dependency_graph(L, deps)
         weight, variable, factor, ftv, domain_mask, n_edges = self._compile(V, cardinality, L, L_offset, y, deps, init_acc, init_deps) # , init_deps, init_class_prior)
-        print(weight)
-        print(variable)
-        print(factor)
-        print(ftv)
-        print(domain_mask)
-        print(n_edges)
 
         fg = NumbSkull(n_inference_epoch=0, n_learning_epoch=epochs, stepsize=step_size, decay=decay,
                        reg_param=reg_param_scaled, regularization=reg_type, truncation=truncation,
