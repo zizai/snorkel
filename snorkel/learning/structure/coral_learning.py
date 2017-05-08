@@ -61,7 +61,6 @@ class CoralDependencySelector(object):
                 weights[k] = 0.0
 
             _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, UDF_USAGE[UDF_SET], weights, joint, threshold, truncation)
-            print(weights)
 
             for k in range(n_vocab):
                 if abs(weights[n_lf + k]) > threshold:
