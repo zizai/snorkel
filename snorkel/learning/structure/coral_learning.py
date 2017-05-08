@@ -61,8 +61,8 @@ class CoralDependencySelector(object):
                 weights[k] = 0.0
 
             _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, UDF_USAGE[UDF_SET], weights, joint, threshold, truncation)
-
             print(weights)
+
             for k in range(n_vocab):
                 if abs(weights[n_lf + k]) > threshold:
                     deps.add((j, k) if j < k else (k, j))
@@ -85,7 +85,7 @@ def eval_udf(i, udf_index, V, L, var_samp, value):
 @jit(nopython=True, cache=True, nogil=True)
 def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights, joint, regularization, truncation):
     step_size = 1.0 / n_data
-    epochs = 10
+    epochs = 100
     l1delta = regularization * step_size * truncation
 
     for t in range(epochs):
@@ -147,7 +147,7 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
                     weights[k] -= step_size * joint[3 + value] * +1 * u
 
                 # increase conditional
-                value = V[i, k]
+                value = V[i, j]
                 u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], j, value)
                 weights[k] += step_size * -1 * u * conditional_neg
                 weights[k] += step_size * +1 * u * conditional_pos
@@ -182,5 +182,7 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
 
             # Third, takes regularization gradient step
             if (t * n_data + i) % truncation == 0:
-                for k in range(len(weights)):
+                # do not regularize accuracy
+                # only regularize dependencies
+                for k in range(n_lf, len(weights)):
                     weights[k] = max(0, weights[k] - l1delta) if weights[k] > 0 else min(0, weights[k] + l1delta)
