@@ -91,10 +91,6 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
     for t in range(epochs):
         for i in range(n_data):
             # Processes a training example
-            weights[0] = 1.
-            weights[1] = 0.5
-            weights[2] = 0.5
-
             # First, computes joint and conditional distributions
             joint[:] = 0, 0, 0, 0, 0, 0
             for k in range(n_lf):
@@ -143,38 +139,19 @@ def _fit_deps(n_data, n_lf, n_vocab, j, V, cardinality, L, Lstart, udf, weights,
 
             # Second, takes likelihood gradient step
 
-            #for k in range(n):
-            #    if j == k:
-            #        # Accuracy
-            #        weights[j] -= step_size * (joint[5] + joint[0] - joint[2] - joint[3])
-            #        if L[i, j] == 1:
-            #            weights[j] += step_size * (conditional_pos - conditional_neg)
-            #        elif L[i, j] == -1:
-            #            weights[j] += step_size * (conditional_neg - conditional_pos)
-            #    else:
-            #        if L[i, k] == 1:
-            #            # Accuracy
-            #            weights[k] -= step_size * (marginal_pos - marginal_neg - conditional_pos + conditional_neg)
+            for k in range(n_lf):
+                for value in range(cardinality[j]):
+                    # decrease marginal
+                    u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], j, value)
+                    weights[k] -= step_size * joint[0 + value] * -1 * u
+                    weights[k] -= step_size * joint[3 + value] * +1 * u
 
-            #            # Similar
-            #            weights[n + k] -= step_size * (joint[2] + joint[5])
-            #            if L[i, j] == 1:
-            #                weights[n + k] += step_size
+                # increase conditional
+                value = V[i, k]
+                u = eval_udf(i, udf[k], V, L[Lstart[k]:Lstart[k + 1]], j, value)
+                weights[k] += step_size * -1 * u * conditional_neg
+                weights[k] += step_size * +1 * u * conditional_pos
 
-            #        elif L[i, k] == -1:
-            #            # Accuracy
-            #            weights[k] -= step_size * (marginal_neg - marginal_pos - conditional_neg + conditional_pos)
-
-            #            # Similar
-            #            weights[n + k] -= step_size * (joint[0] + joint[3])
-            #            if L[i, j] == -1:
-            #                weights[n + k] += step_size
-
-            #        else:
-            #            # Similar
-            #            weights[n + k] -= step_size * (joint[1] + joint[4])
-            #            if L[i, j] == 0:
-            #                weights[n + k] += step_size
             for k in range(n_vocab):
                 # Similarity
                 if j != k:
