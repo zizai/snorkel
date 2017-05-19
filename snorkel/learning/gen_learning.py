@@ -192,7 +192,7 @@ class GenerativeModel(object):
     optional_names = ('lf_prior', 'lf_propensity', 'lf_class_propensity')
     dep_names = ('dep_similar', 'dep_fixing', 'dep_reinforcing', 'dep_exclusive')
 
-    def train(self, L, y=None, deps=(), init_acc = 1.0, init_deps=1.0, init_class_prior=-1.0, epochs=100, step_size=None, decay=0.99, reg_param=0.1, reg_type=2, verbose=False,
+    def train(self, L, y=None, deps=(), init_acc = 1.0, init_deps=1.0, init_class_prior=-1.0, epochs=100, step_size=None, decay=0.99, reg_param=0.1, reg_type=2, verbose=False, high_order_sim=(),
               truncation=10, burn_in=50, timer=None):
         """
         Fits the parameters of the model to a data set. By default, learns a conditionally independent model.
@@ -222,7 +222,7 @@ class GenerativeModel(object):
         step_size = step_size or 1.0 / L.shape[0]
         reg_param_scaled = reg_param / L.shape[0]
         self._process_dependency_graph(L, deps)
-        weight, variable, factor, ftv, domain_mask, n_edges = self._compile(L, y, init_acc, init_deps, init_class_prior)
+        weight, variable, factor, ftv, domain_mask, n_edges = self._compile(L, y, init_acc, init_deps, init_class_prior, high_order_sim)
         fg = NumbSkull(n_inference_epoch=0, n_learning_epoch=epochs, stepsize=step_size, decay=decay,
                        reg_param=reg_param_scaled, regularization=reg_type, truncation=truncation,
                        quiet=(not verbose), verbose=verbose, learn_non_evidence=True, burn_in=burn_in)
@@ -329,7 +329,7 @@ class GenerativeModel(object):
         for dep_name in GenerativeModel.dep_names:
             setattr(self, dep_name, getattr(self, dep_name).tocoo(copy=True))
 
-    def _compile(self, L, y, init_acc, init_deps, init_class_prior):
+    def _compile(self, L, y, init_acc, init_deps, init_class_prior, high_order_sim):
         """
         Compiles a generative model based on L and the current labeling function dependencies.
         """
@@ -338,6 +338,7 @@ class GenerativeModel(object):
         n_weights = 1 if self.class_prior else 0
 
         n_weights += n
+        n_weights += len(high_order_sim)
         for optional_name in GenerativeModel.optional_names:
             if getattr(self, optional_name):
                 n_weights += n
@@ -348,6 +349,7 @@ class GenerativeModel(object):
         n_factors = m * n_weights
 
         n_edges = 1 if self.class_prior else 0
+        n_edges += sum([len(i) for i in high_order_sim])
         n_edges += 2 * n
         if self.lf_prior:
             n_edges += n
@@ -375,6 +377,11 @@ class GenerativeModel(object):
             w_off = 1
         else:
             w_off = 0
+
+        for hos in high_order_sim:
+            weight[w_off]['isFixed'] = False
+            weight[w_off]['initialValue'] = np.float64(0)
+            w_off += 1
 
         for i in range(w_off, w_off + n):
             weight[i]['isFixed'] = False
@@ -437,6 +444,21 @@ class GenerativeModel(object):
             f_off = 0
             ftv_off = 0
             w_off = 0
+
+        for hos in high_order_sim:
+            for i in range(m):
+                factor[f_off]["factorFunction"] = FACTORS["EQUAL"]
+                factor[f_off]["weightId"] = w_off
+                factor[f_off]["featureValue"] = 1
+                factor[f_off]["arity"] = len(hos)
+                factor[f_off]["ftv_offset"] = ftv_off
+
+                for v in hos:
+                    ftv[ftv_off]["vid"] = m + i * n + v
+                    ftv_off += 1
+
+                f_off += 1
+            w_off += 1
 
 
         # Factors over labeling function outputs
