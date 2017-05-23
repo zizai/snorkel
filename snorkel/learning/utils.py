@@ -6,7 +6,7 @@ import numpy as np
 import scipy.sparse as sparse
 import warnings
 import uuid
-
+import shutil
 from pandas import DataFrame
 
 matplotlib.use('Agg')
@@ -322,7 +322,7 @@ class GridSearch(object):
         return product(param.get_all_values() for param in self.params)
 
     def fit(self, X_validation, validation_labels, gold_candidate_set=None,
-        b=0.5, set_unlabeled_as_neg=True, validation_kwargs={},
+        b=0.5, set_unlabeled_as_neg=True, validation_kwargs={}, model_cache="./", keep_ckpnts=False,
         **model_hyperparams):
         """
         Basic method to start grid search, returns DataFrame table of results
@@ -337,10 +337,10 @@ class GridSearch(object):
         model_k         = 0
 
         # create temp directory for model snapshots
-        model_dir = "{0}/models".format(os.path.dirname(os.path.abspath(__file__)))
-        if not os.path.exists(model_dir):
-            os.mkdir(model_dir)
-        tmp_dir = "{0}/{1}".format(model_dir, str(uuid.uuid4()))
+        #model_dir = "{0}/models".format(model_cache)
+        #if not os.path.exists(model_cache):
+        #    os.mkdir(model_cache)
+        tmp_dir = "{0}/{1}".format(model_cache, str(uuid.uuid4()))
         os.mkdir(tmp_dir)
 
         for k, param_vals in enumerate(self.search_space()):
@@ -374,6 +374,9 @@ class GridSearch(object):
 
         # Set optimal parameter in the learner model
         self.model.load("{0}/{1}".format(tmp_dir, opt_model))
+
+        if not keep_ckpnts:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
         # Return DataFrame of scores
         self.results = DataFrame.from_records(
