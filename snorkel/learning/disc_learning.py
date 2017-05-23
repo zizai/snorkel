@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 
 from .utils import marginals_to_labels, MentionScorer
@@ -89,7 +90,9 @@ class TFNoiseAwareModel(NoiseAwareModel):
         self.save_info(model_name)
         save_dict = self.save_dict or tf.global_variables()
         saver = tf.train.Saver(save_dict)
-        saver.save(self.session, './' + model_name, global_step=0)
+        #saver.save(self.session, './' + model_name, global_step=0)
+        saver.save(self.session, model_name, global_step=0)
+
         if verbose:
             print("[{0}] Model saved. To load, use name\n\t\t{1}".format(
                 self.name, model_name
@@ -104,7 +107,7 @@ class TFNoiseAwareModel(NoiseAwareModel):
         self._build()
         load_dict = self.save_dict or tf.global_variables()
         saver = tf.train.Saver(load_dict)
-        ckpt = tf.train.get_checkpoint_state('./')
+        ckpt = tf.train.get_checkpoint_state(os.path.dirname(model_name))
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(self.session, ckpt.model_checkpoint_path)
             if verbose:

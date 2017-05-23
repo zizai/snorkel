@@ -1,9 +1,11 @@
+import os
 import math
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sparse
 import warnings
+import uuid
 
 from pandas import DataFrame
 
@@ -333,6 +335,14 @@ class GridSearch(object):
         f1_opt          = -1.0
         base_model_name = self.model.name
         model_k         = 0
+
+        # create temp directory for model snapshots
+        model_dir = "{0}/models".format(os.path.dirname(os.path.abspath(__file__)))
+        if not os.path.exists(model_dir):
+            os.mkdir(model_dir)
+        tmp_dir = "{0}/{1}".format(model_dir, str(uuid.uuid4()))
+        os.mkdir(tmp_dir)
+
         for k, param_vals in enumerate(self.search_space()):
             model_name = '{0}_{1}'.format(base_model_name, model_k)
             model_k += 1
@@ -358,11 +368,13 @@ class GridSearch(object):
             p, r, f1 = scores_from_counts(tp, fp, tn, fn)
             run_stats.append(list(param_vals) + [p, r, f1])
             if f1 > f1_opt:
-                self.model.save(model_name)
+                self.model.save("{0}/{1}".format(tmp_dir, model_name))
                 opt_model = model_name
                 f1_opt    = f1
+
         # Set optimal parameter in the learner model
-        self.model.load(opt_model)
+        self.model.load("{0}/{1}".format(tmp_dir, opt_model))
+
         # Return DataFrame of scores
         self.results = DataFrame.from_records(
             run_stats, columns=self.param_names + ['Prec.', 'Rec.', 'F1']
