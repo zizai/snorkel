@@ -385,7 +385,7 @@ class GridSearch(object):
         return self.results
     
     
-class RandomSearch(GridSearch):
+class RandomSearch(GridSearch):3
     def __init__(self, session, model, X, training_marginals, parameters, n=10, **kwargs):
         """Search a random sample of size n from a parameter grid"""
         self.n = n
