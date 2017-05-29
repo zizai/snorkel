@@ -182,7 +182,9 @@ class Brat(object):
         for doc_name in self.annotations:
             for mid in self.annotations[doc_name]:
                 if mid[0] in export_types:
-                    rows.append(self._get_stable_label(doc_name, mid))
+                    row = self._get_stable_label(doc_name, mid)
+                    if row:
+                        rows.append(row)
 
         with open(outfile,"w") as fp:
             fp.write("\n".join(rows))
@@ -197,7 +199,7 @@ class Brat(object):
         """
         if not self.annotations or m_id not in self.annotations[doc_name]:
             print>>sys.stderr, "ID not found in annotations"
-            return ""
+            return None
 
         item = self.annotations[doc_name][m_id]
 
@@ -208,6 +210,9 @@ class Brat(object):
         # relation
         elif type(item) is tuple:
             mtype, arg1, arg2 = self.annotations[doc_name][m_id]
+            if arg1 not in self.annotations[doc_name] or arg2 not in self.annotations[doc_name]:
+                return None
+
             e1 = self.annotations[doc_name][arg1]
             e2 = self.annotations[doc_name][arg2]
 
