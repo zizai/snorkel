@@ -184,7 +184,7 @@ class Brat(object):
                 if mid[0] in export_types:
                     row = self._get_stable_label(doc_name, mid)
                     if row:
-                        rows.append(row)
+                        rows.append(delim.join([row,'1']))
 
         with open(outfile,"w") as fp:
             fp.write("\n".join(rows))
