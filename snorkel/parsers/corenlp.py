@@ -243,8 +243,6 @@ class StanfordCoreNLPServer(Parser):
                 # add whitespace based on offsets of originalText
                 text += (' ' * (i - len(text))) + t['originalText'] if len(text) != i else t['originalText']
             parts['text'] = text
-            #else:
-            #parts['text'] = ''.join(t['originalText'] + t.get('after', '') for t in block['tokens'])
 
             # make char_offsets relative to start of sentence
             abs_sent_offset = parts['char_offsets'][0]
