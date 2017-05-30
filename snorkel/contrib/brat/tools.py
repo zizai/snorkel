@@ -355,6 +355,7 @@ class Brat(object):
                             entity += [parts]
                         else:
                             print>> sys.stderr, "SUB SPAN ERROR", text, (i, j)
+                            print>> sys.stderr, row, "\n"
                             continue
 
                     # TODO: we assume continuous spans here
