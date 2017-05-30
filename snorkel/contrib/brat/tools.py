@@ -165,61 +165,74 @@ class Brat(object):
             print "\t {} documents".format(len(doc_index))
             print "\t {} annotations".format( sum([len(cand_index[name]) for name in cand_index] ))
 
-    def export_gold_labels(self, outfile, export_types=['R','*'], fmt='tsv'):
+    def export_gold_labels(self, outfile, export_types=['R','*'], fmt='tsv',
+                           symmetric_relations=True):
         """
         Export all candidates (by default only export relations
         ~~
         17774-014129-DISCHARGE_SUMMARY::span:1297:1300
         17774-014129-DISCHARGE_SUMMARY::span:1288:1295	1
 
+        TODO: Force order of span arguments
+
         :param outfile:
         :return:
         """
         delim = "\t" if fmt == "tsv" else ","
-        header = delim.join(['context_stable_ids','label'])
-
-        rows = [header]
+        rows = []
         for doc_name in self.annotations:
             for mid in self.annotations[doc_name]:
                 if mid[0] in export_types:
-                    row = self._get_stable_label(doc_name, mid)
-                    if row:
-                        rows.append(delim.join([row,'1']))
+                    item = self.annotations[doc_name][mid]
+
+                    # relations
+                    if mid[0] in ['R','*']:
+                        mtype, arg1, arg2 = item
+                        e1 = self.annotations[doc_name][arg1]
+                        e2 = self.annotations[doc_name][arg2]
+
+                        if symmetric_relations:
+                            rows.append(self._get_stable_label(doc_name, [e1, e2]))
+                            rows.append(self._get_stable_label(doc_name, [e2, e1]))
+                        else:
+                            raise NotImplementedError()
+
+                    # entities
+                    elif mid[0] in ['T']:
+                        rows.append(self._get_stable_label(doc_name, [item]))
+
+        # write gold label file
+        header = delim.join(['context_stable_ids', 'label'])
 
         with open(outfile,"w") as fp:
-            fp.write("\n".join(rows))
+            data = []
+            fp.write(header + "\n")
+            for row in rows:
+                data.append(delim.join([row,"1"]))
+            fp.write("\n".join(data))
 
 
-    def _get_stable_label(self, doc_name, m_id):
+    def _get_stable_label(self, doc_name, item):
         """
 
         :param doc_name:
         :param m_id:
         :return:
         """
-        if not self.annotations or m_id not in self.annotations[doc_name]:
-            print>>sys.stderr, "ID not found in annotations"
-            return None
-
-        item = self.annotations[doc_name][m_id]
-
         # entity
-        if type(item) is dict:
-            return "{}::span:{}:{}".format(doc_name, item['char_start'], item['char_end'])
+        if len(item) == 1:
+            e1 = item[0]
+            return "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'])
 
         # relation
-        elif type(item) is tuple:
-            mtype, arg1, arg2 = self.annotations[doc_name][m_id]
-            if arg1 not in self.annotations[doc_name] or arg2 not in self.annotations[doc_name]:
-                return None
-
-            e1 = self.annotations[doc_name][arg1]
-            e2 = self.annotations[doc_name][arg2]
-
+        elif len(item) == 2:
+            e1, e2 = item
             # build stable labels
             e1 = "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'])
             e2 = "{}::span:{}:{}".format(doc_name, e2['char_start'], e2['char_end'])
             return "{}~~{}".format(e1, e2)
+
+        return None
 
 
     def _get_arg_type(self, c, span, use_titlecase=True):
