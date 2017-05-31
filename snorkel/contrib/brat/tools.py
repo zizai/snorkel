@@ -214,7 +214,7 @@ class Brat(object):
 
     def _get_stable_label(self, doc_name, item):
         """
-
+        Create stable labels
         :param doc_name:
         :param m_id:
         :return:
@@ -222,14 +222,13 @@ class Brat(object):
         # entity
         if len(item) == 1:
             e1 = item[0]
-            return "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'])
+            return "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'] - 1)
 
         # relation
         elif len(item) == 2:
             e1, e2 = item
-            # build stable labels
-            e1 = "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'])
-            e2 = "{}::span:{}:{}".format(doc_name, e2['char_start'], e2['char_end'])
+            e1 = "{}::span:{}:{}".format(doc_name, e1['char_start'], e1['char_end'] - 1)
+            e2 = "{}::span:{}:{}".format(doc_name, e2['char_start'], e2['char_end'] - 1)
             return "{}~~{}".format(e1, e2)
 
         return None
