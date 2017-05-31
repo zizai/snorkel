@@ -52,7 +52,7 @@ class CorpusParserUDF(UDF):
                 yield Sentence(**parts)
 
         except Exception as e:
-            print>>sys.stderr,"WARNING - Parsing Error"
+            print>>sys.stderr,"WARNING - Parsing Error", e
             self.req_handler = self.parser.connect()
 
 

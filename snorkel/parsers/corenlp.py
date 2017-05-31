@@ -5,6 +5,8 @@ import json
 import signal
 import warnings
 
+from socket import timeout
+from urllib2 import HTTPError, URLError
 from subprocess import Popen,PIPE
 from collections import defaultdict
 
@@ -160,14 +162,14 @@ class StanfordCoreNLPServer(Parser):
         Print server parameters
         :return:
         '''
-        print "------------------------------------"
+        print "-" * 40
         print self.endpoint
         print "version:", self.version
         print "shell pid:", self.process_group.pid
         print "port:", self.port
         print "timeout:", self.timeout
         print "threads:", self.num_threads
-        print "------------------------------------"
+        print "-" * 40
 
     def connect(self):
         '''
@@ -204,9 +206,21 @@ class StanfordCoreNLPServer(Parser):
 
         if isinstance(text, unicode):
             text = text.encode('utf-8', 'error')
-        resp = conn.post(self.endpoint, data=text, allow_redirects=True)
-        text = text.decode('utf-8')
-        content = resp.content.strip()
+
+        try:
+            resp = conn.post(self.endpoint, data=text, allow_redirects=True)
+            text = text.decode('utf-8')
+            content = resp.content.strip()
+
+        except (HTTPError, URLError) as error:
+            print>>sys.stderr, "Data not retrieved"
+            yield []
+            return
+
+        except timeout:
+            print>>sys.stderr,"Socket time out error"
+            yield []
+            return
 
         # check for parsing error messages
         StanfordCoreNLPServer.validate_response(content)
