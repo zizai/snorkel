@@ -292,6 +292,8 @@ class StanfordCoreNLPServer(Parser):
                 parts['text'] = StanfordCoreNLPServer.strip_non_printing_chars(parts['text'])
                 parts['words'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['words']]
                 parts['lemmas'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['lemmas']]
+                tree = document.meta['tree'][position]
+                document.meta['tree'][position] = StanfordCoreNLPServer.strip_non_printing_chars(tree)
 
             if document:
                 parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)
