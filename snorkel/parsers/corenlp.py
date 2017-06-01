@@ -204,17 +204,17 @@ class StanfordCoreNLPServer(Parser):
             print>> sys.stderr, "Warning, empty document {0} passed to CoreNLP".format(document.name if document else "?")
             return {}
 
+        # handing encoding
         if isinstance(text, unicode):
             text = text.encode('utf-8', 'error')
+        # POST request to CoreNLP Server
         try:
             resp = conn.post(self.endpoint, data=text, allow_redirects=True)
             text = text.decode(self.encoding)
             content = resp.content.strip()
-
         except (HTTPError, URLError) as error:
             print>>sys.stderr, "Data not retrieved"
             return {}
-
         except timeout:
             print>>sys.stderr,"Socket time out error"
             return {}
