@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import signal
+import string
 import warnings
 
 from socket import timeout
@@ -207,6 +208,11 @@ class StanfordCoreNLPServer(Parser):
         # handing encoding
         if isinstance(text, unicode):
             text = text.encode('utf-8', 'error')
+
+        # Fix for CoreNLP v 3.6.0 that strips NUL (0x00) characters (these break database operations w/ psql)
+        if self.version == "3.6.0":
+            text = "".join([c for c in text if c in string.printable])
+
         # POST request to CoreNLP Server
         try:
             resp = conn.post(self.endpoint, data=text, allow_redirects=True)
