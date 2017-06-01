@@ -5,8 +5,9 @@ import requests
 
 class Parser(object):
 
-    def __init__(self,name):
+    def __init__(self, name, encoding='utf-8'):
         self.name = name
+        self.encoding = encoding
 
     def connect(self):
         '''

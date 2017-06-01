@@ -50,7 +50,7 @@ class StanfordCoreNLPServer(Parser):
     BLOCK_DEFS = {"3.6.0":"basic-dependencies", "3.7.0":"basicDependencies"}
 
     def __init__(self, annotators=['tokenize', 'ssplit', 'pos', 'lemma', 'depparse', 'ner'],
-                 annotator_opts={}, tokenize_whitespace=False, split_newline=False,
+                 annotator_opts={}, tokenize_whitespace=False, split_newline=False, encoding="utf-8",
                  java_xmx='4g', port=12345, num_threads=1, verbose=False, version='3.6.0'):
         '''
         Create CoreNLP server instance.
@@ -64,7 +64,7 @@ class StanfordCoreNLPServer(Parser):
         :param verbose:
         :param version:
         '''
-        super(StanfordCoreNLPServer,self).__init__(name="CoreNLP")
+        super(StanfordCoreNLPServer,self).__init__(name="CoreNLP", encoding=encoding)
 
         self.tokenize_whitespace = tokenize_whitespace
         self.split_newline = split_newline
@@ -202,25 +202,22 @@ class StanfordCoreNLPServer(Parser):
         '''
         if len(text.strip()) == 0:
             print>> sys.stderr, "Warning, empty document {0} passed to CoreNLP".format(document.name if document else "?")
-            return
+            return {}
 
         if isinstance(text, unicode):
             text = text.encode('utf-8', 'error')
-
         try:
             resp = conn.post(self.endpoint, data=text, allow_redirects=True)
-            text = text.decode('utf-8')
+            text = text.decode(self.encoding)
             content = resp.content.strip()
 
         except (HTTPError, URLError) as error:
             print>>sys.stderr, "Data not retrieved"
-            yield []
-            return
+            return {}
 
         except timeout:
             print>>sys.stderr,"Socket time out error"
-            yield []
-            return
+            return {}
 
         # check for parsing error messages
         StanfordCoreNLPServer.validate_response(content)
@@ -229,7 +226,7 @@ class StanfordCoreNLPServer(Parser):
             blocks = json.loads(content, strict=False)['sentences']
         except:
             warnings.warn("CoreNLP skipped a malformed sentence.\n{}".format(text), RuntimeWarning)
-            return
+            return {}
 
         position = 0
         for block in blocks:
@@ -261,6 +258,7 @@ class StanfordCoreNLPServer(Parser):
             # make char_offsets relative to start of sentence
             abs_sent_offset = parts['char_offsets'][0]
             parts['char_offsets'] = [p - abs_sent_offset for p in parts['char_offsets']]
+            parts['abs_char_offsets'] = [p for p in parts['char_offsets']]
             parts['dep_parents'] = sort_X_on_Y(dep_par, dep_order)
             parts['dep_labels'] = sort_X_on_Y(dep_lab, dep_order)
             parts['position'] = position
@@ -286,10 +284,11 @@ class StanfordCoreNLPServer(Parser):
 
             # Assign the stable id as document's stable id plus absolute character offset
             abs_sent_offset_end = abs_sent_offset + parts['char_offsets'][-1] + len(parts['words'][-1])
+
             if document:
                 parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)
             position += 1
-            yield parts
+            return parts
 
     @staticmethod
     def validate_response(content):
