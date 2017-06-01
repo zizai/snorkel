@@ -45,17 +45,14 @@ class CorpusParserUDF(UDF):
 
     def apply(self, x, **kwargs):
         """Given a Document object and its raw text, parse into processed Sentences"""
-        #try:
-        doc, text = x
-        for parts in self.req_handler.parse(doc, text):
-            parts = self.fn(parts) if self.fn is not None else parts
-            yield Sentence(**parts)
-
-        # except Exception as e:
-        #     print>>sys.stderr,"WARNING - Parsing Error", e
-        #     self.req_handler = self.parser.connect()
-
-
+        try:
+            doc, text = x
+            for parts in self.req_handler.parse(doc, text):
+                parts = self.fn(parts) if self.fn is not None else parts
+                yield Sentence(**parts)
+        except Exception as e:
+            print>>sys.stderr,"WARNING - Parsing Error", e
+            self.req_handler = self.parser.connect()
 
 class DocPreprocessor(object):
     """
