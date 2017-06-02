@@ -1,3 +1,4 @@
+import time
 from multiprocessing import Process, JoinableQueue
 from Queue import Empty
 
@@ -84,6 +85,7 @@ class UDFRunner(object):
         in_queue = JoinableQueue()
         for x in xs:
             in_queue.put(x)
+            time.sleep(0.01)
 
         # If the UDF has a reduce step, we collect the output of apply in a Queue
         out_queue = None

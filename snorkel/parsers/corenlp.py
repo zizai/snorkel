@@ -15,6 +15,9 @@ from .parser import Parser, URLParserConnection
 from ..models import Candidate, Context, Document, Sentence, construct_stable_id
 from ..utils import sort_X_on_Y
 
+import logging
+logging.basicConfig(filename='corenlp.log',level=logging.DEBUG)
+
 
 class StanfordCoreNLPServer(Parser):
     '''
@@ -214,9 +217,11 @@ class StanfordCoreNLPServer(Parser):
             resp = conn.post(self.endpoint, data=text, allow_redirects=True, timeout=10.0)
             text = text.decode(self.encoding)
             content = resp.content.strip()
+
+            logging.info('{} {}'.format(document.name, len(text)))
+
         except socket.error, e:
             print>>sys.stderr,"Socket error"
-            #return {}
             raise ValueError("Socket Error")
 
         # check for parsing error messages
