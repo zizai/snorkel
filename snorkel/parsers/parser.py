@@ -42,7 +42,7 @@ class URLParserConnection(ParserConnection):
     '''
     URL parser connection
     '''
-    def __init__(self, parser, retries=5):
+    def __init__(self, parser, retries=None):
         self.retries = retries
         self.parser = parser
         self.request = self._connection()

@@ -3,11 +3,11 @@ import os
 import sys
 import json
 import signal
+import socket
 import string
 import warnings
 
-from socket import timeout
-from urllib2 import HTTPError, URLError
+
 from subprocess import Popen,PIPE
 from collections import defaultdict
 
@@ -205,21 +205,19 @@ class StanfordCoreNLPServer(Parser):
             print>> sys.stderr, "Warning, empty document {0} passed to CoreNLP".format(document.name if document else "?")
             return {}
 
-        # handing encoding
+        # handle encoding (force to unicode)
         if isinstance(text, unicode):
             text = text.encode('utf-8', 'error')
 
         # POST request to CoreNLP Server
         try:
-            resp = conn.post(self.endpoint, data=text, allow_redirects=True)
+            resp = conn.post(self.endpoint, data=text, allow_redirects=True, timeout=10.0)
             text = text.decode(self.encoding)
             content = resp.content.strip()
-        except (HTTPError, URLError) as error:
-            print>>sys.stderr, "Data not retrieved"
-            return {}
-        except timeout:
-            print>>sys.stderr,"Socket time out error"
-            return {}
+        except socket.error, e:
+            print>>sys.stderr,"Socket error"
+            #return {}
+            raise ValueError("Socket Error")
 
         # check for parsing error messages
         StanfordCoreNLPServer.validate_response(content)
@@ -287,7 +285,7 @@ class StanfordCoreNLPServer(Parser):
             # Assign the stable id as document's stable id plus absolute character offset
             abs_sent_offset_end = abs_sent_offset + parts['char_offsets'][-1] + len(parts['words'][-1])
 
-            # Fix for CoreNLP v 3.6.0 that strips NUL (0x00) characters (these break database operations w/ psql)
+            # Hack / Fix for CoreNLP v 3.6.0 that strips NUL (0x00) characters (these break database operations w/ psql)
             if self.version == "3.6.0":
                 parts['text'] = StanfordCoreNLPServer.strip_non_printing_chars(parts['text'])
                 parts['words'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['words']]
@@ -301,7 +299,7 @@ class StanfordCoreNLPServer(Parser):
             return parts
 
     @staticmethod
-    def strip_non_printing_chars(self,s):
+    def strip_non_printing_chars(s):
         return "".join([c for c in s if c in string.printable])
 
     @staticmethod

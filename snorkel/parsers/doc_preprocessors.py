@@ -51,7 +51,7 @@ class CorpusParserUDF(UDF):
                 parts = self.fn(parts) if self.fn is not None else parts
                 yield Sentence(**parts)
         except Exception as e:
-            print>>sys.stderr,"WARNING - Parsing Error", e
+            print>>sys.stderr,"WARNING - Parsing Error, reconnecting...", e
             self.req_handler = self.parser.connect()
 
 class DocPreprocessor(object):
