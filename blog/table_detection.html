@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>??: Machine Learning for Table Detection in PDF documents</title>
+    <style type="text/css">
+        .effectfront {
+        border: none;
+        margin: 0 auto;
+        }
+
+        .effectfront:hover {
+        -webkit-transform: scale(1.2);
+        -moz-transform: scale(1.2);
+        -o-transform: scale(1.2);
+        transform: scale(1.2);
+        transition: all 0.3s;
+        -webkit-transition: all 0.3s;
+        }
+
+        body {
+        font-family: Helvetica, arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        background-color: white;
+        padding: 30px;
+        }
+
+        body>*:first-child {
+        margin-top: 0 !important;
+        }
+
+        body>*:last-child {
+        margin-bottom: 0 !important;
+        }
+
+        a {
+        color: #4183C4;
+        }
+
+        a.absent {
+        color: #cc0000;
+        }
+
+        a.anchor {
+        display: block;
+        padding-left: 30px;
+        margin-left: -30px;
+        cursor: pointer;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+        margin: 20px 0 10px;
+        padding: 0;
+        font-weight: bold;
+        -webkit-font-smoothing: antialiased;
+        cursor: text;
+        position: relative;
+        }
+
+        h1:hover a.anchor,
+        h2:hover a.anchor,
+        h3:hover a.anchor,
+        h4:hover a.anchor,
+        h5:hover a.anchor,
+        h6:hover a.anchor {
+        background:
+        url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA09pVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoMTMuMCAyMDEyMDMwNS5tLjQxNSAyMDEyLzAzLzA1OjIxOjAwOjAwKSAgKE1hY2ludG9zaCkiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OUM2NjlDQjI4ODBGMTFFMTg1ODlEODNERDJBRjUwQTQiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OUM2NjlDQjM4ODBGMTFFMTg1ODlEODNERDJBRjUwQTQiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo5QzY2OUNCMDg4MEYxMUUxODU4OUQ4M0REMkFGNTBBNCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo5QzY2OUNCMTg4MEYxMUUxODU4OUQ4M0REMkFGNTBBNCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PsQhXeAAAABfSURBVHjaYvz//z8DJYCRUgMYQAbAMBQIAvEqkBQWXI6sHqwHiwG70TTBxGaiWwjCTGgOUgJiF1J8wMRAIUA34B4Q76HUBelAfJYSA0CuMIEaRP8wGIkGMA54bgQIMACAmkXJi0hKJQAAAABJRU5ErkJggg==)
+        no-repeat 10px center;
+        text-decoration: none;
+        }
+
+        h1 tt,
+        h1 code {
+        font-size: inherit;
+        }
+
+        h2 tt,
+        h2 code {
+        font-size: inherit;
+        }
+
+        h3 tt,
+        h3 code {
+        font-size: inherit;
+        }
+
+        h4 tt,
+        h4 code {
+        font-size: inherit;
+        }
+
+        h5 tt,
+        h5 code {
+        font-size: inherit;
+        }
+
+        h6 tt,
+        h6 code {
+        font-size: inherit;
+        }
+
+        h1 {
+        font-size: 28px;
+        color: black;
+        }
+
+        h2 {
+        font-size: 24px;
+        border-bottom: 1px solid #cccccc;
+        color: black;
+        }
+
+        h3 {
+        font-size: 18px;
+        }
+
+        h4 {
+        font-size: 16px;
+        }
+
+        h5 {
+        font-size: 14px;
+        }
+
+        h6 {
+        color: #777777;
+        font-size: 14px;
+        }
+
+        p,
+        blockquote,
+        ul,
+        ol,
+        dl,
+        li,
+        table,
+        pre {
+        margin: 15px 0;
+        }
+
+        hr {
+        background: transparent
+        url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAECAYAAACtBE5DAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OENDRjNBN0E2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OENDRjNBN0I2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Q0NGM0E3ODY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Q0NGM0E3OTY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PqqezsUAAAAfSURBVHjaYmRABcYwBiM2QSA4y4hNEKYDQxAEAAIMAHNGAzhkPOlYAAAAAElFTkSuQmCC)
+        repeat-x 0 0;
+        border: 0 none;
+        color: #cccccc;
+        height: 4px;
+        padding: 0;
+        }
+
+        body>h2:first-child {
+        margin-top: 0;
+        padding-top: 0;
+        }
+
+        body>h1:first-child {
+        margin-top: 0;
+        padding-top: 0;
+        }
+
+        body>h1:first-child+h2 {
+        margin-top: 0;
+        padding-top: 0;
+        }
+
+        body>h3:first-child,
+        body>h4:first-child,
+        body>h5:first-child,
+        body>h6:first-child {
+        margin-top: 0;
+        padding-top: 0;
+        }
+
+        a:first-child h1,
+        a:first-child h2,
+        a:first-child h3,
+        a:first-child h4,
+        a:first-child h5,
+        a:first-child h6 {
+        margin-top: 0;
+        padding-top: 0;
+        }
+
+        h1 p,
+        h2 p,
+        h3 p,
+        h4 p,
+        h5 p,
+        h6 p {
+        margin-top: 0;
+        }
+
+        li p.first {
+        display: inline-block;
+        }
+
+        li {
+        margin: 0;
+        }
+
+        ul,
+        ol {
+        padding-left: 30px;
+        }
+
+        ul :first-child,
+        ol :first-child {
+        margin-top: 0;
+        }
+
+        dl {
+        padding: 0;
+        }
+
+        dl dt {
+        font-size: 14px;
+        font-weight: bold;
+        font-style: italic;
+        padding: 0;
+        margin: 15px 0 5px;
+        }
+
+        dl dt:first-child {
+        padding: 0;
+        }
+
+        dl dt> :first-child {
+        margin-top: 0;
+        }
+
+        dl dt> :last-child {
+        margin-bottom: 0;
+        }
+
+        dl dd {
+        margin: 0 0 15px;
+        padding: 0 15px;
+        }
+
+        dl dd> :first-child {
+        margin-top: 0;
+        }
+
+        dl dd> :last-child {
+        margin-bottom: 0;
+        }
+
+        blockquote {
+        border-left: 4px solid #dddddd;
+        padding: 0 15px;
+        color: #777777;
+        }
+
+        blockquote> :first-child {
+        margin-top: 0;
+        }
+
+        blockquote> :last-child {
+        margin-bottom: 0;
+        }
+
+        table {
+        padding: 0;
+        border-collapse: collapse;
+        }
+
+        table tr {
+        border-top: 1px solid #cccccc;
+        background-color: white;
+        margin: 0;
+        padding: 0;
+        }
+
+        table tr:nth-child(2n) {
+        background-color: #f8f8f8;
+        }
+
+        table tr th {
+        font-weight: bold;
+        border: 1px solid #cccccc;
+        margin: 0;
+        padding: 6px 13px;
+        }
+
+        table tr td {
+        border: 1px solid #cccccc;
+        margin: 0;
+        padding: 6px 13px;
+        }
+
+        table tr th :first-child,
+        table tr td :first-child {
+        margin-top: 0;
+        }
+
+        table tr th :last-child,
+        table tr td :last-child {
+        margin-bottom: 0;
+        }
+
+        img {
+        max-width: 100%;
+        }
+
+        span.frame {
+        display: block;
+        overflow: hidden;
+        }
+
+        span.frame>span {
+        border: 1px solid #dddddd;
+        display: block;
+        float: left;
+        overflow: hidden;
+        margin: 13px 0 0;
+        padding: 7px;
+        width: auto;
+        }
+
+        span.frame span img {
+        display: block;
+        float: left;
+        }
+
+        span.frame span span {
+        clear: both;
+        color: #333333;
+        display: block;
+        padding: 5px 0 0;
+        }
+
+        span.align-center {
+        display: block;
+        overflow: hidden;
+        clear: both;
+        }
+
+        span.align-center>span {
+        display: block;
+        overflow: hidden;
+        margin: 13px auto 0;
+        text-align: center;
+        }
+
+        span.align-center span img {
+        margin: 0 auto;
+        text-align: center;
+        }
+
+        span.align-right {
+        display: block;
+        overflow: hidden;
+        clear: both;
+        }
+
+        span.align-right>span {
+        display: block;
+        overflow: hidden;
+        margin: 13px 0 0;
+        text-align: right;
+        }
+
+        span.align-right span img {
+        margin: 0;
+        text-align: right;
+        }
+
+        span.float-left {
+        display: block;
+        margin-right: 13px;
+        overflow: hidden;
+        float: left;
+        }
+
+        span.float-left span {
+        margin: 13px 0 0;
+        }
+
+        span.float-right {
+        display: block;
+        margin-left: 13px;
+        overflow: hidden;
+        float: right;
+        }
+
+        span.float-right>span {
+        display: block;
+        overflow: hidden;
+        margin: 13px auto 0;
+        text-align: right;
+        }
+
+        code,
+        tt {
+        margin: 0 2px;
+        padding: 0 5px;
+        white-space: nowrap;
+        border: 1px solid #eaeaea;
+        background-color: #f8f8f8;
+        border-radius: 3px;
+        }
+
+        pre code {
+        margin: 0;
+        padding: 0;
+        white-space: pre;
+        border: none;
+        background: transparent;
+        }
+
+        .highlight pre {
+        background-color: #f8f8f8;
+        border: 1px solid #cccccc;
+        font-size: 13px;
+        line-height: 19px;
+        overflow: auto;
+        padding: 6px 10px;
+        border-radius: 3px;
+        }
+
+        pre {
+        background-color: #f8f8f8;
+        border: 1px solid #cccccc;
+        font-size: 13px;
+        line-height: 19px;
+        overflow: auto;
+        padding: 6px 10px;
+        border-radius: 3px;
+        }
+
+        pre code,
+        pre tt {
+        background-color: transparent;
+        border: none;
+        }
+
+        sup {
+        font-size: 0.83em;
+        vertical-align: super;
+        line-height: 0;
+        }
+
+        * {
+        -webkit-print-color-adjust: exact;
+        }
+
+        @media screen and (min-width: 914px) {
+        body {
+        width: 854px;
+        margin: 0 auto;
+        }
+        }
+
+        @media print {
+        table,
+        pre {
+        page-break-inside: avoid;
+        }
+        pre {
+        word-wrap: break-word;
+        }
+        }
+
+        .top-banner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 0;
+        width: 100%;
+        }
+
+        #top-banner-img {
+        opacity: 0.5;
+        width: 100%;
+        max-height: 350px;
+        }
+
+        #main-title {
+        position: relative;
+        margin-top: 100px;
+        margin-bottom: 100px;
+        padding: 10px;
+        font-size: 40px;
+        background: #333333;
+        color: #f8f8f8;
+        z-index: 10;
+        }
+
+        blockquote {
+        font-size: large;
+        font-weight: 300;
+        }
+
+        p.img {
+        text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+<span class="top-banner">
+    <img id="top-banner-img" src="tables_img/tables.var.png">
+</span>
+
+<p id="main-title">??: Machine Learning for Table Detection in PDF documents</p>
+
+<p>Post by <a href="https://stanford.edu/~chami/" target="_blank">Ines Chami</a>, Payal Bajaj, Stephen Bach and <a
+        href="https://cs.stanford.edu/people/chrismre/" target="_blank">Chris Ré</a></p>
+<p>The source code is made available at <a href="https://stanford.edu/~chami/" target="_blank">hazy research git </a>
+    and we provide a demo tutorial at <a href="https://stanford.edu/~chami/" target="_blank">notebook</a></p>
+
+<!--<p><em>And referencing work by many other <a href="http://cs.stanford.edu/people/chrismre/#students" target="_blank">members of Hazy Research</a></em></p>-->
+
+<p>
+    Snorkel is currently being used for information extraction from unstructured data, namely text.
+    Text mining can however be a limiting approach since important knowledge and relational information can also be
+    found in semi-structured data such as tables or figures.
+    <a>Fonduer</a> has been recently developed for information extraction from <b>richly formatted</b> data, where
+    "information is conveyed via combinations of textual, structural, tabular, and
+    visual expressions".
+    A crucial step in this process is the localization of tables in PDF documents.
+    Previous methods were proposed for table detection but they all relied and human engineered features and would
+    exhibit a high variance from one dataset to another.
+    We developed a robust machine learning approach for table detection and we walk through the different steps in this
+    blog post.
+</p>
+<!--<p class="img"><img src="fonduer_img/rfd.png" /></p>-->
+<!--<blockquote>-->
+<!--<p>-->
+<!--</p>-->
+<!--</blockquote>-->
+
+<h1>Motivations: Tables Variation across datasets</h1>
+
+<p>
+    We present below some examples of tables found in PDF documents.</p>
+
+<p class="img"><img class="effectfront" src="tables_img/tables.var.png" width="900px"/></p>
+<p>
+    As shown in the examples above, tables can vary greatly from one document to another.
+    For instance, tables can be horizontal or vertical, tables can have vertical lines of not, tables can span multiple
+    pages, tables can have a caption or not, tables can contain text or numbers...
+    Previous methods were based on heuristic rules to detect tables. For instance, some methods rely on the caption
+    "table" to reduce the search area to the one around the word "table".
+    Other methods rely on the presence of lines to detect tables. However, these heuristic based approaches would only
+    work for the type of tables they were built for.
+</p>
+
+<blockquote>
+    <p>
+        We proposed a robust machine learning algorithm that can detect tables in PDF documents and that generalizes
+        easily to any type of table.
+    </p>
+</blockquote>
+<h1>Our Approach</h1>
+<p>
+    Our method can be broken down into four units:
+</p>
+<ul>
+    <li>
+        <p>
+            <b>Candidates generation:</b> Given a pdf document, we first generate a set of candidate regions for tables.
+            To generate those candidates, we analyze alignment of text and position of lines.</p>
+    </li>
+</ul>
+<ul>
+    <li>
+        <p>
+            <b>Features Extraction:</b> For each candidate region, we extract a set of features (24 in total). This is a
+            crucial step compared to heuristic based approaches since we can use any type of features, even those which
+            are very specific. The algorithm will learn which features are significant.</p>
+    </li>
+</ul>
+<ul>
+    <li>
+        <p>
+            <b>Labels generation:</b> This steps allows us to build a label vector of 0 and 1. To do so, we compute the
+            intersection of union (IOU, in terms of area) between a candidate region and ground truth tables. If IOU is
+            greater than some threshold (currently 0.8), we label the candidate as a true table region.
+        </p>
+    </li>
+</ul>
+<ul>
+    <li>
+        <p>
+            <b>Candidates classification:</b> We then train a machine learning classifier to predict whether a candidate
+            region is a table or not. We use a logistic regression model for this task.
+        </p>
+    </li>
+</ul>
+
+<h1>Candidates generation:</h1>
+
+The candidates generation is the first step in the detection algorithm.
+It allows us to generate candidate regions that are likely to contain tables.
+The candidates are regions returned as tuples of 5 numbers (page number, top, left, bottom, right).
+
+<blockquote>
+    <p>The candidate generation is essentially based on two structural properties often found in tables that are
+        structural alignment of text and presence of lines in tables.</p>
+</blockquote>
+
+<ul>
+    <li>
+        <p>
+            <b>Alignments:</b> text within tables is often aligned, that is the elements within a table are often
+            centered around the same vertical (or horizontal) axis within a column (or row).</p>
+    </li>
+</ul>
+<p>
+    We use structural alignments of text in PDF documents to generate tables candidates.
+    Given the bounding boxes of each word in a document we first create small clusters of text aligned in adjacent rows
+    and iterate this procedure with adjacent rows or adjacent columns.
+    This iterative clustering strategy allows us to generate multiple candidates, with various sizes as shown below.
+</p>
+<p class="img"><img class="effectfront" src="tables_img/alignments.png" width="900px"/></p>
+<ul>
+    <li>
+        <p>
+            <b>Lines:</b> The presence of vertical or horizontal lines in tables is a common fact and we use it to
+            generate additional candidates.
+            We use a procesing library that extracts lines coordinates in PDF documents.
+            We first merge small segments that lie next to each other and add additional lines to create bounding boxes.
+            For instance, if two lines are vertically aligned, we add add vertical lines at the edges to create a
+            bounding box.
+            We then iterate over all lines coordinates in order to find pairs of horizontal and vertical lines that have
+            the same (top, left) coordinates and return the corresponding bounding box as a table candidate.
+            This procedure is illustrated below.
+        <p class="img"><img class="effectfront" src="tables_img/lines.png" width="900px"/></p>
+        </p>
+    </li>
+</ul>
+
+We then use merge the candidates generated by lines and alignments. Note that these candidates contain a lot of false
+positive but our machine learning approach will remove these!
+
+
+<h1 id="toc_3">Features Extraction</h1>
+
+For each candidate region, we extract a set of 24 features that are relevant to tables. such as:
+
+
+<ul>
+    <li>
+        <p>number of lines within a candidate region</p>
+    </li>
+    <li>
+        <p>proportion of digits in text within a region</p>
+    </li>
+    <li>
+        <p>average white spacing between words</p>
+    </li>
+    <li>
+        <p>number of columns, rows that are aligned</p>
+    </li>
+    <li>
+        <p>text area coverage (area covered by text / region area)</p>
+    </li>
+    <li>
+        <p>... and many others!</p>
+    </li>
+</ul>
+
+This featurization a key step allowing robustness to any type of document.
+For instance, if a table does not contain lines, a heuristic based approach would simply ignore that table but our algorithm can still rely on the 23 other features to detect that table.
+
+<h1 id="toc_3">Labels Generation and Candidates Classification</h1>
+
+<p>
+    It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated.
+    To generate these labels, we computed the maximum intersection over union (iou, in terms of area) for each candidate with all the ground tables region.
+    When this iou was greater than some preset threshold, we labeled the candidate as a true table region.
+    A model is then trained logistic regression classifier.
+    During test time, our model allows user to simply reuse the pretrained model to extract tables for any test PDF.
+</p>
+
+<h1 id="toc_6">Next Steps</h1>
+
+<ul>
+    <li>
+        <p>
+            <b> Weak supervision:</b> collecting training data for table detection is hard. We build an annotation that allows us to render pdf pages and manually crop table regions.
+            However, sicne this can be very time consuming for more than hundreds of documents.
+            We are currently working towards a weak supervising approach, namely use our current small model to generate more training examples and use these noisy data to train larger models.
+        </p>
+    </li>
+    <li>
+        <p>
+            <b> Visual Features:</b> Tables are not only structurally but also visually differentiable from other parts of a document.
+            We are working towards a computer vision approach that would allow us to also extract and add visual features into the loop</p>
+    </li>
+    <li>
+        <p>
+            <b> Tree Structure:</b> Our end goal is the construction of a hierarchical tree of context objects such as text blocks, figures,
+            tables, etc.
+        </p>
+    </li>
+
+</ul>
+
+<p>
+    TODO:should I talk about pdf miner as preprocessing step or not relevant?<br>
+    TODO: Payal, detail alignments?<br>
+    TODO: define horizontal and vertical alignments<br>
+    TODO: add candidates image<br>
+    TODO: add final results image<br>
+    TODO: find project name and replace background image<br>
+</p>
+<script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-93927842-1', 'auto');
+      ga('send', 'pageview');
+
+
+</script>
+
+</body>
+
+</html>
