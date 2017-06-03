@@ -5,8 +5,8 @@ import json
 import signal
 import socket
 import string
+import logging
 import warnings
-
 
 from subprocess import Popen,PIPE
 from collections import defaultdict
@@ -15,9 +15,9 @@ from .parser import Parser, URLParserConnection
 from ..models import Candidate, Context, Document, Sentence, construct_stable_id
 from ..utils import sort_X_on_Y
 
-import logging
-logging.basicConfig(filename='corenlp.log',level=logging.DEBUG)
 
+logging.basicConfig(filename='corenlp.log',level=logging.DEBUG)
+logger = logging.getLogger('StanfordCoreNLPServer')
 
 class StanfordCoreNLPServer(Parser):
     '''
@@ -55,7 +55,8 @@ class StanfordCoreNLPServer(Parser):
 
     def __init__(self, annotators=['tokenize', 'ssplit', 'pos', 'lemma', 'depparse', 'ner'],
                  annotator_opts={}, tokenize_whitespace=False, split_newline=False, encoding="utf-8",
-                 java_xmx='4g', port=12345, num_threads=1, verbose=False, version='3.6.0'):
+                 java_xmx='4g', port=12345, num_threads=1, verbose=False, version='3.6.0',
+                 logging=True):
         '''
         Create CoreNLP server instance.
         :param annotators:
@@ -81,6 +82,8 @@ class StanfordCoreNLPServer(Parser):
         self.num_threads = num_threads
         self.verbose = verbose
         self.version = version
+
+        self.logging = logging
 
         # configure connection request options
         opts = self._conn_opts(annotators, annotator_opts, tokenize_whitespace, split_newline)
@@ -214,11 +217,12 @@ class StanfordCoreNLPServer(Parser):
 
         # POST request to CoreNLP Server
         try:
-            resp = conn.post(self.endpoint, data=text, allow_redirects=True, timeout=10.0)
+            resp = conn.post(self.endpoint, data=text, allow_redirects=True, timeout=30.0)
             text = text.decode(self.encoding)
             content = resp.content.strip()
 
-            logging.info('{} {}'.format(document.name, len(text)))
+            if self.logging:
+                logger.info('{} {}'.format(document.name, len(text)))
 
         except socket.error, e:
             print>>sys.stderr,"Socket error"
