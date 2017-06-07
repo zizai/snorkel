@@ -531,7 +531,7 @@
     visual expressions".
     A crucial step in this process is the localization of tables in PDF documents.
     Most of the state-of-the-art approaches for table detection rely on manually engineered heuristics which tend to overfit to a particular type of dataset.
-     We have developed a robust machine learning approach for identifying bounding boxes of tables in digitized PDF documents which can then directly be fed into Fonduer for relation extraction from such tables. (table detection) and we walk through the different steps in this blog post.
+    We have developed a robust machine learning approach for identifying bounding boxes of tables in digitized PDF documents which can then directly be fed into Fonduer for relation extraction from such tables. We walk through the different steps of the TabLoc approach in this blog post.
 </p>
 <p align="justify">The source code is available <a href="https://github.com/HazyResearch/TreeStructure" target="_blank">here</a>
     and we also provide a demo <a href="https://github.com/HazyResearch/TreeStructure/blob/master/table-extraction/tutorials/table-extraction-demo.ipynb" target="_blank">tutorial</a>.</p>
@@ -550,7 +550,7 @@
 <p class="img"><img class="effectfront" src="tables_img/tablesVar.png" width="900px"/></p>
 <p align="justify">
     As shown in the examples above, tables can vary greatly from one document to another.
-    For instance, tables can be horizontal or vertical, tables may or may not be bounded by can have vertical and horizontal lines of not,
+    For instance, tables can be horizontal or vertical, tables may or may not be bounded by vertical and horizontal lines,
     tables can span multiple pages, tables may or may not have captions, tables can contain text or numbers...
     Previous methods are based on heuristic rules to detect tables. For instance, some methods rely on the caption
     "table" to reduce the search area to the one around the word "table".
@@ -683,9 +683,9 @@ For instance, if a table does not contain lines, a heuristic based approach woul
 
 <p align="justify">
     <img src="tables_img/ar.jpg" style="float:left;width:150px;height:100px;">It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated.
-    To generate these labels, we computed the maximum IoU for each candidate with all the ground tables region.
-    When this iou was greater than some preset threshold, we labeled the candidate as a true table region.
-    A model is then trained logistic regression classifier.
+    To generate these labels, we compute the maximum IoU for each candidate with all the ground tables region.
+    When this IoU is greater than some preset threshold, we label the candidate as a true table region.
+    A logistic regression classifier is then trained using the ground truth labels.
     During test time, our model allows user to simply reuse the pretrained model to extract tables for any test PDF!
     We display below the final results for the previous candidate generation examples. We can see that TabLoc removed the false
     positive in the first page and kept one candidate in the second page.
@@ -700,13 +700,13 @@ For instance, if a table does not contain lines, a heuristic based approach woul
         <p align="justify">
             <b> Weak supervision:</b> Collecting training data for table detection is hard. We build an annotation that allows us to render pdf pages and manually crop table regions.
             However, since this can be very time consuming for more than hundreds of documents.
-            We are currently working towards a weak supervising approach, namely use our current small model to generate more training examples and use these noisy data to train larger models.
+            We are currently working towards a weak supervision approach, namely use our current small model to generate more training examples and use this noisy data to train larger models.
         </p>
     </li>
     <li>
         <p align="justify">
             <b> Visual Features:</b> Tables are not only structurally but also visually differentiable from other parts of a document.
-            We are working towards a computer vision approach that would allow us to also extract and add visual features into the loop</p>
+            We are working towards a computer vision approach that would allow us to also extract and add visual features into the loop.</p>
     </li>
     <li>
         <p align="justify">
