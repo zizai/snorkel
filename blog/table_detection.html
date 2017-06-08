@@ -691,9 +691,8 @@ For instance, if a table does not contain lines, a heuristic based approach woul
 <h1 id="toc_3">Labels Generation and Candidates Classification</h1>
 
 <p align="justify">
-    <img src="tables_img/ar.jpg" style="float:left;width:150px;height:100px;">It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated.
-    To generate these labels, we compute the maximum IoU for each candidate with all the ground tables region.
-    When this IoU is greater than some preset threshold, we label the candidate as a true table region.
+    <img src="tables_img/ar.jpg" style="float:left;width:150px;height:100px;">It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated. In order to generate these ground truth labels, we compare each candidate with all ground truth tables. Note that this requires us to have ground truth table annotations for documents in the training set. We compute the intersection over union of bounding box area of a candidate with all ground truth tables and when the maximum IoU is greater than some preset threshold, we label the candidate as a true table region.
+
     A logistic regression classifier is then trained using the ground truth labels.
     During test time, our model allows user to simply reuse the pretrained model to extract tables for any test PDF!
     We display below the final results for the previous candidate generation examples. We can see that TabLoc removed the false
@@ -756,8 +755,8 @@ We present the results of table localization on 166 Paleontology research papers
 <ul>
     <li>
         <p align="justify">
-            <b> Weak supervision:</b> Collecting training data for table detection is hard. We build an annotation that allows us to render pdf pages and manually crop table regions.
-            However, since this can be very time consuming for more than hundreds of documents.
+            <b> Label generation using weak supervision:</b> Collecting training data for table detection is hard. We build an annotation that allows us to render pdf pages and manually crop table regions. We use these regions to generate labels for our candidates.
+            However, this can be very time consuming for more than hundreds of documents. 
             We are currently working towards a weak supervision approach, namely use our current small model to generate more training examples and use this noisy data to train larger models.
         </p>
     </li>
