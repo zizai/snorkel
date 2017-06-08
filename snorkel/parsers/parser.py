@@ -74,7 +74,7 @@ class URLParserConnection(ParserConnection):
         requests_session.mount('http://', HTTPAdapter(max_retries=retries))
         return requests_session
 
-    def post(self, url, data, allow_redirects=True, timeout=10.0):
+    def post(self, url, data, allow_redirects=True):
         '''
 
         :param url:
@@ -83,7 +83,7 @@ class URLParserConnection(ParserConnection):
         :param timeout:
         :return:
         '''
-        resp = self.request.post(url, data=data, allow_redirects=allow_redirects, timeout=timeout)
+        resp = self.request.post(url, data=data, allow_redirects=allow_redirects)
         return resp.content.strip()
 
     def parse(self, document, text):
