@@ -2,6 +2,9 @@
 import sys
 import requests
 
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 
 class Parser(object):
 
@@ -42,7 +45,7 @@ class URLParserConnection(ParserConnection):
     '''
     URL parser connection
     '''
-    def __init__(self, parser, retries=None):
+    def __init__(self, parser, retries=5):
         self.retries = retries
         self.parser = parser
         self.request = self._connection()
@@ -56,12 +59,10 @@ class URLParserConnection(ParserConnection):
 
         :return:
         '''
-        from requests.packages.urllib3.util.retry import Retry
-        from requests.adapters import HTTPAdapter
         requests_session = requests.Session()
         retries = Retry(total=self.retries,
-                        connect=20,
-                        read=0,
+                        connect=self.retries,
+                        read=self.retries,
                         backoff_factor=0.1,
                         status_forcelist=[500, 502, 503, 504])
 
@@ -73,6 +74,18 @@ class URLParserConnection(ParserConnection):
         requests_session.mount('http://', HTTPAdapter(max_retries=retries))
         return requests_session
 
+    def post(self, url, data, allow_redirects=True, timeout=10.0):
+        '''
+
+        :param url:
+        :param data:
+        :param allow_redirects:
+        :param timeout:
+        :return:
+        '''
+        resp = self.request.post(url, data=data, allow_redirects=allow_redirects, timeout=timeout)
+        return resp.content.strip()
+
     def parse(self, document, text):
         '''
         Return parse generator
@@ -80,7 +93,7 @@ class URLParserConnection(ParserConnection):
         :param text:
         :return:
         '''
-        yield self.parser.parse(document, text, self.request)
+        yield self.parser.parse(document, text, self)
 
 
 

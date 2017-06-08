@@ -204,7 +204,7 @@ class StanfordCoreNLPServer(Parser):
 
         :param document:
         :param text:
-        :param conn: server URL+properties string
+        :param conn: server connection
         :return:
         '''
         if len(text.strip()) == 0:
@@ -217,9 +217,8 @@ class StanfordCoreNLPServer(Parser):
 
         # POST request to CoreNLP Server
         try:
-            resp = conn.post(self.endpoint, data=text, allow_redirects=True, timeout=30.0)
-            text = text.decode(self.encoding)
-            content = resp.content.strip()
+            content = conn.post(self.endpoint, text)
+            content = content.decode(self.encoding)
 
             if self.logging:
                 logger.info('{} {}'.format(document.name, len(text)))
@@ -255,7 +254,6 @@ class StanfordCoreNLPServer(Parser):
             # certain configuration options remove 'before'/'after' fields in output JSON (TODO: WHY?)
             # In order to create the 'text' field with correct character offsets we use
             # 'characterOffsetEnd' and 'characterOffsetBegin' to build our string from token input
-            #if not [t for t in block['tokens'] if t.get('after', None)]:
             text = ""
             for t in block['tokens']:
                 # shift to start of local sentence offset
@@ -295,12 +293,12 @@ class StanfordCoreNLPServer(Parser):
             abs_sent_offset_end = abs_sent_offset + parts['char_offsets'][-1] + len(parts['words'][-1])
 
             # Hack / Fix for CoreNLP v 3.6.0 that strips NUL (0x00) characters (these break database operations w/ psql)
-            if self.version == "3.6.0":
-                parts['text'] = StanfordCoreNLPServer.strip_non_printing_chars(parts['text'])
-                parts['words'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['words']]
-                parts['lemmas'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['lemmas']]
-                tree = document.meta['tree'][position]
-                document.meta['tree'][position] = StanfordCoreNLPServer.strip_non_printing_chars(tree)
+            # if self.version == "3.6.0":
+            #     parts['text'] = StanfordCoreNLPServer.strip_non_printing_chars(parts['text'])
+            #     parts['words'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['words']]
+            #     parts['lemmas'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['lemmas']]
+            #     tree = document.meta['tree'][position]
+            #     document.meta['tree'][position] = StanfordCoreNLPServer.strip_non_printing_chars(tree)
 
             if document:
                 parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)

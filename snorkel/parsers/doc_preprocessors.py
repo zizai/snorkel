@@ -40,19 +40,16 @@ class CorpusParserUDF(UDF):
     def __init__(self, parser, fn, **kwargs):
         super(CorpusParserUDF, self).__init__(**kwargs)
         self.parser = parser
-        self.req_handler = parser.connect()
+        # each thread has its own connection object
+        self.conn = parser.connect()
         self.fn = fn
 
     def apply(self, x, **kwargs):
         """Given a Document object and its raw text, parse into processed Sentences"""
-        try:
-            doc, text = x
-            for parts in self.req_handler.parse(doc, text):
-                parts = self.fn(parts) if self.fn is not None else parts
-                yield Sentence(**parts)
-        except Exception as e:
-            print>>sys.stderr,"WARNING - Parsing Error, reconnecting...", e
-            self.req_handler = self.parser.connect()
+        doc, text = x
+        for parts in self.conn.parse(doc, text):
+            parts = self.fn(parts) if self.fn is not None else parts
+            yield Sentence(**parts)
 
 class DocPreprocessor(object):
     """
@@ -75,6 +72,8 @@ class DocPreprocessor(object):
 
         """
         doc_count = 0
+        file_path = self._get_files(self.path) if type(self.path) is str else self.path
+
         if type(self.path) is list:
             for fp in self.path:
                 file_name = os.path.basename(fp)
