@@ -72,7 +72,7 @@ def candidate_subclass(class_name, args, table_name=None):
 
         # Declares name for storage table
         '__tablename__' : table_name,
-                
+
         # Connects candidate_subclass records to generic Candidate records
         'id' : Column(Integer, ForeignKey('candidate.id', ondelete='CASCADE'), primary_key=True),
                 
@@ -99,6 +99,7 @@ def candidate_subclass(class_name, args, table_name=None):
 
         # Canonical ids, to be set post-entity normalization stage
         class_attribs[arg + '_cid'] = Column(Integer)
+
 
     class_attribs['__table_args__'] = (UniqueConstraint(*unique_con_args),)
 
