@@ -522,15 +522,23 @@
 
 <!--<p><em>And referencing work by many other <a href="http://cs.stanford.edu/people/chrismre/#students" target="_blank">members of Hazy Research</a></em></p>-->
 
+<blockquote>
 <p align="justify">
-    <p align="justify"><img src="tables_img/investigate.jpg" style="float:left;width:100px;height:100px;">Snorkel is currently being used for information extraction from unstructured data, namely text.
+TLDR; Table Detection is a crucial pre-processing step in information extraction from documents. We introduce TabLoc, a machine learning based table localization algorithm to detect tables and identify their boundaries from digitized PDF documents. The first version of TabLoc is based on logistic regression and it outperforms the state of the art approaches in table detection and generalizes well to multiple table variations.
+</p>
+</blockquote>
+
+<h1>Motivation: Table Localization</h1>
+
+<p align="justify">
+    <p align="justify"><img src="tables_img/investigate.jpg" style="float:left;width:100px;height:100px;">Information extraction from data is becoming increasingly popular to convert data to a queryable form which can be leveraged for various purposes. For instance, extracting "Spouse" relations from natural language can be used to populate a knowledge base which can then further support downstream applications such as information retrieval and question answering. Snorkel is currently being used for information extraction from unstructured data, namely text.
     Text mining can however be a limiting approach since important knowledge and relational information can also be
     found in semi-structured data such as tables or figures.
     <a href="https://hazyresearch.github.io/snorkel/blog/fonduer.html">Fonduer</a> has been recently developed for information extraction from <b>richly formatted</b> data, where
     "information is conveyed via combinations of textual, structural, tabular, and
     visual expressions".
     A crucial step in this process is the localization of tables in PDF documents.
-    Most of the state-of-the-art approaches for table detection rely on manually engineered heuristics which tend to overfit to a particular type of dataset.
+    Most of the state-of-the-art approaches for table detection rely on manually engineered heuristics which focus particular type of dataset, and cannot generalize well to other variations of tables.
     We have developed a robust machine learning approach for identifying bounding boxes of tables in digitized PDF documents which can then directly be fed into Fonduer for relation extraction from such tables. We walk through the different steps of the TabLoc approach in this blog post.
 </p>
 <p align="justify">The source code is available <a href="https://github.com/HazyResearch/TreeStructure" target="_blank">here</a>
@@ -542,7 +550,7 @@
 <!--</p>-->
 <!--</blockquote>-->
 
-<h1>Motivations: Tables variation across datasets</h1>
+<h1>Challenges: Tables variation across documents</h1>
 
 <p>
     We present below some examples of tables found in PDF documents.</p>
@@ -569,6 +577,7 @@
 <p>
     The TabLoc approach can be broken down into four units:
 </p>
+<p class="img"><img class="effectfront" src="tables_img/framework.png" width="900px"/></p>
 <ul>
     <li>
         <p align="justify">
@@ -692,6 +701,55 @@ For instance, if a table does not contain lines, a heuristic based approach woul
 </p>
 
 <p class="img"><img class="effectfront" src="tables_img/final.png" width="700px"/></p>
+
+<h1 id="toc_4">Results</h1>
+We present the results of table localization on 166 Paleontology research papers. TabLoc outperforms state-of-the-art approach Nurimnen's algorithm as shown in the table below. This is because the latter overfits to ICDAR documents as it was built for them and doesn't generalize well to other documents. Further, it provides better results than OCR based approaches. This is because TabLoc is a learning algorithm as opposed to others which just rely on heuristics. Thus it is able to generalize better to table variations and varied documents.
+<p align="justify">
+    <table>
+        <tr>
+        <th>Algorithm</th>
+        <th>Precision</th>
+        <th>Recall</th>
+        <th>f1 score</th>
+        </tr>
+        <tr>
+        <td>Nurimnen's Algorithm</td>
+        <td>50.3</td>
+        <td>22.7</td>
+        <td>31.3</td>
+        </tr>
+        <tr>
+        <td>OCR (Tesseract)</td>
+        <td>75.0</td>
+        <td>67.2</td>
+        <td>70.9</td>
+        </tr>
+        <tr>
+        <td>Lines Candidates</td>
+        <td>88.8</td>
+        <td>37.2</td>
+        <td>52.4</td>
+        </tr>
+        <tr>
+        <td>Alignment Candidates</td>
+        <td>92.7</td>
+        <td>44.6</td>
+        <td>60.3</td>
+        </tr>
+        <tr>
+        <td>Lines+Alignment Candidates</td>
+        <td>82.4</td>
+        <td>75.1</td>
+        <td>73.9</td>
+        </tr>
+        <tr>
+        <td>TabLoc</td>
+        <td>81.4</td>
+        <td>81.0</td>
+        <td>81.2</td>
+        </tr>
+    </table>
+</p>
 
 <h1 id="toc_6">Next Steps</h1>
 
