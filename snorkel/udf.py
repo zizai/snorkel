@@ -152,7 +152,6 @@ class UDF(Process):
             try:
                 x = self.in_queue.get(True, QUEUE_TIMEOUT)
                 for y in self.apply(x, **self.apply_kwargs):
-
                     # If an out_queue is provided, add to that, else add to session
                     if self.out_queue is not None:
                         self.out_queue.put(y, True, QUEUE_TIMEOUT)

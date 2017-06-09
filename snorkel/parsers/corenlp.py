@@ -209,7 +209,7 @@ class StanfordCoreNLPServer(Parser):
         '''
         if len(text.strip()) == 0:
             print>> sys.stderr, "Warning, empty document {0} passed to CoreNLP".format(document.name if document else "?")
-            return {}
+            return
 
         # handle encoding (force to unicode)
         if isinstance(text, unicode):
@@ -233,8 +233,8 @@ class StanfordCoreNLPServer(Parser):
         try:
             blocks = json.loads(content, strict=False)['sentences']
         except:
-            warnings.warn("CoreNLP skipped a malformed sentence.\n{}".format(text), RuntimeWarning)
-            return {}
+            warnings.warn("CoreNLP skipped a malformed document.\n{}".format(text), RuntimeWarning)
+            return
 
         position = 0
         for block in blocks:
@@ -303,7 +303,7 @@ class StanfordCoreNLPServer(Parser):
             if document:
                 parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)
             position += 1
-            return parts
+            yield parts
 
     @staticmethod
     def strip_non_printing_chars(s):

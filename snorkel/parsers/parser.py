@@ -93,7 +93,7 @@ class URLParserConnection(ParserConnection):
         :param text:
         :return:
         '''
-        yield self.parser.parse(document, text, self)
+        return self.parser.parse(document, text, self)
 
 
 

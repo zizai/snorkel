@@ -74,25 +74,14 @@ class DocPreprocessor(object):
         doc_count = 0
         file_path = self._get_files(self.path) if type(self.path) is str else self.path
 
-        if type(self.path) is list:
-            for fp in self.path:
-                file_name = os.path.basename(fp)
-                if self._can_read(file_name):
-                    for doc, text in self.parse_file(fp, file_name):
-                        yield doc, text
-                        doc_count += 1
-                        if doc_count >= self.max_docs:
-                            return
-
-        elif type(self.path) is str:
-            for fp in self._get_files(self.path):
-                file_name = os.path.basename(fp)
-                if self._can_read(file_name):
-                    for doc, text in self.parse_file(fp, file_name):
-                        yield doc, text
-                        doc_count += 1
-                        if doc_count >= self.max_docs:
-                            return
+        for fp in file_path:
+            file_name = os.path.basename(fp)
+            if self._can_read(file_name):
+                for doc, text in self.parse_file(fp, file_name):
+                    yield doc, text
+                    doc_count += 1
+                    if doc_count >= self.max_docs:
+                        return
 
     def __iter__(self):
         return self.generate()
