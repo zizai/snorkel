@@ -524,27 +524,22 @@
 
 <blockquote>
 <p align="justify">
-TLDR; Table Detection is a crucial pre-processing step in information extraction from documents.
-    We introduce TabLoc, a machine learning based table localization algorithm to detect tables and identify their boundaries from digitized PDF documents.
-    The first version of TabLoc outperforms the state of the art approaches in table detection and generalizes well to multiple table variations.
+TLDR; Table Detection is a crucial pre-processing step in information extraction from documents. We introduce TabLoc, a machine learning based table localization algorithm to identify table boundaries in digitized PDF documents. The first version of TabLoc is based on logistic regression and it outperforms the state of the art approaches in table detection and generalizes well to multiple kinds of documents.
 </p>
 </blockquote>
 
 <h1>Motivation: Table Localization</h1>
 
 <p align="justify">
-    <p align="justify"><img src="tables_img/investigate.jpg" style="float:left;width:100px;height:100px;">Information extraction from data is becoming increasingly popular to convert data to a queryable form which can be leveraged for various purposes.
-    For instance, extracting "Spouse" relations from natural language can be used to populate a knowledge base which can then further support downstream applications such as information retrieval and question answering.
-    <a href="https://github.com/HazyResearch/snorkel">Snorkel</a> is a system that can extract structured information from unstructured data, namely text.
-    Text mining can however be a limiting approach since important knowledge and relational information can also be
+    <p align="justify"><img src="tables_img/investigate.jpg" style="float:left;width:100px;height:100px;">Information extraction from data is becoming increasingly popular to convert data to a queryable form which can be leveraged for various purposes. For instance, extracting "Spouse" relations from natural language can be used to populate a knowledge base which can then further support downstream applications such as information retrieval and question answering. Snorkel is currently being used for information extraction from unstructured data, namely text.Text mining can however be a limiting approach since important knowledge and relational information can also be
     found in semi-structured data such as tables or figures.
-    <a href="https://hazyresearch.github.io/snorkel/blog/fonduer.html">Fonduer</a> has been recently developed for information extraction from <b>richly formatted</b> data, where
+    </p>
+    <p align="justify"><a href="https://hazyresearch.github.io/snorkel/blog/fonduer.html">Fonduer</a> has been recently developed for information extraction from <b>richly formatted</b> data, where
     "information is conveyed via combinations of textual, structural, tabular, and
     visual expressions".
-    A crucial step in this process is the localization of tables in PDF documents.
+    A crucial step in relation extraction from tables is the localization of tables in PDF documents.
     Most of the state-of-the-art approaches for table detection rely on manually engineered heuristics which focus particular type of dataset, and cannot generalize well to other variations of tables.
-    We have developed a robust machine learning approach for identifying bounding boxes of tables in digitized PDF documents which can then directly be fed into Fonduer for relation extraction from such tables.
-    We walk through the different steps of the TabLoc approach in this blog post.
+    TabLoc is a robust machine learning approach for identifying bounding boxes of tables in digitized PDF documents which can then directly be fed into Fonduer for relation extraction from such tables. We walk through the different steps of the TabLoc in this blog post.
 </p>
 <p align="justify">The source code is available <a href="https://github.com/HazyResearch/TreeStructure" target="_blank">here</a>
     and we also provide a demo <a href="https://github.com/HazyResearch/TreeStructure/blob/master/table-extraction/tutorials/table-extraction-demo.ipynb" target="_blank">tutorial</a>.</p>
@@ -558,13 +553,12 @@ TLDR; Table Detection is a crucial pre-processing step in information extraction
 <h1>Challenges: Tables variation across documents</h1>
 
 <p>
-    We present below some examples of tables found in PDF documents.</p>
+    Tables can vary greatly from one document to another.
+    For instance, tables can be horizontal or vertical, tables may or may not be bounded by vertical and horizontal lines,
+    tables can span multiple pages, tables may or may not have captions, tables can contain text or numbers, etc. We present below some examples of tables found in PDF documents.</p>
 
 <p class="img"><img class="effectfront" src="tables_img/tablesVar.png" width="900px"/></p>
-<p align="justify">
-    As shown in the examples above, tables can vary greatly from one document to another.
-    For instance, tables can be horizontal or vertical, tables may or may not be bounded by vertical and horizontal lines,
-    tables can span multiple pages, tables may or may not have captions, tables can contain text or numbers...
+<p align="justify"> 
     Previous methods are based on heuristic rules to detect tables. For instance, some methods rely on the caption
     "table" to reduce the search area to the one around the word "table".
     Other methods rely on the presence of lines to detect tables.
@@ -575,7 +569,7 @@ TLDR; Table Detection is a crucial pre-processing step in information extraction
 <blockquote>
     <p align="justify">
         TabLoc is a robust machine learning algorithm that can detect tables in digitized PDF documents and that generalizes
-        easily to multiple types of tables.
+        easily to different kinds of tables.
     </p>
 </blockquote>
 <h1>Our Approach</h1>
@@ -611,34 +605,31 @@ TLDR; Table Detection is a crucial pre-processing step in information extraction
 <ul>
     <li>
         <p align="justify">
-            <b>Candidates classification:</b> We then train a machine learning classifier to predict whether a candidate
-            region is a table or not. We use a logistic regression model for this task.
+            <b>Candidates classification:</b> We then train a binaryclassifier to predict whether a candidate
+            region is a table or not using logistic regression.
         </p>
     </li>
 </ul>
 
 <h1>Candidates generation:</h1>
 
-<p align="justify"><img src="tables_img/candLogo.png" style="float:right;width:200px;height:100px;">The candidates generation is the first step in the detection algorithm. It allows us to generate candidate regions that are likely to contain tables.
+<p align="justify"><img src="tables_img/candLogo.png" style="float:right;width:200px;height:100px;">Tabloc begins by generating candidate regions that are likely to contain tables.
 We use <a href="https://pypi.python.org/pypi/pdfminer/">PDFminer</a>, a parsing library that can that extracts lines and
 words coordinates in PDF documents, to analyze alignments of text and position of lines and then return tables candidates
 as tuples of 5 numbers (page number, top, left, bottom, right).</p>
 
 <blockquote>
-    <p align="justify">The candidate generation is essentially based on two structural properties often found in tables that are
-        structural alignment of text and presence of lines in tables.</p>
+    <p align="justify">The candidate generation is essentially based on two structural properties often found in tables: structural alignment of text and presence of lines in tables.</p>
 </blockquote>
 
 <ul>
     <li>
         <p align="justify">
-            <b>Alignments:</b> text within tables is often aligned, that is the elements within a table are often
+            <b>Alignments:</b> Text within tables is often aligned, that is the elements within a table are often
             centered around the same vertical (or horizontal) axis within a column (or row).
-            In what follows next, we qualify objects with this property as <b>vertically or horizontally aligned</b>.
-            We use structural alignments of text in PDF documents to generate tables candidates.
-            We extract the bounding boxes of each word in a document and perform hierarchical clustering by first combining
+            TabLoc qualifies objects with this property as <b>vertically or horizontally aligned</b> and uses structural alignments of text in PDF documents to generate tables candidates. Then it extracts the bounding boxes of each word in the document and performs hierarchical clustering by first combining
             text aligned in adjacent rows to obtain columns of the table, followed by combining these columns to create table
-            candidates. This iterative clustering strategy allows us to generate multiple candidates, with various sizes as
+            candidates. This iterative clustering strategy allows TabLoc to generate multiple candidates, with various sizes as
             shown below.</p>
     </li>
 </ul>
@@ -646,12 +637,11 @@ as tuples of 5 numbers (page number, top, left, bottom, right).</p>
 <ul>
     <li>
         <p align="justify">
-            <b>Lines:</b> The presence of vertical or horizontal lines in tables is a common fact and we use it to
-            generate additional candidates.
-            We first merge small segments that lie next to each other and add additional lines to create bounding boxes.
-            For instance, if two lines are vertically aligned, we add add vertical lines at the edges to create a
+            <b>Lines:</b> TabLoc uses the presence of vertical or horizontal lines in tables to generate additional candidates.
+            It first merges small segments that are next to each other and add additional lines to create bounding boxes.
+            For instance, if two lines are vertically aligned, the vertical lines at the edges are added to create a
             bounding box.
-            We then iterate over all lines coordinates in order to find pairs of horizontal and vertical lines that share
+            It then iterates over all lines coordinates in order to find pairs of horizontal and vertical lines that share
             the same (top, left) coordinates and return the corresponding bounding box as a table candidate.
             In the figure below, we show an example of how TabLoc generates candidates based on lines coordinates.
         <p class="img"><img class="effectfront" src="tables_img/lines.png" width="700px"/></p>
@@ -659,14 +649,14 @@ as tuples of 5 numbers (page number, top, left, bottom, right).</p>
     </li>
 </ul>
 
-We then merge the candidates generated by lines and alignments.
+TabLoc merges the candidates generated by lines and alignments.
 Note that these candidates contain a lot of false positive but our machine learning approach will remove these! We display below some examples for candidate generation.
 
 <p class="img"><img class="effectfront" src="tables_img/candidates.png" width="700px"/></p>
 
 <h1 id="toc_3">Features Extraction</h1>
 
-For each candidate region, we extract a set of 24 features that are relevant to tables, such as:
+For each candidate region, TabLoc extracts a set of 24 features that are relevant to tables, such as:
 
 
 <ul>
@@ -696,55 +686,64 @@ For instance, if a table does not contain lines, a heuristic based approach woul
 <h1 id="toc_3">Labels Generation and Candidates Classification</h1>
 
 <p align="justify">
-    <img src="tables_img/ar.jpg" style="float:left;width:150px;height:100px;">It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated. In order to generate these ground truth labels, we compare each candidate with all ground truth tables. Note that this requires us to have ground truth table annotations for documents in the training set. We compute the intersection over union of bounding box area of a candidate with all ground truth tables and when the maximum IoU is greater than some preset threshold, we label the candidate as a true table region.
+    <img src="tables_img/ar.jpg" style="float:left;width:150px;height:100px;">It is always hard to reduce a retrieval problem to a simple classification task. In our setting, our goal is to retrieve tables regions but we need ground truth labels to classify the candidates that we generated. In order to generate these ground truth labels, TabLoc compares each candidate with all ground truth tables. Note that this requires us to have ground truth table annotations for documents in the training set. It computes the intersection over union of bounding box area of a candidate with all ground truth tables and when the maximum IoU is greater than some preset threshold, the candidate is labeled as a true table region.
 
     A logistic regression classifier is then trained using the ground truth labels.
-    During test time, our model allows user to simply reuse the pretrained model to extract tables for any test PDF!
+    During test time, TabLoc allows user to simply reuse the pretrained model to extract tables for any test PDF!
     We display below the final results for the previous candidate generation examples. We can see that TabLoc removed the false
-    positive in the first page and kept one candidate in the second page.
+    positive in the first page and kept one correct table candidate in the second page.
 </p>
 
 <p class="img"><img class="effectfront" src="tables_img/final.png" width="700px"/></p>
 
 <h1 id="toc_4">Results</h1>
+We present the results of table localization by TabLoc on 166 Paleontology research papers. It outperforms state-of-the-art approach Nurimnen's algorithm as shown in the table below. This is because the latter overfits to ICDAR documents as it was built for them and doesn't generalize well to other documents. Further, it provides better results than OCR based approaches. This is because TabLoc is a learning algorithm as opposed to others which just rely on heuristics. Thus it is able to generalize better to table variations and varied documents.
 <p align="justify">
-We present the results of table localization on 166 Paleontology research papers.
-    TabLoc outperforms state-of-the-art approach Nurimnen's algorithm as shown in the table below.
-    This is because the latter overfits to ICDAR documents as it was built for them and doesn't generalize well to other documents.
-    Further, it provides better results than OCR based approaches. This is because TabLoc is a learning algorithm as opposed to others which just rely on heuristics.
-    Thus it is able to generalize better to table variations and varied documents.</p>
-    <table align="center">
+    <table>
         <tr>
         <th>Algorithm</th>
-        <th>Precision (%)</th>
-        <th>Recall (%)</th>
-        <th>F1 score (%)</th>
+        <th>Precision</th>
+        <th>Recall</th>
+        <th>f1 score</th>
         </tr>
         <tr>
-        <td>Nurimnen & al [1]</td>
+        <td>Nurimnen's Algorithm[1]</td>
         <td>50.3</td>
         <td>22.7</td>
         <td>31.3</td>
         </tr>
         <tr>
-        <td>OCR (Tesseract) [2]</td>
+        <td>OCR (Tesseract)[2]</td>
         <td>75.0</td>
         <td>67.2</td>
         <td>70.9</td>
         </tr>
         <tr>
-        <td> Our Heuristic Approach</td>
-        <td><b>82.4</b></td>
+        <td>Lines Candidates</td>
+        <td>88.8</td>
+        <td>37.2</td>
+        <td>52.4</td>
+        </tr>
+        <tr>
+        <td>Alignment Candidates</td>
+        <td>92.7</td>
+        <td>44.6</td>
+        <td>60.3</td>
+        </tr>
+        <tr>
+        <td>Lines+Alignment Candidates</td>
+        <td>82.4</td>
         <td>75.1</td>
         <td>73.9</td>
         </tr>
         <tr>
         <td>TabLoc</td>
         <td>81.4</td>
-        <td><b>81.0</b></td>
-        <td><b>81.2</b></td>
+        <td>81.0</td>
+        <td>81.2</td>
         </tr>
     </table>
+</p>
 
 <h1 id="toc_6">Next Steps</h1>
 
@@ -771,11 +770,16 @@ We present the results of table localization on 166 Paleontology research papers
 
 </ul>
 
-<h1 id="toc_6">References</h1>
-<ol>
-   <li id='#bib01'>Anssi Nurimen, Algorithmic Extraction of Data in Tables in PDF</li>
-    <li id='#bib01'>??</li>
-</ol>
+<h2>References</h2>
+<p>
+    <ol>
+    <li>Nurminen, A. (2013). Algorithmic extraction of data in tables in pdf documents. Master’s thesis, Tampere University of Technology.</li>
+    <li>https://github.com/UW-Deepdive-Infrastructure/table-extract</li>
+    </ol>
+</p>
+<p>
+    TODO: Replace background image<br>
+</p>
 <script>
       (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -784,6 +788,7 @@ We present the results of table localization on 166 Paleontology research papers
 
       ga('create', 'UA-93927842-1', 'auto');
       ga('send', 'pageview');
+
 
 </script>
 
