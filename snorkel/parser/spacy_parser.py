@@ -8,14 +8,15 @@ try:
     from spacy import util
     from spacy.deprecated import resolve_model_name
 except:
-    raise Exception("spaCy not installed. Use `pip install spacy`.")
-
+    raise Exception("spacy not installed. Use `pip install spacy`.")
 
 class Spacy(Parser):
     '''
     spaCy
     https://spacy.io/
 
+    Minimal (buggy) implementation to show how alternate parsers can
+    be added to Snorkel.
     Models for each target language needs to be downloaded using the
     following command:
 
@@ -64,7 +65,10 @@ class Spacy(Parser):
         data_path = util.get_data_path()
         model_name = resolve_model_name(name)
         model_path = data_path / model_name
-        return model_path.exists()
+        if not model_path.exists():
+            lang_name = util.get_lang_class(name).lang
+            return False
+        return True
 
     @staticmethod
     def load_lang_model(lang):
@@ -82,9 +86,12 @@ class Spacy(Parser):
         :param lang:
         :return:
         '''
-        if not Spacy.model_installed(lang):
+        if Spacy.model_installed:
+            model = spacy.load(lang)
+        else:
             download(lang)
-        return spacy.load(lang)
+            model = spacy.load(lang)
+        return model
 
     def connect(self):
         return ParserConnection(self)
@@ -107,16 +114,20 @@ class Spacy(Parser):
         for sent in doc.sents:
             parts = defaultdict(list)
             text = sent.text
-
-            for i,token in enumerate(sent):
+            sent = [t for t in sent]
+            abs_i = min([t.i for t in sent])
+            dep_order, dep_par, dep_lab = [], [], []
+            for token in sent:
                 parts['words'].append(str(token))
                 parts['lemmas'].append(token.lemma_)
                 parts['pos_tags'].append(token.tag_)
                 parts['ner_tags'].append(token.ent_type_ if token.ent_type_ else 'O')
                 parts['char_offsets'].append(token.idx)
                 parts['abs_char_offsets'].append(token.idx)
-                head_idx = 0 if token.head is token else token.head.i - sent[0].i + 1
-                parts['dep_parents'].append(head_idx)
+
+                deps = [t.i for t in list(token.ancestors)]
+                parent = deps[0] - abs_i + 1 if deps else 1
+                parts['dep_parents'].append(parent)
                 parts['dep_labels'].append(token.dep_)
 
             # Add null entity array (matching null for CoreNLP)
