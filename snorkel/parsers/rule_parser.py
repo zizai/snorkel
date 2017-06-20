@@ -1,102 +1,12 @@
-import re
 from collections import defaultdict
-from snorkel.models import construct_stable_id
-from snorkel.parser import Parser, ParserConnection
-
-try:
-    import spacy as sp
-    from spacy.cli import download
-    from spacy import util
-    from spacy.deprecated import resolve_model_name
-except:
-    raise Exception("spacy not installed. Use `pip install spacy`.")
-
-class Tokenizer(object):
-    '''
-    Interface for rule-based tokenizers
-    '''
-    def apply(self,s):
-        raise NotImplementedError()
-
-class RegexTokenizer(Tokenizer):
-    '''
-    Regular expression tokenization.
-    '''
-    def __init__(self, rgx="\s+"):
-        super(RegexTokenizer, self).__init__()
-        self.rgx = re.compile(rgx)
-
-    def apply(self,s):
-        '''
-
-        :param s:
-        :return:
-        '''
-        tokens = []
-        offset = 0
-        # keep track of char offsets
-        for t in self.rgx.split(s):
-            while t < len(s) and t != s[offset:len(t)]:
-                offset += 1
-            tokens += [(t,offset)]
-            offset += len(t)
-        return tokens
-
-class SpacyTokenizer(Tokenizer):
-    '''
-    Only use spaCy's tokenizer functionality
-    '''
-    def __init__(self, lang='en'):
-        super(SpacyTokenizer, self).__init__()
-        self.lang = lang
-        self.model = SpacyTokenizer.load_lang_model(lang)
-
-    def apply(self, s):
-        doc = self.model.tokenizer(s)
-        return [(t.text, t.idx) for t in doc]
-
-    @staticmethod
-    def model_installed(name):
-        '''
-        Check if spaCy language model is installed
-        :param name:
-        :return:
-        '''
-        data_path = util.get_data_path()
-        model_name = resolve_model_name(name)
-        model_path = data_path / model_name
-        if not model_path.exists():
-            lang_name = util.get_lang_class(name).lang
-            return False
-        return True
-
-    @staticmethod
-    def load_lang_model(lang):
-        '''
-        Load spaCy language model or download if
-        model is available and not installed
-
-        Currenty supported spaCy languages
-
-        en English (50MB)
-        de German (645MB)
-        fr French (1.33GB)
-        es Spanish (377MB)
-
-        :param lang:
-        :return:
-        '''
-        if SpacyTokenizer.model_installed(lang):
-            model = sp.load(lang)
-        else:
-            download(lang)
-            model = sp.load(lang)
-        return model
+from tokenizers import SpacyTokenizer,RegexTokenizer
+from ..models import construct_stable_id
+from ..parsers import Parser, ParserConnection
 
 
 class RuleBasedParser(Parser):
     '''
-    Simple, rule-based parser that requires a functions for
+    Simple, rule-based parser that requires objects  for
      1) detecting sentence boundaries
      2) tokenizing
     '''

@@ -12,7 +12,7 @@ import requests
 import lxml.etree as et
 
 try:
-    import spacy
+    import spacy_parser
 except:
     print>>sys.stderr,"Warning, unable to load 'spaCy' module"
 

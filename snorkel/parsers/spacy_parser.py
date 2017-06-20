@@ -1,14 +1,11 @@
 from collections import defaultdict
-from snorkel.models import construct_stable_id
-from snorkel.parser import Parser, ParserConnection
+from ..models import construct_stable_id
+from ..parsers import Parser, ParserConnection
 
 try:
-    import spacy as sp
-    from spacy.cli import download
-    from spacy import util
-    from spacy.deprecated import resolve_model_name
-except:
-    raise Exception("spacy not installed. Use `pip install spacy`.")
+    import spacy as _spacy
+except Exception as e:
+    raise Exception("spaCy not installed. Use `pip install spacy`.")
 
 class Spacy(Parser):
     '''
@@ -62,11 +59,11 @@ class Spacy(Parser):
         :param name:
         :return:
         '''
-        data_path = util.get_data_path()
-        model_name = resolve_model_name(name)
+        data_path = _spacy.util.get_data_path()
+        model_name = _spacy.deprecated.resolve_model_name(name)
         model_path = data_path / model_name
         if not model_path.exists():
-            lang_name = util.get_lang_class(name).lang
+            lang_name = _spacy.util.get_lang_class(name).lang
             return False
         return True
 
@@ -88,10 +85,10 @@ class Spacy(Parser):
         '''
         if Spacy.model_installed(lang):
             print "Model installed", lang
-            model = sp.load(lang)
+            model = _spacy.load(lang)
         else:
-            download(lang)
-            model = sp.load(lang)
+            _spacy.cli.download(lang)
+            model = _spacy.load(lang)
         return model
 
     def connect(self):
