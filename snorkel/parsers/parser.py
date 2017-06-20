@@ -12,6 +12,17 @@ class Parser(object):
         self.name = name
         self.encoding = encoding
 
+    def to_unicode(self, text):
+        '''
+        Convert char encoding to unicode
+        :param text:
+        :return:
+        '''
+        text = text.encode('utf-8', 'error')
+        text = text.decode('string_escape', errors='ignore')
+        text = text.decode('utf-8')
+        return text
+
     def connect(self):
         '''
         Return connection object for this parser type
@@ -38,7 +49,7 @@ class ParserConnection(object):
         raise NotImplemented
 
     def parse(self, document, text):
-        yield self.parser.parse(document, text)
+        return self.parser.parse(document, text)
 
 
 class URLParserConnection(ParserConnection):

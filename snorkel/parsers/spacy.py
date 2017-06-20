@@ -3,7 +3,7 @@ from snorkel.models import construct_stable_id
 from snorkel.parser import Parser, ParserConnection
 
 try:
-    import spacy
+    import spacy as sp
     from spacy.cli import download
     from spacy import util
     from spacy.deprecated import resolve_model_name
@@ -88,12 +88,10 @@ class Spacy(Parser):
         '''
         if Spacy.model_installed(lang):
             print "Model installed", lang
-            model = spacy.load(lang)
+            model = sp.load(lang)
         else:
-            print "download"
             download(lang)
-            print "?"
-            model = spacy.load(lang)
+            model = sp.load(lang)
         return model
 
     def connect(self):
