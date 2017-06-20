@@ -231,7 +231,7 @@ class StanfordCoreNLPServer(Parser):
             blocks = json.loads(content, strict=False)['sentences']
         except:
             warnings.warn("CoreNLP skipped a malformed document.", RuntimeWarning)
-            return
+
 
         position = 0
         for block in blocks:
