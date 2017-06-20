@@ -69,7 +69,7 @@ class StanfordCoreNLPServer(Parser):
         :param verbose:
         :param version:
         '''
-        super(StanfordCoreNLPServer,self).__init__(name="CoreNLP", encoding=encoding)
+        super(StanfordCoreNLPServer, self).__init__(name="CoreNLP", encoding=encoding)
 
         self.tokenize_whitespace = tokenize_whitespace
         self.split_newline = split_newline
@@ -277,11 +277,6 @@ class StanfordCoreNLPServer(Parser):
                     document.meta['tree'] = {}
                 document.meta['tree'][position] = tree
 
-            # store absolute sentence offsets
-            if 'abs_sent_offset' not in document.meta:
-                document.meta['abs_sent_offset'] = {}
-            document.meta['abs_sent_offset'][position] = abs_sent_offset
-
             # Link the sentence to its parent document object
             parts['document'] = document if document else None
 
@@ -291,14 +286,6 @@ class StanfordCoreNLPServer(Parser):
 
             # Assign the stable id as document's stable id plus absolute character offset
             abs_sent_offset_end = abs_sent_offset + parts['char_offsets'][-1] + len(parts['words'][-1])
-
-            # Hack / Fix for CoreNLP v 3.6.0 that strips NUL (0x00) characters (these break database operations w/ psql)
-            # if self.version == "3.6.0":
-            #     parts['text'] = StanfordCoreNLPServer.strip_non_printing_chars(parts['text'])
-            #     parts['words'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['words']]
-            #     parts['lemmas'] = [StanfordCoreNLPServer.strip_non_printing_chars(t) for t in parts['lemmas']]
-            #     tree = document.meta['tree'][position]
-            #     document.meta['tree'][position] = StanfordCoreNLPServer.strip_non_printing_chars(tree)
 
             if document:
                 parts['stable_id'] = construct_stable_id(document, 'sentence', abs_sent_offset, abs_sent_offset_end)
