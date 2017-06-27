@@ -1,6 +1,9 @@
 import time
 from multiprocessing import Process, JoinableQueue
-from Queue import Empty
+try:
+    from queue import Empty
+except:
+    from Queue import Empty
 
 from .models.meta import new_sessionmaker, snorkel_conn_string
 from .utils import ProgressBar
@@ -28,7 +31,7 @@ class UDFRunner(object):
         """
         # Clear everything downstream of this UDF if requested
         if clear:
-            print "Clearing existing..."
+            print("Clearing existing...")
             SnorkelSession = new_sessionmaker()
             session = SnorkelSession()
             self.clear(session, **kwargs)
@@ -36,7 +39,7 @@ class UDFRunner(object):
             session.close()
 
         # Execute the UDF
-        print "Running UDF..."
+        print("Running UDF...")
         if parallelism is None or parallelism < 2:
             self.apply_st(xs, progress_bar, clear=clear, count=count, **kwargs)
         else:
