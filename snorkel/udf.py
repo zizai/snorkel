@@ -80,6 +80,7 @@ class UDFRunner(object):
         
     def apply_mt(self, xs, parallelism, **kwargs):
         """Run the UDF multi-threaded using python multiprocessing"""
+
         if snorkel_conn_string.startswith('sqlite'):
             raise ValueError('Multiprocessing with SQLite is not supported. Please use a different database backend,'
                              ' such as PostgreSQL.')

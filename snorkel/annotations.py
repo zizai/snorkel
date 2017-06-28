@@ -2,6 +2,7 @@ import numpy as np
 from pandas import DataFrame, Series
 import scipy.sparse as sparse
 from sqlalchemy.sql import bindparam, select
+from sqlalchemy.orm.query import Query
 import inspect
 
 from .features import get_span_feats
@@ -104,41 +105,45 @@ class Annotator(UDFRunner):
                                         annotation_key_class=annotation_key_class,
                                         f_gen=f_gen)
 
-    def apply(self, split, key_group=0, replace_key_set=True, **kwargs):
+    def apply(self, cand_gen, key_group=0, replace_key_set=True, **kwargs):
 
         # If we are replacing the key set, make sure the reducer key id cache is cleared!
         if replace_key_set:
             self.reducer.key_cache = {}
 
-        # Get the cids based on the split, and also the count
+        # Get the cids based on the cand_gen, and also the count
         SnorkelSession = new_sessionmaker()
         session        = SnorkelSession()
-        cids_query     = session.query(Candidate.id).filter(Candidate.split == split)
 
-        # Note: In the current UDFRunner implementation, we load all these into memory and fill a
-        # multiprocessing JoinableQueue with them before starting... so might as well load them here and pass in.
-        # Also, if we try to pass in a query iterator instead, with AUTOCOMMIT on, we get a TXN error...
-        cids       = cids_query.all()
+        cids = self._query_candidate_ids(session, cand_gen)
         cids_count = len(cids)
-        
+
         # Run the Annotator
-        super(Annotator, self).apply(cids, split=split, key_group=key_group, replace_key_set=replace_key_set, count=cids_count, **kwargs)
+        super(Annotator, self).apply(cids, cand_gen=cand_gen, key_group=key_group, replace_key_set=replace_key_set, count=cids_count, **kwargs)
 
         # Load the matrix
-        return self.load_matrix(session, split=split, key_group=key_group)
+        return self.load_matrix(session, cand_gen=cand_gen, key_group=key_group)
 
-    def clear(self, session, split, key_group, replace_key_set, **kwargs):
+    def clear(self, session, cand_gen, key_group, replace_key_set, **kwargs):
         """
         Deletes the Annotations for the Candidates in the given split.
         If replace_key_set=True, deletes *all* Annotations (of this Annotation sub-class)
         and also deletes all AnnotationKeys (of this sub-class)
         """
         query = session.query(self.annotation_class)
-        
+
         # If replace_key_set=False, then we just delete the annotations for candidates in our split
         if not replace_key_set:
-            sub_query = session.query(Candidate.id).filter(Candidate.split == split).subquery()
-            query     = query.filter(self.annotation_class.candidate_id.in_(sub_query))
+
+            if type(cand_gen) is int:
+                sub_query = session.query(Candidate.id).filter(Candidate.split == cand_gen).subquery()
+                query = query.filter(self.annotation_class.candidate_id.in_(sub_query))
+            elif type(cand_gen) is Query:
+                sub_query = cand_gen.subquery()
+                query = query.filter(self.annotation_class.candidate_id.in_(sub_query))
+            else:
+                query = query.filter(self.annotation_class.candidate_id.in_(cand_gen))
+
         query.delete(synchronize_session='fetch')
 
         # If we are creating a new key set, delete all old annotation keys
@@ -147,11 +152,35 @@ class Annotator(UDFRunner):
             query = query.filter(self.annotation_key_class.group == key_group)
             query.delete(synchronize_session='fetch')
 
-    def apply_existing(self, split, key_group=0, **kwargs):
-        """Alias for apply that emphasizes we are using an existing AnnotatorKey set."""
-        return self.apply(split, key_group=key_group, replace_key_set=False, **kwargs)
+    def _query_candidate_ids(self, session, cand_gen):
+        """
+        Build a set of candidates ids
+        :return:
+        """
+        if type(cand_gen) is int:
+            cids_query = session.query(Candidate.id).filter(Candidate.split == cand_gen)
 
-    def load_matrix(self, session, split, key_group=0, **kwargs):
+            # Note: In the current UDFRunner implementation, we load all these into memory and fill a
+            # multiprocessing JoinableQueue with them before starting... so might as well load them here and pass in.
+            # Also, if we try to pass in a query iterator instead, with AUTOCOMMIT on, we get a TXN error...
+            cids = cids_query.all()
+
+        elif type(cand_gen) is list:
+            cids = cand_gen
+
+        elif type(cand_gen) is Query:
+            cids = cand_gen.all()
+
+        else:
+            raise ValueError("cand_gen type not recognized")
+
+        return cids
+
+    def apply_existing(self, cand_gen, key_group=0, **kwargs):
+        """Alias for apply that emphasizes we are using an existing AnnotatorKey set."""
+        return self.apply(cand_gen, key_group=key_group, replace_key_set=False, **kwargs)
+
+    def load_matrix(self, session, cand_gen, key_group=0, **kwargs):
         raise NotImplementedError()
 
 
@@ -256,14 +285,24 @@ class AnnotatorUDF(UDF):
 
 
 def load_matrix(matrix_class, annotation_key_class, annotation_class, session,
-    split=0, key_group=0, key_names=None, zero_one=False, load_as_array=False):
+    cand_gen=0, key_group=0, key_names=None, zero_one=False, load_as_array=False):
     """
     Returns the annotations corresponding to a split of candidates with N members
     and an AnnotationKey group with M distinct keys as an N x M CSR sparse matrix.
     """
-    cid_query = session.query(Candidate.id)
-    cid_query = cid_query.filter(Candidate.split == split)
-    cid_query = cid_query.order_by(Candidate.id)
+
+    if type(cand_gen) is int:
+        cids_query = session.query(Candidate.id).filter(Candidate.split == cand_gen)
+        cand_gen = cids_query.order_by(Candidate.id).all()
+    elif type(cand_gen) is Query:
+        cand_gen = cand_gen.all()
+    elif type(list):
+        cand_gen = map(tuple,cand_gen)
+
+    # cid_query = session.query(Candidate.id)
+    # cid_query = cid_query.filter(Candidate.split == split)
+    # cid_query = cid_query.order_by(Candidate.id)
+    #cids = cand_gen
 
     keys_query = session.query(annotation_key_class.id)
     keys_query = keys_query.filter(annotation_key_class.group == key_group)
@@ -274,7 +313,7 @@ def load_matrix(matrix_class, annotation_key_class, annotation_class, session,
     # First, we query to construct the row index map
     cid_to_row = {}
     row_to_cid = {}
-    for cid, in cid_query.all():
+    for cid, in cand_gen: #cid_query.all():
         if cid not in cid_to_row:
             j = len(cid_to_row)
 
@@ -368,8 +407,8 @@ class LabelAnnotator(Annotator):
         
         super(LabelAnnotator, self).__init__(Label, LabelKey, f_gen)
 
-    def load_matrix(self, session, split, **kwargs):
-        return load_label_matrix(session, split=split, **kwargs)
+    def load_matrix(self, session, cand_gen, **kwargs):
+        return load_label_matrix(session, cand_gen=cand_gen, **kwargs)
 
         
 class FeatureAnnotator(Annotator):
@@ -377,8 +416,8 @@ class FeatureAnnotator(Annotator):
     def __init__(self, f=get_span_feats):
         super(FeatureAnnotator, self).__init__(Feature, FeatureKey, f)
 
-    def load_matrix(self, session, split, key_group=0, **kwargs):
-        return load_feature_matrix(session, split=split, key_group=key_group, **kwargs)
+    def load_matrix(self, session, cand_gen, key_group=0, **kwargs):
+        return load_feature_matrix(session, cand_gen=cand_gen, key_group=key_group, **kwargs)
 
 
 def save_marginals(session, X, marginals, training=True):
@@ -442,14 +481,15 @@ def save_marginals(session, X, marginals, training=True):
     print "Saved %s marginals" % len(marginals)
 
 
-def load_marginals(session, X, split=0, training=True):
+def load_marginals(session, X, cand_gen, training=True):
     """Load the marginal probs. for a given split of Candidates"""
     # Load marginal tuples from db
     marginal_tuples = session.query(
         Marginal.candidate_id,
         Marginal.value,
         Marginal.probability
-    ).filter(Candidate.split == split).\
+    #).filter(Candidate.split == split). \
+    ).filter(Candidate.id.in_(cand_gen)). \
     filter(Marginal.training == training).all()
 
     # Assemble cols 1,...,K of marginals matrix
