@@ -151,17 +151,12 @@ def candidate_subclass(class_name, args, table_name=None, cardinality=None,
         # Canonical ids, to be set post-entity normalization stage
         class_attribs[arg + '_cid'] = Column(String)
 
-<<<<<<< HEAD
-
-    class_attribs['__table_args__'] = (UniqueConstraint(*unique_con_args),)
-=======
     # Add unique constraints to the arguments
     class_attribs['__table_args__'] = (
         UniqueConstraint(*unique_args),
         # Note: This still doesn't fix issue...
         {'keep_existing' : True}
     )
->>>>>>> tf-hooks-update
 
     # Create class
     C = type(class_name, (Candidate,), class_attribs)
