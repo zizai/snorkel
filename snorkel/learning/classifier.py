@@ -25,8 +25,8 @@ class Classifier(object):
         if self.cardinality > 2:
             return self.marginals(X).argmax(axis=1) + 1
         else:
-            return np.array([1 if p > b else -1 if p < b else 0 
-                for p in self.marginals(X)])
+            return np.array([1 if p > b else -1 if p < b else 0
+                             for p in self.marginals(X)])
 
     def score(self, X_test, Y_test, b=0.5, set_unlabeled_as_neg=True):
         """
@@ -61,7 +61,7 @@ class Classifier(object):
             else:
                 predictions = predictions[Y_test != 0]
                 Y_test = Y_test[Y_test != 0]
-            
+
             # Compute and return precision, recall, and F1 score
             tp = (0.5 * (predictions * Y_test + 1))[predictions == 1].sum()
             precision = tp / predictions[predictions == 1].sum()
@@ -69,9 +69,9 @@ class Classifier(object):
             f1 = (2 * precision * recall) / (precision + recall)
             return precision, recall, f1
 
-    def error_analysis(self, session, X_test, Y_test, 
-        gold_candidate_set=None, b=0.5, set_unlabeled_as_neg=True, display=True,
-        scorer=MentionScorer, **kwargs):
+    def error_analysis(self, session, X_test, Y_test,
+                       gold_candidate_set=None, b=0.5, set_unlabeled_as_neg=True, display=True,
+                       scorer=MentionScorer, **kwargs):
         """
         Prints full score analysis using the Scorer class, and then returns the
         a tuple of sets conatining the test candidates bucketed for error 
@@ -95,9 +95,9 @@ class Classifier(object):
         ] if not self.representation else X_test
 
         # Initialize and return scorer
-        s = scorer(test_candidates, Y_test, gold_candidate_set)          
+        s = scorer(test_candidates, Y_test, gold_candidate_set)
         return s.score(test_marginals, train_marginals=None, b=b,
-            display=display, set_unlabeled_as_neg=set_unlabeled_as_neg)
+                       display=display, set_unlabeled_as_neg=set_unlabeled_as_neg)
 
     def save(self):
         raise NotImplementedError()

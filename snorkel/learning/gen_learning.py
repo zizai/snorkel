@@ -18,6 +18,7 @@ DEP_FIXING = 1
 DEP_REINFORCING = 2
 DEP_EXCLUSIVE = 3
 
+
 class GenerativeModel(Classifier):
     """
     A generative model for data programming for binary classification.
@@ -32,8 +33,9 @@ class GenerativeModel(Classifier):
         function propensity factors
     :param seed: seed for initializing state of Numbskull variables
     """
+
     def __init__(self, class_prior=False, lf_prior=False, lf_propensity=False,
-        lf_class_propensity=False, seed=271828):
+                 lf_class_propensity=False, seed=271828):
 
         try:
             numbskull_version = numbskull.__version__
@@ -43,7 +45,8 @@ class GenerativeModel(Classifier):
 
         if StrictVersion(numbskull_version) < StrictVersion(numbskull_require):
             raise ValueError(
-                "Snorkel requires Numbskull version %s, but version %s is installed." % (numbskull_require, numbskull_version))
+                "Snorkel requires Numbskull version %s, but version %s is installed." % (
+                numbskull_require, numbskull_version))
 
         self.class_prior = class_prior
         self.lf_prior = lf_prior
@@ -68,10 +71,10 @@ class GenerativeModel(Classifier):
     )
 
     def train(self, L, deps=(), LF_acc_prior_weights=None,
-        LF_acc_prior_weight_default=1, labels=None, label_prior_weight=5,
-        init_deps=0.0, init_class_prior=-1.0, epochs=30, step_size=None, 
-        decay=1.0, reg_param=0.1, reg_type=2, verbose=False, truncation=10, 
-        burn_in=5, cardinality=None, timer=None, candidate_ranges=None):
+              LF_acc_prior_weight_default=1, labels=None, label_prior_weight=5,
+              init_deps=0.0, init_class_prior=-1.0, epochs=30, step_size=None,
+              decay=1.0, reg_param=0.1, reg_type=2, verbose=False, truncation=10,
+              burn_in=5, cardinality=None, timer=None, candidate_ranges=None):
         """
         Fits the parameters of the model to a data set. By default, learns a
         conditionally independent model. Additional unary dependencies can be
@@ -124,7 +127,7 @@ class GenerativeModel(Classifier):
         reg_param_scaled = reg_param / L.shape[0]
 
         # Check to make sure matrix is int-valued
-        element_type = type(L[0,0])
+        element_type = type(L[0, 0])
         if not element_type in [np.int64, np.int32, int]:
             raise ValueError("""Label matrix must have int-type elements, 
                 but elements have type %s""" % element_type)
@@ -222,14 +225,14 @@ class GenerativeModel(Classifier):
             L, init_deps, init_class_prior, LF_acc_prior_weights, is_fixed, self.cardinalities)
         fg = NumbSkull(
             n_inference_epoch=0,
-            n_learning_epoch=epochs, 
+            n_learning_epoch=epochs,
             stepsize=step_size,
             decay=decay,
             reg_param=reg_param_scaled,
             regularization=reg_type,
             truncation=truncation,
             quiet=(not verbose),
-            verbose=verbose, 
+            verbose=verbose,
             learn_non_evidence=True,
             burn_in=burn_in
         )
@@ -248,10 +251,10 @@ class GenerativeModel(Classifier):
         else:
             self.cardinality_for_stats = self.cardinality
         self.learned_weights = fg.factorGraphs[0].weight_value
-        weight, variable, factor, ftv, domain_mask, n_edges =\
+        weight, variable, factor, ftv, domain_mask, n_edges = \
             self._compile(sparse.coo_matrix((1, n), L.dtype), init_deps,
-                init_class_prior, LF_acc_prior_weights, is_fixed,
-                [self.cardinality_for_stats])
+                          init_class_prior, LF_acc_prior_weights, is_fixed,
+                          [self.cardinality_for_stats])
 
         variable["isEvidence"] = False
         weight["isFixed"] = True
@@ -324,11 +327,11 @@ class GenerativeModel(Classifier):
                     "Recall": tp / count[i, 1, :].sum(),
                     "Accuracy": (tp + tn) / coverage,
                     "Coverage": coverage
-                    })
+                })
             else:
                 correct = sum([count[i, j, j] for j in range(cardinality)])
                 coverage = 1 - sum([count[i, j, cardinality]
-                    for j in range(cardinality)])
+                                    for j in range(cardinality)])
                 stats.append({
                     "Accuracy": correct / coverage,
                     "Coverage": coverage
@@ -372,14 +375,14 @@ class GenerativeModel(Classifier):
                 for l_index1 in range(l_i.nnz):
                     data_j, j = l_i.data[l_index1], l_i.col[l_index1]
                     if data_j == 1:
-                        logp_true  += self.weights.lf_accuracy[j]
+                        logp_true += self.weights.lf_accuracy[j]
                         logp_false -= self.weights.lf_accuracy[j]
-                        logp_true  += self.weights.lf_class_propensity[j]
+                        logp_true += self.weights.lf_class_propensity[j]
                         logp_false -= self.weights.lf_class_propensity[j]
                     elif data_j == -1:
-                        logp_true  -= self.weights.lf_accuracy[j]
+                        logp_true -= self.weights.lf_accuracy[j]
                         logp_false += self.weights.lf_accuracy[j]
-                        logp_true  += self.weights.lf_class_propensity[j]
+                        logp_true += self.weights.lf_class_propensity[j]
                         logp_false -= self.weights.lf_class_propensity[j]
                     else:
                         ValueError("""Illegal value at %d, %d: %d.
@@ -421,7 +424,7 @@ class GenerativeModel(Classifier):
                         # for categoricals
                         marginals[int(data_j - 1)] += \
                             2 * self.weights.lf_accuracy[j]
-                            
+
                 # NB: fixing and reinforcing not available for categoricals
                 # Get softmax
                 exps = np.exp(marginals)
@@ -434,7 +437,7 @@ class GenerativeModel(Classifier):
                 M = sparse.coo_matrix((m, self.cardinality), dtype=np.float64)
                 for i, marginals in enumerate(all_marginals):
                     for j, p in enumerate(marginals):
-                        M[i, self.mappings[j-1]] = p
+                        M[i, self.mappings[j - 1]] = p
             else:
                 M = np.vstack(all_marginals)
             return M
@@ -446,8 +449,8 @@ class GenerativeModel(Classifier):
         test_candidates = [X_test.get_candidate(session, i) for i in xrange(X_test.shape[0])]
 
         # Initialize scorer
-        s               = scorer(test_candidates, test_labels, gold_candidate_set)
-        test_marginals  = self.marginals(X_test, **kwargs)
+        s = scorer(test_candidates, test_labels, gold_candidate_set)
+        test_marginals = self.marginals(X_test, **kwargs)
 
         return s.score(test_marginals, train_marginals=None, b=b,
                        set_unlabeled_as_neg=set_unlabeled_as_neg, display=display)
@@ -582,7 +585,7 @@ class GenerativeModel(Classifier):
                 variable[index]["isEvidence"] = 1
                 variable[index]["dataType"] = 0
                 variable[index]["cardinality"] = cardinalities[i] + 1
-                
+
                 # Default to abstain
                 variable[index]["initialValue"] = cardinalities[i]
 
@@ -640,8 +643,10 @@ class GenerativeModel(Classifier):
 
         # Factors over labeling function outputs
         nfactors_for_lf = [(int(self.hasPrior[i]) + int(not is_fixed[i])) for i in range(n)]
-        f_off, ftv_off, w_off = self._compile_output_factors(L, factor, f_off, ftv, ftv_off, w_off, "DP_GEN_LF_ACCURACY",
-                                                             (lambda m, n, i, j: i, lambda m, n, i, j: m + n * i + j), nfactors_for_lf)
+        f_off, ftv_off, w_off = self._compile_output_factors(L, factor, f_off, ftv, ftv_off, w_off,
+                                                             "DP_GEN_LF_ACCURACY",
+                                                             (lambda m, n, i, j: i, lambda m, n, i, j: m + n * i + j),
+                                                             nfactors_for_lf)
 
         optional_name_map = {
             'lf_prior':
@@ -694,15 +699,17 @@ class GenerativeModel(Classifier):
                     raise NotImplementedError(
                         dep_name + " not implemented for categorical classes.")
                 for i in range(len(mat.data)):
-                    f_off, ftv_off, w_off = self._compile_dep_factors(L, factor, 
-                        f_off, ftv, ftv_off, w_off, mat.row[i], mat.col[i],
-                        dep_name_map[dep_name][0], dep_name_map[dep_name][1])
+                    f_off, ftv_off, w_off = self._compile_dep_factors(L, factor,
+                                                                      f_off, ftv, ftv_off, w_off, mat.row[i],
+                                                                      mat.col[i],
+                                                                      dep_name_map[dep_name][0],
+                                                                      dep_name_map[dep_name][1])
 
         return weight, variable, factor, ftv, domain_mask, n_edges
 
-    def _compile_output_factors(self, L, factors, factors_offset, ftv, 
-        ftv_offset, weight_offset, factor_name, vid_funcs,
-        nfactors_for_lf=None):
+    def _compile_output_factors(self, L, factors, factors_offset, ftv,
+                                ftv_offset, weight_offset, factor_name, vid_funcs,
+                                nfactors_for_lf=None):
         """
         Compiles factors over the outputs of labeling functions, i.e., for which
         there is one weight per labeling function and one factor per labeling 
@@ -734,7 +741,8 @@ class GenerativeModel(Classifier):
 
         return factors_index, ftv_index, w_off
 
-    def _compile_dep_factors(self, L, factors, factors_offset, ftv, ftv_offset, weight_offset, j, k, factor_name, vid_funcs):
+    def _compile_dep_factors(self, L, factors, factors_offset, ftv, ftv_offset, weight_offset, j, k, factor_name,
+                             vid_funcs):
         """
         Compiles factors for dependencies between pairs of labeling functions (possibly also depending on the latent
         class label).
@@ -799,7 +807,6 @@ class GenerativeModel(Classifier):
 
 
 class GenerativeModelWeights(object):
-
     def __init__(self, n):
         self.n = n
         self.class_prior = 0.0
@@ -853,12 +860,12 @@ class GenerativeModelWeights(object):
 ###
 class NaiveBayes(NoiseAwareModel):
     def __init__(self, bias_term=False):
-        self.w         = None
+        self.w = None
         self.bias_term = bias_term
 
     def train(self, X, n_iter=1000, w0=None, rate=0.01, alpha=0.5, mu=1e-6,
-            sample=False, n_samples=100, evidence=None, warm_starts=False, 
-            tol=1e-6, verbose=True):
+              sample=False, n_samples=100, evidence=None, warm_starts=False,
+              tol=1e-6, verbose=True):
         """
         Perform SGD wrt the weights w
         * n_iter:      Number of steps of SGD
@@ -875,14 +882,14 @@ class NaiveBayes(NoiseAwareModel):
         self.X_train = X
 
         # Set up stuff
-        N, M   = X.shape
-        print "="*80
+        N, M = X.shape
+        print "=" * 80
         print "Training marginals (!= 0.5):\t%s" % N
         print "Features:\t\t\t%s" % M
-        print "="*80
-        Xt     = X.transpose()
+        print "=" * 80
+        Xt = X.transpose()
         Xt_abs = sparse_abs(Xt) if sparse.issparse(Xt) else np.abs(Xt)
-        w0     = w0 if w0 is not None else np.ones(M)
+        w0 = w0 if w0 is not None else np.ones(M)
 
         # Initialize training
         w = w0.copy()
@@ -896,20 +903,20 @@ class NaiveBayes(NoiseAwareModel):
         for step in range(n_iter):
 
             # Get the expected LF accuracy
-            t,f = sample_data(X, w, n_samples=n_samples) if sample else exact_data(X, w, evidence)
+            t, f = sample_data(X, w, n_samples=n_samples) if sample else exact_data(X, w, evidence)
             p_correct, n_pred = transform_sample_stats(Xt, t, f, Xt_abs)
 
             # Get the "empirical log odds"; NB: this assumes one is correct, clamp is for sampling...
             l = np.clip(log_odds(p_correct), -10, 10)
 
             # SGD step with normalization by the number of samples
-            g0 = (n_pred*(w - l)) / np.sum(n_pred)
+            g0 = (n_pred * (w - l)) / np.sum(n_pred)
 
             # Momentum term for faster training
-            g = 0.95*g0 + 0.05*g
+            g = 0.95 * g0 + 0.05 * g
 
             # Check for convergence
-            wn     = np.linalg.norm(w, ord=2)
+            wn = np.linalg.norm(w, ord=2)
             g_size = np.linalg.norm(g, ord=2)
             if step % 250 == 0 and verbose:
                 print "\tLearning epoch = {}\tGradient mag. = {:.6f}".format(step, g_size)
@@ -922,12 +929,12 @@ class NaiveBayes(NoiseAwareModel):
             w -= rate * g
 
             # Apply elastic net penalty
-            w_bias    = w[-1]
-            soft      = np.abs(w) - mu
-            ridge_pen = (1 + (1-alpha) * mu)
+            w_bias = w[-1]
+            soft = np.abs(w) - mu
+            ridge_pen = (1 + (1 - alpha) * mu)
 
             #          \ell_1 penalty by soft thresholding        |  \ell_2 penalty
-            w = (np.sign(w)*np.select([soft>0], [soft], default=0)) / ridge_pen
+            w = (np.sign(w) * np.select([soft > 0], [soft], default=0)) / ridge_pen
 
             # Don't regularize the bias term
             if self.bias_term:
