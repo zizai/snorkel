@@ -10,7 +10,7 @@ from ...parser import TextDocPreprocessor, CorpusParser
 from ...models import Candidate, StableLabel, Document, TemporarySpan, Sentence, candidate_subclass, GoldLabel
 
 
-class Brat(object):
+class BratProject(object):
     """
     Snorkel Import/Export for
     Brat Rapid Annotation Tool

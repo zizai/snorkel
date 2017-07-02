@@ -94,7 +94,7 @@ class StanfordCoreNLPServer(Parser):
         if self.verbose:
             self.summary()
 
-    def _start_server(self,force_load=False):
+    def _start_server(self, force_load=False):
         '''
         Launch CoreNLP server
         :param force_load:  Force server to pre-load models vs. on-demand
