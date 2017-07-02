@@ -43,8 +43,8 @@ class LogisticRegression(TFNoiseAwareModel):
         @l1_penalty: L1 reg. coefficient
         @l2_penalty: L2 reg. coefficient
         """
-        super(LogisticRegression, self)._build_training_ops()
-
+        super(LogisticRegression, self)._build_training_ops()   
+        
         # Add L1 and L2 penalties
         if l1_penalty > 0:
             self.loss += l1_penalty * tf.reduce_sum(tf.abs(self.w))
@@ -74,12 +74,12 @@ class SparseLogisticRegression(LogisticRegression):
 
     def _build_model(self, d=None, **kwargs):
         # Define sparse input placeholders + sparse tensors
-        self.indices = tf.placeholder(tf.int64)
-        self.shape = tf.placeholder(tf.int64, (2,))
-        self.ids = tf.placeholder(tf.int64)
+        self.indices = tf.placeholder(tf.int64) 
+        self.shape   = tf.placeholder(tf.int64, (2,))
+        self.ids     = tf.placeholder(tf.int64)
         self.weights = tf.placeholder(tf.float32)
-        sparse_ids = tf.SparseTensor(self.indices, self.ids, self.shape)
-        sparse_vals = tf.SparseTensor(self.indices, self.weights, self.shape)
+        sparse_ids   = tf.SparseTensor(self.indices, self.ids, self.shape)
+        sparse_vals  = tf.SparseTensor(self.indices, self.weights, self.shape)
         self.Y = tf.placeholder(tf.float32, (None, self.cardinality)) \
             if self.cardinality > 2 else tf.placeholder(tf.float32, (None,))
 
@@ -89,7 +89,7 @@ class SparseLogisticRegression(LogisticRegression):
         self.w = tf.Variable(tf.random_normal((self.d, k), stddev=SD, seed=s1))
         self.b = tf.Variable(tf.random_normal((k,), stddev=SD, seed=s2))
         z = tf.nn.embedding_lookup_sparse(params=self.w, sp_ids=sparse_ids,
-                                          sp_weights=sparse_vals, combiner='sum')
+            sp_weights=sparse_vals, combiner='sum')
         self.logits = tf.nn.bias_add(z, self.b)
         if self.cardinality == 2:
             self.logits = tf.squeeze(self.logits)
@@ -133,11 +133,11 @@ class SparseLogisticRegression(LogisticRegression):
         indices, shape, ids, weights = self._batch_sparse_data(X_b)
         return {
             self.indices: indices,
-            self.shape: shape,
-            self.ids: ids,
+            self.shape:   shape,
+            self.ids:     ids,
             self.weights: weights,
-            self.Y: Y_b,
-            self.lr: lr
+            self.Y:       Y_b,
+            self.lr:      lr
         }
 
     def marginals(self, X_test):
@@ -147,7 +147,7 @@ class SparseLogisticRegression(LogisticRegression):
         indices, shape, ids, weights = self._batch_sparse_data(X_test)
         return self.session.run(self.marginals_op, {
             self.indices: indices,
-            self.shape: shape,
-            self.ids: ids,
+            self.shape:   shape,
+            self.ids:     ids,
             self.weights: weights
         })
