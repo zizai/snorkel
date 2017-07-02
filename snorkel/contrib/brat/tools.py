@@ -10,11 +10,7 @@ from ...parser import TextDocPreprocessor, CorpusParser
 from ...models import Candidate, StableLabel, Document, TemporarySpan, Sentence, candidate_subclass, GoldLabel
 
 
-<<<<<<< f4ff68cae148c73cecc7ab7dedca1578abfcc304
 class BratProject(object):
-=======
-class Brat(object):
->>>>>>> added brat demo notebooks
     """
     Snorkel Import/Export for
     Brat Rapid Annotation Tool
@@ -53,11 +49,7 @@ class Brat(object):
     NORM_ID = 'N'
     NOTE_ID = '#'
 
-<<<<<<< f4ff68cae148c73cecc7ab7dedca1578abfcc304
-    def __init__(self, session, tmpl_path='annotation.config.tmpl', encoding="utf-8", verbose=True):
-=======
     def __init__(self, session, tmpl_path='tmpl.config', encoding="utf-8", verbose=True):
->>>>>>> added brat demo notebooks
         """
         Initialize BRAT import tools.
         :param session:
