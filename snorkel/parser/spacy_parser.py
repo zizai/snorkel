@@ -10,6 +10,7 @@ try:
 except:
     raise Exception("spaCy not installed. Use `pip install spacy`.")
 
+
 class Spacy(Parser):
     '''
     spaCy
@@ -57,8 +58,6 @@ class Spacy(Parser):
     def model_installed(name):
         '''
         Check if spaCy language model is installed
-        lang_name = util.get_lang_class(name).lang
-
         :param name:
         :return:
         '''
@@ -66,6 +65,7 @@ class Spacy(Parser):
         model_name = resolve_model_name(name)
         model_path = data_path / model_name
         return model_path.exists()
+
 
     @staticmethod
     def load_lang_model(lang):
@@ -86,6 +86,7 @@ class Spacy(Parser):
         if not Spacy.model_installed(lang):
             download(lang)
         return spacy.load(lang)
+
 
     def connect(self):
         return ParserConnection(self)
