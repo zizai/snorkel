@@ -2,7 +2,6 @@ import numpy as np
 from pandas import DataFrame, Series
 import scipy.sparse as sparse
 from sqlalchemy.sql import bindparam, select
-import inspect
 
 from .features import get_span_feats
 from .models import (
@@ -90,7 +89,8 @@ class csr_LabelMatrix(csr_AnnotationMatrix):
 
         if est_accs is not None:
             col_names.append('Learned Acc.')
-            d['Learned Acc.'] = Series(data=est_accs, index=lf_names)
+            d['Learned Acc.'] = est_accs
+            d['Learned Acc.'].index = lf_names
         return DataFrame(data=d, index=lf_names)[col_names]
 
 
@@ -442,21 +442,45 @@ def save_marginals(session, X, marginals, training=True):
     print "Saved %s marginals" % len(marginals)
 
 
-def load_marginals(session, X, split=0, training=True):
+def load_marginals(session, X=None, split=0, training=True):
     """Load the marginal probs. for a given split of Candidates"""
+
     # Load marginal tuples from db
     marginal_tuples = session.query(
         Marginal.candidate_id,
         Marginal.value,
         Marginal.probability
-    ).filter(Candidate.split == split).\
-    filter(Marginal.training == training).all()
+    ).join(Candidate)\
+        .filter(Candidate.split == split)\
+        .filter(Marginal.training == training).all()
 
     # Assemble cols 1,...,K of marginals matrix
-    cardinality = X.get_candidate(session, 0).cardinality
-    marginals = np.zeros((X.shape[0], cardinality))
-    for cid, k, p in marginal_tuples:
-        marginals[X.candidate_index[cid], k] = p
+    if X is not None:
+        # For now, handle feature matrix vs. list of objects with try / except
+        try:
+            cardinality = X.get_candidate(session, 0).cardinality
+            marginals = np.zeros((X.shape[0], cardinality))
+            for cid, k, p in marginal_tuples:
+                marginals[X.candidate_index[cid], k] = p
+        except:
+            cardinality = X[0].cardinality
+            marginals = np.zeros((len(X), cardinality))
+            candidate_index = dict([(x.id, i) for i, x in enumerate(X)])
+            for cid, k, p in marginal_tuples:
+                marginals[candidate_index[cid], k] = p
+    else:
+        cardinality = session.query(Candidate).get(marginal_tuples[0][0]).cardinality
+
+        # Loads cid map
+        cids = session.query(Candidate.id).filter(Candidate.split == split)\
+                .order_by(Candidate.id).all()
+        cid_map = {}
+        for i, (cid,) in enumerate(cids):
+            cid_map[cid] = i
+
+        marginals = np.zeros((len(cid_map), cardinality))
+        for i, (cid, k, p) in enumerate(marginal_tuples):
+            marginals[cid_map[cid], k] = p
 
     # Add first column if k > 2, else ravel
     if cardinality > 2:

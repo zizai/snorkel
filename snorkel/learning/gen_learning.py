@@ -1,4 +1,5 @@
 from .disc_learning import NoiseAwareModel
+from .classifier import Classifier
 from .utils import MentionScorer
 import numbskull
 from numbskull import NumbSkull
@@ -17,7 +18,7 @@ DEP_FIXING = 1
 DEP_REINFORCING = 2
 DEP_EXCLUSIVE = 3
 
-class GenerativeModel(object):
+class GenerativeModel(Classifier):
     """
     A generative model for data programming for binary classification.
 
@@ -70,7 +71,7 @@ class GenerativeModel(object):
         LF_acc_prior_weight_default=1, labels=None, label_prior_weight=5,
         init_deps=0.0, init_class_prior=-1.0, epochs=30, step_size=None, 
         decay=1.0, reg_param=0.1, reg_type=2, verbose=False, truncation=10, 
-        burn_in=5, cardinality=None, timer=None, candidate_ranges=None):
+        burn_in=5, cardinality=None, timer=None, candidate_ranges=None, threads=1):
         """
         Fits the parameters of the model to a data set. By default, learns a
         conditionally independent model. Additional unary dependencies can be
@@ -117,6 +118,7 @@ class GenerativeModel(object):
             candidates can take. If a label is outside of this range throws an
             error. If None, then each candidate can take any value from 0 to
             cardinality.
+        :param threads: the number of threads to use for sampling. Default is 1.
         """
         m, n = L.shape
         step_size = step_size or 0.0001
@@ -230,7 +232,8 @@ class GenerativeModel(object):
             quiet=(not verbose),
             verbose=verbose, 
             learn_non_evidence=True,
-            burn_in=burn_in
+            burn_in=burn_in,
+            nthreads=threads
         )
         fg.loadFactorGraph(weight, variable, factor, ftv, domain_mask, n_edges)
 

@@ -8,15 +8,14 @@ try:
     from spacy import util
     from spacy.deprecated import resolve_model_name
 except:
-    raise Exception("spacy not installed. Use `pip install spacy`.")
+    raise Exception("spaCy not installed. Use `pip install spacy`.")
+
 
 class Spacy(Parser):
     '''
     spaCy
     https://spacy.io/
 
-    Minimal (buggy) implementation to show how alternate parsers can
-    be added to Snorkel.
     Models for each target language needs to be downloaded using the
     following command:
 
@@ -65,10 +64,8 @@ class Spacy(Parser):
         data_path = util.get_data_path()
         model_name = resolve_model_name(name)
         model_path = data_path / model_name
-        if not model_path.exists():
-            lang_name = util.get_lang_class(name).lang
-            return False
-        return True
+        return model_path.exists()
+
 
     @staticmethod
     def load_lang_model(lang):
@@ -86,15 +83,10 @@ class Spacy(Parser):
         :param lang:
         :return:
         '''
-        if Spacy.model_installed(lang):
-            print "Model installed", lang
-            model = spacy.load(lang)
-        else:
-            print "download"
+        if not Spacy.model_installed(lang):
             download(lang)
-            print "?"
-            model = spacy.load(lang)
-        return model
+        return spacy.load(lang)
+
 
     def connect(self):
         return ParserConnection(self)

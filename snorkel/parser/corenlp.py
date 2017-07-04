@@ -220,9 +220,6 @@ class StanfordCoreNLPServer(Parser):
             content = conn.post(self.endpoint, text)
             content = content.decode(self.encoding)
 
-            if self.logging:
-                logger.info('{} {}'.format(document.name, len(text)))
-
         except socket.error, e:
             print>>sys.stderr,"Socket error"
             raise ValueError("Socket Error")
@@ -233,8 +230,8 @@ class StanfordCoreNLPServer(Parser):
         try:
             blocks = json.loads(content, strict=False)['sentences']
         except:
-            warnings.warn("CoreNLP skipped a malformed document.\n{}".format(text), RuntimeWarning)
-            return
+            warnings.warn("CoreNLP skipped a malformed document.", RuntimeWarning)
+
 
         position = 0
         for block in blocks:
