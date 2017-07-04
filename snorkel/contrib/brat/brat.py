@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import codecs
 import shutil
@@ -239,7 +240,12 @@ class BratAnnotator(object):
             rel_type = str(stype.type).rstrip(".type")
             arg_types = [key.rstrip("_id") for key in stype.__dict__ if "_id" in key]
             arg_types = [name[0].upper()+name[1:] for name in arg_types]
-            entity_defs.extend(arg_types)
+
+            # HACK: Assume all args that differ by just a number are
+            # of the same type, e.g., person1, person2
+            arg_types = [re.sub("\d+$", "", name) for name in arg_types]
+
+            entity_defs.extend(set(arg_types))
             if len(arg_types) > 1:
                 rela_name = [str(stype.type).replace(".type","")] + arg_types
                 rela_defs.append("{}\tArg1:{}, Arg2:{}".format(*rela_name))
