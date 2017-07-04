@@ -1,5 +1,4 @@
 import os
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
 import re
 import sys
 import glob
@@ -17,36 +16,18 @@ from collections import defaultdict
 from IPython.display import IFrame, display, HTML
 from ...models import Span, Candidate, Document, Sentence, TemporarySpan, GoldLabel, GoldLabelKey
 from ...learning.utils import print_scores
-=======
-import sys
-import codecs
-import shutil
-import signal
-import tarfile
-import subprocess
-
-from .utils import download
-from IPython.display import IFrame, display, HTML
-from ...models import Span, Candidate, Document, Sentence
-
->>>>>>> Integrated BRAT annotator interface
 
 class BratAnnotator(object):
     """
-    Snorkel Interface fo
+    Snorkel Interface for
     Brat Rapid Annotation Tool
     http://brat.nlplab.org/
 
     This implements a minimal interface for annotating simple relation pairs and their entities.
 
     """
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
     def __init__(self, session, candidate_class, encoding="utf-8",
                  annotator_name='brat', address='localhost', port=8001):
-=======
-    def __init__(self, session, candidate_class, tmpl_path='tmpl.config', encoding="utf-8",
-                 address='localhost', port=8001):
->>>>>>> Integrated BRAT annotator interface
         """
         Begin BRAT session by:
         - checking that all app files are downloaded
@@ -68,7 +49,6 @@ class BratAnnotator(object):
         self.brat_root = 'brat-v1.3_Crunchy_Frog'
         self.data_root = "{}/{}/data".format(self.path, self.brat_root)
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         self.standoff_parser = StandoffAnnotations(encoding=self.encoding)
 
         # setup snorkel annotator object
@@ -77,22 +57,13 @@ class BratAnnotator(object):
             self.annotator = GoldLabelKey(name=annotator_name)
             self.session.add(self.annotator)
             self.session.commit()
-=======
-        # load brat annotation config template
-        mod_path = "{}/{}".format(os.path.abspath(os.path.dirname(__file__)), tmpl_path)
-        self.config_tmpl = "".join(open(mod_path, "rU").readlines())
->>>>>>> Integrated BRAT annotator interface
 
         self._download()
         self.process_group = None
         self._start_server()
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
     def init_collection(self, annotation_dir, split=None, cid_query=None,
                         overwrite=False, errors='replace'):
-=======
-    def init_collection(self, doc_root, split=None, cid_query=None, overwrite=False):
->>>>>>> Integrated BRAT annotator interface
         """
         Initialize document collection on disk
 
@@ -104,15 +75,9 @@ class BratAnnotator(object):
         """
         assert split != None or cid_query != None
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         collection_path = "{}/{}".format(self.data_root, annotation_dir)
         if os.path.exists(collection_path) and not overwrite:
             msg = "Error! Collection at '{}' already exists. ".format(annotation_dir)
-=======
-        collection_path = "{}/{}".format(self.data_root, doc_root)
-        if os.path.exists(collection_path) and not overwrite:
-            msg = "Error! Collection at '{}' already exists.".format(doc_root)
->>>>>>> Integrated BRAT annotator interface
             msg += "Please set overwrite=True to erase all existing annotations.\n"
             sys.stderr.write(msg)
             return
@@ -120,22 +85,14 @@ class BratAnnotator(object):
         # remove existing annotations
         if os.path.exists(collection_path):
             shutil.rmtree(collection_path, ignore_errors=True)
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
             print("Removed existing collection at '{}'".format(annotation_dir))
-=======
-            print("Removed existing collection at '{}'".format(doc_root))
->>>>>>> Integrated BRAT annotator interface
 
         # create subquery based on candidate split
         if split != None:
             cid_query = self.session.query(Candidate.id).filter(Candidate.split == split).subquery()
 
         # generate all documents for this candidate set
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         doc_ids = get_doc_ids_by_query(self.session, self.candidate_class, cid_query)
-=======
-        doc_ids = get_doc_ids_by_split(self.session, self.candidate_class, cid_query)
->>>>>>> Integrated BRAT annotator interface
         documents = self.session.query(Document).filter(Document.id.in_(doc_ids)).all()
 
         # create collection on disk
@@ -144,7 +101,6 @@ class BratAnnotator(object):
         for doc in documents:
             text = doc_to_text(doc)
             outfpath = "{}/{}".format(collection_path, doc.name)
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
             with codecs.open(outfpath + ".txt","w", self.encoding, errors=errors) as fp:
                 fp.write(text)
             with codecs.open(outfpath + ".ann","w", self.encoding, errors=errors) as fp:
@@ -186,17 +142,6 @@ class BratAnnotator(object):
             shutil.rmtree(out_dir + "__MACOSX")
 
     def view(self, annotation_dir, document=None, new_window=True):
-=======
-            with open(outfpath + ".txt","w") as fp:
-                fp.write(text)
-            with open(outfpath + ".ann","w") as fp:
-                fp.write("")
-
-        # add minimal annotation.config based on candidate_subclass info
-        self._init_annotation_config(self.candidate_class, doc_root)
-
-    def view(self, doc_root, document=None, new_window=True):
->>>>>>> Integrated BRAT annotator interface
         """
         Launch web interface for Snorkel. The default mode launches a new window.
         This is preferred as we have limited control of default widget sizes,
@@ -216,11 +161,7 @@ class BratAnnotator(object):
         """
         # http://localhost:8001/index.xhtml#/pain/train/
         doc_name = document.name if document else ""
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         url = "http://{}:{}/index.xhtml#/{}/{}".format(self.address, self.port, annotation_dir, doc_name)
-=======
-        url = "http://{}:{}/index.xhtml#/{}/{}".format(self.address, self.port, doc_root, doc_name)
->>>>>>> Integrated BRAT annotator interface
 
         if new_window:
             # NOTE: if we use javascript, we need pop-ups enabled for a given browser
@@ -242,7 +183,6 @@ class BratAnnotator(object):
         display(HTML("<style>.container { width:100% !important; }</style>"))
         display(IFrame(url, width=width, height=height))
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
     def map_annotations(self, session, annotation_dir, candidates, symmetric_relations=True):
         """
         Import a collection of BRAT annotations,  map it onto the provided set
@@ -364,7 +304,7 @@ class BratAnnotator(object):
     def import_gold_labels(self, session, annotation_dir, candidates,
                            symmetric_relations=True,  annotator_name='brat'):
         """
-        We assume all candidates provided to this function are true instances
+
         :param session:
         :param candidates:
         :param annotator_name:
@@ -396,8 +336,6 @@ class BratAnnotator(object):
 
         print_scores(tp, fp, tn, fn + recall_correction, title=title)
 
-=======
->>>>>>> Integrated BRAT annotator interface
     def _close(self):
         '''
         Kill the process group linked with this server.
@@ -424,16 +362,6 @@ class BratAnnotator(object):
         url = "http://{}:{}".format(self.address, self.port)
         print("Launching BRAT server at {} [pid={}]...".format(url, self.process_group.pid))
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
-=======
-    def __del__(self):
-        '''
-        Clean-up this object by forcing the server process to shut-down
-        :return:
-        '''
-        self._close()
-
->>>>>>> Integrated BRAT annotator interface
     def _download(self):
         """
         Download and install latest version of BRAT
@@ -483,16 +411,11 @@ class BratAnnotator(object):
         """
         collection_path = "{}/{}".format(self.data_root, doc_root)
         # create config file
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         config = self.standoff_parser._create_config([candidate_class])
-=======
-        config = self._create_config([candidate_class])
->>>>>>> Integrated BRAT annotator interface
         config_path = "{}/annotation.conf".format(collection_path)
         with codecs.open(config_path, 'w', self.encoding) as fp:
             fp.write(config)
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
         # initalize tools config (this sets sentence tokenzation for visuzliation)
         shutil.copyfile("{}/templates/tools.conf".format(self.path),
                         "{}/tools.conf".format(collection_path))
@@ -522,7 +445,7 @@ class BratAnnotator(object):
 
     def _create_relations(self, document, annotations):
         """
-        Initalize temporary Span objects for all our named entity labels
+        Initialize temporary Span objects for all our named entity labels
         and then create lists of Span pairs for each relation label.
 
         :return:
@@ -711,8 +634,6 @@ class StandoffAnnotations(object):
             return name[0]
         name = map(lambda x: x.lower(), name)
         return "".join(map(lambda x: x[0].upper() + x[1:], name))
-=======
->>>>>>> Integrated BRAT annotator interface
 
     def _create_config(self, candidate_types):
         """
@@ -727,16 +648,12 @@ class StandoffAnnotations(object):
             rel_type = str(stype.type).rstrip(".type")
             arg_types = [key.rstrip("_id") for key in stype.__dict__ if "_id" in key]
             arg_types = [name[0].upper()+name[1:] for name in arg_types]
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
 
             # HACK: Assume all args that differ by just a number are
             # of the same type, e.g., person1, person2
             arg_types = [re.sub("\d+$", "", name) for name in arg_types]
 
             entity_defs.extend(set(arg_types))
-=======
-            entity_defs.extend(arg_types)
->>>>>>> Integrated BRAT annotator interface
             if len(arg_types) > 1:
                 rela_name = [str(stype.type).replace(".type","")] + arg_types
                 rela_defs.append("{}\tArg1:{}, Arg2:{}".format(*rela_name))
@@ -745,7 +662,6 @@ class StandoffAnnotations(object):
         rela_defs = set(rela_defs)
         return self.config_tmpl.format("\n".join(entity_defs), "\n".join(rela_defs), "", "")
 
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
     def _parse_config(self, filename):
         """
         Parse BRAT annotation.config
@@ -849,29 +765,10 @@ def doc_to_text(doc):
     Convert document object to original text represention.
     Assumes parser offsets map to original document offsets
 
-=======
-def get_doc_ids_by_split(session, candidate_class, cid_subquery):
-    '''
-    Given a candidate set split, return all corresponding parent document ids
-    '''
-    # TODO: better way to fetch argument id?
-    arg = [arg for arg in candidate_class.__dict__.keys() if "_id" in arg][0]
-
-    q1 = session.query(candidate_class.__dict__[arg]).filter(Candidate.id.in_(cid_subquery)).subquery()
-    q2 = session.query(Span.sentence_id).filter(Span.id.in_(q1)).subquery()
-    return session.query(Sentence.document_id).filter(Sentence.id.in_(q2)).distinct()
-
-
-def doc_to_text(doc, sent_delim='\n'):
-    """
-    Convert document object to original text represention.
-    Assumes parser offsets map to original document offsets
->>>>>>> Integrated BRAT annotator interface
     :param doc:
     :param sent_delim:
     :return:
     """
-<<<<<<< d4db5c93e10ff2fd679815e9f9c2f50ba48e58c8
     text = u""
     for i,sent in enumerate(doc.sentences):
         # setup padding so that BRAT displays a minimal amount of newlines
@@ -881,17 +778,3 @@ def doc_to_text(doc, sent_delim='\n'):
             text += ' ' * (padding - 1) + u"\n"
         text += sent.text.rstrip(u' \t\n\r')
     return text
-=======
-    text = []
-    for sent in doc.sentences:
-        offsets = map(int, sent.stable_id.split(":")[-2:])
-        char_start, char_end = offsets
-        text.append({"text": sent.text, "char_start": char_start, "char_end": char_end})
-
-    s = ""
-    for i in range(len(text) - 1):
-        gap = text[i + 1]['char_start'] - text[i]['char_end']
-        s += text[i]['text'] + (sent_delim * gap)
-
-    return s
->>>>>>> Integrated BRAT annotator interface
