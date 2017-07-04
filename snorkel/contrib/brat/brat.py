@@ -89,9 +89,9 @@ class BratAnnotator(object):
         for doc in documents:
             text = doc_to_text(doc)
             outfpath = "{}/{}".format(collection_path, doc.name)
-            with open(outfpath + ".txt","w") as fp:
+            with codecs.open(outfpath + ".txt","w", self.encoding, errors='ignore') as fp:
                 fp.write(text)
-            with open(outfpath + ".ann","w") as fp:
+            with codecs.open(outfpath + ".ann","w", self.encoding, errors='ignore') as fp:
                 fp.write("")
 
         # add minimal annotation.config based on candidate_subclass info
@@ -225,7 +225,6 @@ class BratAnnotator(object):
         config_path = "{}/annotation.conf".format(collection_path)
         with codecs.open(config_path, 'w', self.encoding) as fp:
             fp.write(config)
-
 
     def _create_config(self, candidate_types):
         """
