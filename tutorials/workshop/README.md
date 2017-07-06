@@ -1,8 +1,9 @@
-# Extracting Spouse Relations from the News
+# Day 1 Snorkel Workshop
+## Extracting Spouse Relations from the News
 
 In this tutorial, we will walk through the process of using Snorkel to identify mentions of
 spouses in a corpus of news articles.
-The tutorial is broken up into 5 notebooks, each covering a step in the pipeline:
+The tutorial is broken up into 4 notebooks, each covering a step in the pipeline, and 3 advanced notebooks covering more 
 
 1. **Preprocessing [[Intro_Tutorial_1](Intro_Tutorial_1.ipynb)]:**
 First we parse the raw input documents into _contexts_ (documents, sentences), and extract
