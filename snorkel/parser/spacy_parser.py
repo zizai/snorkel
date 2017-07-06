@@ -8,7 +8,8 @@ try:
     from spacy import util
     from spacy.deprecated import resolve_model_name
 except:
-    raise Exception("spacy not installed. Use `pip install spacy`.")
+    raise Exception("spaCy not installed. Use `pip install spacy`.")
+
 
 class Spacy(Parser):
     '''
