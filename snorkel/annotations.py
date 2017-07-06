@@ -2,6 +2,8 @@ import numpy as np
 from pandas import DataFrame, Series
 import scipy.sparse as sparse
 from sqlalchemy.sql import bindparam, select
+import cloud
+from time import strftime
 
 from .features import get_span_feats
 from .models import (
@@ -19,7 +21,7 @@ from .utils import (
     matrix_fn,
     matrix_tn
 )
-from future.utils import iteritems
+
 
 class csr_AnnotationMatrix(sparse.csr_matrix):
     """
@@ -40,7 +42,7 @@ class csr_AnnotationMatrix(sparse.csr_matrix):
     def get_candidate(self, session, i):
         """Return the Candidate object corresponding to row i"""
         return session.query(Candidate).filter(Candidate.id == self.row_index[i]).one()
-
+    
     def get_row_index(self, candidate):
         """Return the row index of the Candidate"""
         return self.candidate_index[candidate.id]
@@ -94,100 +96,100 @@ class csr_AnnotationMatrix(sparse.csr_matrix):
         raise NotImplementedError()
 
 
-try:
-    class csr_LabelMatrix(csr_AnnotationMatrix):
+class csr_LabelMatrix(csr_AnnotationMatrix):
 
-        def lf_stats(self, session, labels=None, est_accs=None):
-            """Returns a pandas DataFrame with the LFs and various per-LF statistics"""
-            lf_names = [self.get_key(session, j).name for j in range(self.shape[1])]
+    def lf_stats(self, session, labels=None, est_accs=None):
+        """Returns a pandas DataFrame with the LFs and various per-LF statistics"""
+        lf_names = [self.get_key(session, j).name for j in range(self.shape[1])]
 
-            # Default LF stats
-            col_names = ['j', 'Coverage', 'Overlaps', 'Conflicts']
-            d = {
-                'j'         : range(self.shape[1]),
-                'Coverage'  : Series(data=matrix_coverage(self), index=lf_names),
-                'Overlaps'  : Series(data=matrix_overlaps(self), index=lf_names),
-                'Conflicts' : Series(data=matrix_conflicts(self), index=lf_names)
-            }
-            if labels is not None:
-                col_names.extend(['TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
-                ls = np.ravel(labels.todense() if sparse.issparse(labels) else labels)
-                tp = matrix_tp(self, ls)
-                fp = matrix_fp(self, ls)
-                fn = matrix_fn(self, ls)
-                tn = matrix_tn(self, ls)
-                ac = (tp+tn).astype(float) / (tp+tn+fp+fn)
-                d['Empirical Acc.'] = Series(data=ac, index=lf_names)
-                d['TP']             = Series(data=tp, index=lf_names)
-                d['FP']             = Series(data=fp, index=lf_names)
-                d['FN']             = Series(data=fn, index=lf_names)
-                d['TN']             = Series(data=tn, index=lf_names)
+        # Default LF stats
+        col_names = ['j', 'Coverage', 'Overlaps', 'Conflicts']
+        d = {
+            'j'         : range(self.shape[1]),
+            'Coverage'  : Series(data=matrix_coverage(self), index=lf_names),
+            'Overlaps'  : Series(data=matrix_overlaps(self), index=lf_names),
+            'Conflicts' : Series(data=matrix_conflicts(self), index=lf_names)
+        }
+        if labels is not None:
+            col_names.extend(['TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
+            ls = np.ravel(labels.todense() if sparse.issparse(labels) else labels)
+            tp = matrix_tp(self, ls)
+            fp = matrix_fp(self, ls)
+            fn = matrix_fn(self, ls)
+            tn = matrix_tn(self, ls)
+            ac = (tp+tn).astype(float) / (tp+tn+fp+fn)
+            d['Empirical Acc.'] = Series(data=ac, index=lf_names)
+            d['TP']             = Series(data=tp, index=lf_names)
+            d['FP']             = Series(data=fp, index=lf_names)
+            d['FN']             = Series(data=fn, index=lf_names)
+            d['TN']             = Series(data=tn, index=lf_names)
 
-            if est_accs is not None:
-                col_names.append('Learned Acc.')
-                d['Learned Acc.'] = est_accs
-                d['Learned Acc.'].index = lf_names
-            return DataFrame(data=d, index=lf_names)[col_names]
-
-# This is a hack for getting the documentation to build...
-except:
-    class csr_LabelMatrix(object):
-        def lf_stats(self, session, labels=None, est_accs=None):
-            return None
+        if est_accs is not None:
+            col_names.append('Learned Acc.')
+            d['Learned Acc.'] = Series(data=est_accs, index=lf_names)
+        return DataFrame(data=d, index=lf_names)[col_names]
 
 
 class Annotator(UDFRunner):
     """Abstract class for annotating candidates and persisting these annotations to DB"""
-    def __init__(self, annotation_class, annotation_key_class, f_gen):
+    def __init__(self, annotation_class, annotation_key_class):
         self.annotation_class     = annotation_class
         self.annotation_key_class = annotation_key_class
         super(Annotator, self).__init__(AnnotatorUDF,
                                         annotation_class=annotation_class,
-                                        annotation_key_class=annotation_key_class,
-                                        f_gen=f_gen)
+                                        annotation_key_class=annotation_key_class)
 
-    def apply(self, split=0, key_group=0, replace_key_set=True, cids_query=None,
-        **kwargs):
+    def apply(self, split, annotation_generator=None, key_group=0, 
+        replace_key_set=True, **kwargs):
+        """
+        Executes the candidate ids query, then runs AnnotatorUDF(s), passing
+        along :param annotation_generator: as kwarg in UDFRunner.apply call.
+
+        Note that annotation_generator can be configured / compiled in a
+        sub-class.
+        """
+
         # If we are replacing the key set, make sure the reducer key id cache is cleared!
         if replace_key_set:
             self.reducer.key_cache = {}
 
         # Get the cids based on the split, and also the count
         SnorkelSession = new_sessionmaker()
-        session = SnorkelSession()
-        cids_query = cids_query or session.query(Candidate.id)\
-                                          .filter(Candidate.split == split)
+        session        = SnorkelSession()
+        cids_query     = session.query(Candidate.id).filter(Candidate.split == split)
 
         # Note: In the current UDFRunner implementation, we load all these into memory and fill a
         # multiprocessing JoinableQueue with them before starting... so might as well load them here and pass in.
         # Also, if we try to pass in a query iterator instead, with AUTOCOMMIT on, we get a TXN error...
         cids       = cids_query.all()
         cids_count = len(cids)
-
+        
         # Run the Annotator
-        super(Annotator, self).apply(cids, split=split, key_group=key_group,
-            replace_key_set=replace_key_set, cids_query=cids_query,
-            count=cids_count, **kwargs)
+        super(Annotator, self).apply(
+            cids, 
+            split=split,
+            key_group=key_group, 
+            replace_key_set=replace_key_set,
+            count=cids_count,
+            annotation_generator=annotation_generator,
+            **kwargs
+        )
 
         # Load the matrix
-        return self.load_matrix(session, split=split, cids_query=cids_query,
-            key_group=key_group)
+        return self.load_matrix(session, split=split, key_group=key_group)
 
-    def clear(self, session, split=0, key_group=0, replace_key_set=True,
-        cids_query=None, **kwargs):
+    def clear(self, session, split, key_group, replace_key_set, **kwargs):
         """
         Deletes the Annotations for the Candidates in the given split.
         If replace_key_set=True, deletes *all* Annotations (of this Annotation sub-class)
         and also deletes all AnnotationKeys (of this sub-class)
         """
         query = session.query(self.annotation_class)
-
+        
         # If replace_key_set=False, then we just delete the annotations for candidates in our split
         if not replace_key_set:
-            sub_query = cids_query or session.query(Candidate.id)\
-                                             .filter(Candidate.split == split)
-            sub_query = sub_query.subquery()
-            query = query.filter(self.annotation_class.candidate_id.in_(sub_query))
+            sub_query = session.query(Candidate.id).filter(Candidate.split == split).subquery()
+            query     = query.filter(self.annotation_class.candidate_id.in_(sub_query))
         query.delete(synchronize_session='fetch')
 
         # If we are creating a new key set, delete all old annotation keys
@@ -196,34 +198,25 @@ class Annotator(UDFRunner):
             query = query.filter(self.annotation_key_class.group == key_group)
             query.delete(synchronize_session='fetch')
 
-    def apply_existing(self, split=0, key_group=0, cids_query=None, **kwargs):
+    def apply_existing(self, split, key_group=0, **kwargs):
         """Alias for apply that emphasizes we are using an existing AnnotatorKey set."""
-        return self.apply(split=split, key_group=key_group,
-            replace_key_set=False, cids_query=cids_query, **kwargs)
+        return self.apply(split, key_group=key_group, replace_key_set=False, **kwargs)
 
-    def load_matrix(self, session, split=0, key_group=0, cids_query=None,
-        **kwargs):
+    def load_matrix(self, session, split, key_group=0, **kwargs):
         raise NotImplementedError()
 
 
 class AnnotatorUDF(UDF):
-    def __init__(self, annotation_class, annotation_key_class, f_gen, **kwargs):
+    def __init__(self, annotation_class, annotation_key_class, **kwargs):
         self.annotation_class     = annotation_class
         self.annotation_key_class = annotation_key_class
-
-        # AnnotatorUDF relies on a *generator function* which yields annotations
-        # given a candidate input
-        # NB: inspect.isgeneratorfunction is not sufficient to check if f_ger
-        # is a generator (does not work with fns that wrap gen, e.g. partial)
-        # So no check here at the moment...
-        self.anno_generator = f_gen
 
         # For caching key ids during the reduce step
         self.key_cache = {}
 
         super(AnnotatorUDF, self).__init__(**kwargs)
 
-    def apply(self, cid, **kwargs):
+    def apply(self, cid, annotation_generator=None, **kwargs):
         """
         Applies a given function to a Candidate, yielding a set of Annotations as key_name, value pairs
 
@@ -233,7 +226,7 @@ class AnnotatorUDF(UDF):
         seen = set()
         cid = cid[0]
         c    = self.session.query(Candidate).filter(Candidate.id == cid).one()
-        for key_name, value in self.anno_generator(c):
+        for key_name, value in annotation_generator(c):
 
             # Note: Make sure no duplicates emitted here!
             if (cid, key_name) not in seen:
@@ -255,7 +248,7 @@ class AnnotatorUDF(UDF):
             anno_update_query = anno_update_query.where(self.annotation_class.candidate_id == bindparam('cid'))
             anno_update_query = anno_update_query.where(self.annotation_class.key_id == bindparam('kid'))
             anno_update_query = anno_update_query.values(value=bindparam('value'))
-
+        
         # We only need to insert AnnotationKeys if replace_key_set=True
         # Note that in current configuration, we never update AnnotationKeys!
         if replace_key_set:
@@ -307,14 +300,13 @@ class AnnotatorUDF(UDF):
 
 
 def load_matrix(matrix_class, annotation_key_class, annotation_class, session,
-    split=0, cids_query=None, key_group=0, key_names=None, zero_one=False,
-    load_as_array=False):
+    split=0, key_group=0, key_names=None, zero_one=False, load_as_array=False):
     """
     Returns the annotations corresponding to a split of candidates with N members
     and an AnnotationKey group with M distinct keys as an N x M CSR sparse matrix.
     """
-    cid_query = cids_query or session.query(Candidate.id)\
-                                     .filter(Candidate.split == split)
+    cid_query = session.query(Candidate.id)
+    cid_query = cid_query.filter(Candidate.split == split)
     cid_query = cid_query.order_by(Candidate.id)
 
     keys_query = session.query(annotation_key_class.id)
@@ -353,7 +345,7 @@ def load_matrix(matrix_class, annotation_key_class, annotation_class, session,
     # The total number of annotations in DB which is weird behavior...
     q = session.query(annotation_class.candidate_id, annotation_class.key_id, annotation_class.value)
     q = q.order_by(annotation_class.candidate_id)
-
+    
     # Iteratively construct row index and output sparse matrix
     for cid, kid, val in q.all():
         if cid in cid_to_row and kid in kid_to_col:
@@ -380,12 +372,37 @@ def load_gold_labels(session, annotator_name, **kwargs):
     return load_matrix(csr_LabelMatrix, GoldLabelKey, GoldLabel, session, key_names=[annotator_name], **kwargs)
 
 
-class LabelAnnotator(Annotator):
-    """Apply labeling functions to the candidates, generating Label annotations
+def save_function_pkl(f, file_path):
+    """Convenience wrapper for saving pickle of function or object (e.g. list of
+    functions) including all dependenices, using the cloud lib.
 
-    :param lfs: A _list_ of labeling functions (LFs)
+    Can be reloading using standard pickle.load function.
     """
-    def __init__(self, lfs=None, label_generator=None):
+    cloud.serialization.cloudpickle.dump(f, open(file_path, 'w'))
+
+
+class LabelAnnotator(Annotator):
+    """Apply labeling functions to candidates, generating Label annotations."""
+    def __init__(self):
+        super(LabelAnnotator, self).__init__(Label, LabelKey)
+
+    def apply(self, split, lfs=None, label_generator=None, save_lf_pkl=True,
+        **kwargs):
+        """
+        Compile LF generator then apply.
+
+        :param lfs: A _list_ of labeling functions (LFs)
+        :param save_lf_pkl: Optionally saves pkl of LFs / LF generator plus all
+            dependencies needed to re-run.
+        """
+        # If saving LFs / LF generator, save now
+        if save_lf_pkl:
+            save_function_pkl(
+                lfs or label_generator,
+                'label_fn.{0}.pkl'.format(strftime("%Y_%m_%d_%H_%M_%S"))
+            )
+
+        # Use either list of LF functions or single label generator
         if lfs is not None:
             labels = lambda c : [(lf.__name__, lf(c)) for lf in lfs]
         elif label_generator is not None:
@@ -395,7 +412,7 @@ class LabelAnnotator(Annotator):
 
         # Convert lfs to a generator function
         # In particular, catch verbose values and convert to integer ones
-        def f_gen(c):
+        def annotation_generator(c):
             for lf_key, label in labels(c):
                 # Note: We assume if the LF output is an int, it is already
                 # mapped correctly
@@ -417,27 +434,32 @@ class LabelAnnotator(Annotator):
                     raise ValueError("""
                         Unable to parse label with value %s
                         for candidate with values %s""" % (label, c.values))
+        
+        return super(LabelAnnotator, self).apply(split, 
+            annotation_generator=annotation_generator, **kwargs)
 
-        super(LabelAnnotator, self).__init__(Label, LabelKey, f_gen)
+    def load_matrix(self, session, split, **kwargs):
+        return load_label_matrix(session, split=split, **kwargs)
 
-    def load_matrix(self, session, **kwargs):
-        return load_label_matrix(session, **kwargs)
-
-
+        
 class FeatureAnnotator(Annotator):
     """Apply feature generators to the candidates, generating Feature annotations"""
-    def __init__(self, f=get_span_feats):
-        super(FeatureAnnotator, self).__init__(Feature, FeatureKey, f)
+    def __init__(self):
+        super(FeatureAnnotator, self).__init__(Feature, FeatureKey)
 
-    def load_matrix(self, session, **kwargs):
-        return load_feature_matrix(session, **kwargs)
+    def apply(self, split, annotation_generator=get_span_feats, **kwargs):
+        return super(FeatureAnnotator, self).apply(split, 
+            annotation_generator=annotation_generator, **kwargs)
+
+    def load_matrix(self, session, split, key_group=0, **kwargs):
+        return load_feature_matrix(session, split=split, key_group=key_group, **kwargs)
 
 
 def save_marginals(session, X, marginals, training=True):
     """Save marginal probabilities for a set of Candidates to db.
 
-    :param X: Either an M x N csr_AnnotationMatrix-class matrix, where M
-        is number of candidates, N number of LFs/features; OR a list of
+    :param X: Either an M x N csr_AnnotationMatrix-class matrix, where M 
+        is number of candidates, N number of LFs/features; OR a list of 
         arbitrary objects with candidate ids accessible via a .id attrib
     :param marginals: A dense M x K matrix of marginal probabilities, where
         K is the cardinality of the candidates, OR a M-dim list/array if K=2.
@@ -453,7 +475,7 @@ def save_marginals(session, X, marginals, training=True):
         marginals = np.array(marginals)
         shape = marginals.shape
 
-    # Handle binary input as M x 1-dim array; assume elements represent
+    # Handle binary input as M x 1-dim array; assume elements represent 
     # poksitive (k=1) class values
     if len(shape) == 1:
         marginals = np.vstack([1-marginals, marginals]).T
@@ -485,55 +507,30 @@ def save_marginals(session, X, marginals, training=True):
             'candidate_id': cid,
             'training': training,
             'value': k,
-            # We cast p in case its a numpy type, which psycopg2 does not handle
-            'probability': float(p)
+            'probability': p
         })
 
     # Execute update
     session.execute(q, insert_vals)
     session.commit()
-    print("Saved %s marginals" % len(marginals))
+    print "Saved %s marginals" % len(marginals)
 
 
-def load_marginals(session, X=None, split=0, training=True):
+def load_marginals(session, X, split=0, training=True):
     """Load the marginal probs. for a given split of Candidates"""
-
     # Load marginal tuples from db
     marginal_tuples = session.query(
         Marginal.candidate_id,
         Marginal.value,
         Marginal.probability
-    ).join(Candidate)\
-        .filter(Candidate.split == split)\
-        .filter(Marginal.training == training).all()
+    ).filter(Candidate.split == split).\
+    filter(Marginal.training == training).all()
 
     # Assemble cols 1,...,K of marginals matrix
-    if X is not None:
-        # For now, handle feature matrix vs. list of objects with try / except
-        try:
-            cardinality = X.get_candidate(session, 0).cardinality
-            marginals = np.zeros((X.shape[0], cardinality))
-            for cid, k, p in marginal_tuples:
-                marginals[X.candidate_index[cid], k] = p
-        except:
-            cardinality = X[0].cardinality
-            marginals = np.zeros((len(X), cardinality))
-            candidate_index = dict([(x.id, i) for i, x in enumerate(X)])
-            for cid, k, p in marginal_tuples:
-                marginals[candidate_index[cid], k] = p
-    else:
-        cardinality = session.query(Candidate).get(marginal_tuples[0][0]).cardinality
-
-        # Loads cid map
-        cids = session.query(Candidate.id).filter(Candidate.split == split)\
-                .order_by(Candidate.id).all()
-        cid_map = {}
-        for i, (cid,) in enumerate(cids):
-            cid_map[cid] = i
-
-        marginals = np.zeros((len(cid_map), cardinality))
-        for i, (cid, k, p) in enumerate(marginal_tuples):
-            marginals[cid_map[cid], k] = p
+    cardinality = X.get_candidate(session, 0).cardinality
+    marginals = np.zeros((X.shape[0], cardinality))
+    for cid, k, p in marginal_tuples:
+        marginals[X.candidate_index[cid], k] = p
 
     # Add first column if k > 2, else ravel
     if cardinality > 2:
