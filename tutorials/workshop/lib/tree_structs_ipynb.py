@@ -40,7 +40,7 @@ class XMLTree(object):
         display_html(HTML(data=html))
 
         # JS
-        JS_LIBS = ["http://d3js.org/d3.v3.min.js"]
+        JS_LIBS = ["https://d3js.org/d3.v3.min.js"]
         js = open('lib/vis/tree-chart.js').read() % (json.dumps(self.json), self.id)
         display_javascript(Javascript(data=js, lib=JS_LIBS))
 
