@@ -66,7 +66,6 @@ class Spacy(Parser):
         model_path = data_path / model_name
         return model_path.exists()
 
-
     @staticmethod
     def load_lang_model(lang):
         '''
@@ -86,7 +85,6 @@ class Spacy(Parser):
         if not Spacy.model_installed(lang):
             download(lang)
         return spacy.load(lang)
-
 
     def connect(self):
         return ParserConnection(self)
