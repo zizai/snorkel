@@ -5,7 +5,6 @@ import glob
 import codecs
 import shutil
 import signal
-import zipfile
 import tarfile
 import itertools
 import subprocess
@@ -19,7 +18,7 @@ from ...learning.utils import print_scores
 
 class BratAnnotator(object):
     """
-    Snorkel Interface for
+    Snorkel Interface fo
     Brat Rapid Annotation Tool
     http://brat.nlplab.org/
 
@@ -108,38 +107,6 @@ class BratAnnotator(object):
 
         # add minimal annotation.config based on candidate_subclass info
         self._init_annotation_config(self.candidate_class, annotation_dir)
-
-    def import_collection(self, zip_archive, overwrite=False):
-        """
-        Import zipped archive of BRAT documents and annotations.
-        NOTE zip file must preserve full directory structure.
-
-        :param archive:
-        :param overwrite:
-        :return:
-        """
-        out_dir = "{}/".format(self.data_root)
-        zip_ref = zipfile.ZipFile(zip_archive, 'r')
-        manifest = zip_ref.namelist()
-        if not manifest:
-            msg = "ERROR: Zipfile is empty. Nothing to import"
-            sys.stderr.write(msg)
-            return
-
-        if os.path.exists(out_dir + manifest[0]) and not overwrite:
-            fpath = out_dir + manifest[0]
-            msg = "Error! Collection at '{}' already exists. ".format(fpath)
-            msg += "Please set overwrite=True to erase all existing annotations.\n"
-            sys.stderr.write(msg)
-            return
-
-        zip_ref.extractall(out_dir)
-        zip_ref.close()
-        print("Imported archive to {}".format(out_dir))
-
-        # cleanup for files compressed on MacOS
-        if os.path.exists(out_dir + "__MACOSX"):
-            shutil.rmtree(out_dir + "__MACOSX")
 
     def view(self, annotation_dir, document=None, new_window=True):
         """
@@ -263,8 +230,8 @@ class BratAnnotator(object):
 
         return tp, fp, tn, fn
 
-    def score(self, session, candidates, marginals, annotation_dir,
-                       b=0.5, recall_correction=True, symmetric_relations=True):
+    def adjusted_score(self, session, candidates, marginals, annotation_dir,
+                       b=0.5, symmetric_relations=True):
         """
 
         :param session:
@@ -288,38 +255,9 @@ class BratAnnotator(object):
         y_true = [1 if c in mapped_cands else 0 for c in subset_cands]
         y_pred = [1 if marginals[c.id] > b else 0 for c in subset_cands]
 
-        missed = 0 if not recall_correction else missed
-        title = "{} BRAT Scores ({} Documents)".format("Unadjusted" if not recall_correction else "Adjusted",
-                                                       len(doc_names))
+        title = "BRAT Scores ({} Documents)".format(len(doc_names))
         return self._score(y_true, y_pred, missed, title)
 
-    def get_collection_path(self, annotation_dir):
-        """
-        Return directory path of provided annotation set
-        :param annotation_dir:
-        :return:
-        """
-        return "{}/{}".format(self.data_root, annotation_dir)
-
-    def import_gold_labels(self, session, annotation_dir, candidates,
-                           symmetric_relations=True,  annotator_name='brat'):
-        """
-
-        :param session:
-        :param candidates:
-        :param annotator_name:
-        :return:
-        """
-        mapped_cands, _ = self.map_annotations(session, annotation_dir, candidates, symmetric_relations)
-
-        for c in mapped_cands:
-            if self.session.query(GoldLabel).filter(and_(GoldLabel.key_id == self.annotator.id,
-                                                         GoldLabel.candidate_id == c.id,
-                                                         GoldLabel.value == 1)).all():
-                continue
-            label = GoldLabel(key=self.annotator, candidate=c, value=1)
-            session.add(label)
-        session.commit()
 
     def _score(self, y_true, y_pred, recall_correction=0, title='BRAT Scores'):
         """
@@ -335,6 +273,35 @@ class BratAnnotator(object):
         tp, fp, tn, fn = sum(tp), sum(fp), sum(tn), sum(fn)
 
         print_scores(tp, fp, tn, fn + recall_correction, title=title)
+
+
+    def get_collection_path(self, annotation_dir):
+        """
+        Return directory path of provided annotation set
+        :param annotation_dir:
+        :return:
+        """
+        return "{}/{}".format(self.data_root, annotation_dir)
+
+    def import_gold_labels(self, session, annotation_dir, candidates,
+                           symmetric_relations=True,  annotator_name='brat'):
+        """
+        We assume all candidates provided to this function are true instances
+        :param session:
+        :param candidates:
+        :param annotator_name:
+        :return:
+        """
+        mapped_cands, _ = self.map_annotations(session, annotation_dir, candidates, symmetric_relations)
+
+        for c in mapped_cands:
+            if self.session.query(GoldLabel).filter(and_(GoldLabel.key_id == self.annotator.id,
+                                                         GoldLabel.candidate_id == c.id,
+                                                         GoldLabel.value == 1)).all():
+                continue
+            label = GoldLabel(key=self.annotator, candidate=c, value=1)
+            session.add(label)
+        session.commit()
 
     def _close(self):
         '''
@@ -361,6 +328,13 @@ class BratAnnotator(object):
         os.chdir(cwd)
         url = "http://{}:{}".format(self.address, self.port)
         print("Launching BRAT server at {} [pid={}]...".format(url, self.process_group.pid))
+
+    def __del__(self):
+        '''
+        Clean-up this object by forcing the server process to shut-down
+        :return:
+        '''
+        self._close()
 
     def _download(self):
         """
@@ -438,14 +412,40 @@ class BratAnnotator(object):
                 break
 
         sent = document.sentences[sent_id]
+
         char_start = abs_char_start - sent.abs_char_offsets[0]
         char_end = abs_char_end - sent.abs_char_offsets[0]
+
+        # HACK sometimes we have an off-by-one error in Snorkel document offsets,
+        # where the first char is an empty space. Character encoding bug??
+        try:
+            if sent.text and char_start <= len(sent.text) and sent.text[char_start] == ' ':
+                char_start += 1
+                char_end += 1
+        except:
+
+            print "-" * 20
+            print "+", abs_char_start
+            print sent.abs_char_offsets
+            print sent.char_offsets
+            print sent.text
+            print char_start
+            print "-" * 20
+
+            sent_id = len(document.sentences) - 1
+            sent_offsets = [sent.abs_char_offsets[0] for sent in document.sentences]
+            for i in range(0, len(sent_offsets) - 1):
+                print abs_char_start, sent_offsets[i]
+                if abs_char_start >= sent_offsets[i] and abs_char_end <= sent_offsets[i + 1]:
+                    sent_id = i
+                    break
+
 
         return TemporarySpan(sent, char_start, char_end - 1)
 
     def _create_relations(self, document, annotations):
         """
-        Initialize temporary Span objects for all our named entity labels
+        Initalize temporary Span objects for all our named entity labels
         and then create lists of Span pairs for each relation label.
 
         :return:
@@ -478,15 +478,9 @@ class BratAnnotator(object):
 
         return spans, relations
 
-    def __del__(self):
-        '''
-        Clean-up this object by forcing the server process to shut-down
-        :return:
-        '''
-        self._close()
-
 
 class StandoffAnnotations(object):
+
     """
     Standoff Annotation Parser
 
@@ -707,6 +701,7 @@ class StandoffAnnotations(object):
         return config
 
 
+
 def get_doc_ids_by_query(session, candidate_class, cid_query):
     """
     Given a Candidate.id set  query, return all corresponding parent document ids
@@ -760,6 +755,29 @@ def get_span_ids_by_cand_query(session, candidate_class, cid_query):
     span_pairs = q1.filter(Candidate.id.in_(cid_query)).all()
     return set(itertools.chain.from_iterable(span_pairs))
 
+def doc_to_text1(doc, sent_delim='\n'):
+    """
+    Convert document object to original text represention.
+    Assumes parser offsets map to original document offsets
+
+    :param doc:
+    :param sent_delim:
+    :return:
+    """
+    text = []
+    for sent in doc.sentences:
+        offsets = map(int, sent.stable_id.split(":")[-2:])
+        char_start, char_end = offsets
+        text.append({"text": sent.text, "char_start": char_start, "char_end": char_end})
+
+    s = ""
+    for i in range(len(text) - 1):
+        gap = text[i + 1]['char_start'] - text[i]['char_end']
+        s += text[i]['text'] + (sent_delim * gap)
+
+    return s
+
+
 def doc_to_text(doc):
     """
     Convert document object to original text represention.
@@ -772,7 +790,6 @@ def doc_to_text(doc):
     text = u""
     for i,sent in enumerate(doc.sentences):
         # setup padding so that BRAT displays a minimal amount of newlines
-        # while still preserving char offsets
         if len(text) != sent.abs_char_offsets[0]:
             padding = (sent.abs_char_offsets[0] - len(text))
             text += ' ' * (padding - 1) + u"\n"

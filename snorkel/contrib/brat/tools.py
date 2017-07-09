@@ -49,7 +49,7 @@ class BratProject(object):
     NORM_ID = 'N'
     NOTE_ID = '#'
 
-    def __init__(self, session, tmpl_path='tmpl.config', encoding="utf-8", verbose=True):
+    def __init__(self, session, tmpl_path='annotation.config.tmpl', encoding="utf-8", verbose=True):
         """
         Initialize BRAT import tools.
         :param session:
