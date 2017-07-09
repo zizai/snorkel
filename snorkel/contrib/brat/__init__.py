@@ -1,2 +1,2 @@
 from .tools import *
-from .brat import BratAnnotator
+from .brat import *
