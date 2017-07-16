@@ -138,6 +138,7 @@ class Annotator(UDFRunner):
         super(Annotator, self).__init__(AnnotatorUDF,
                                         annotation_class=annotation_class,
                                         annotation_key_class=annotation_key_class)
+<<<<<<< HEAD
 
     def apply(self, split, annotation_generator=None, key_group=0, 
         replace_key_set=True, **kwargs):
@@ -145,6 +146,15 @@ class Annotator(UDFRunner):
         Executes the candidate ids query, then runs AnnotatorUDF(s), passing
         along :param annotation_generator: as kwarg in UDFRunner.apply call.
 
+=======
+
+    def apply(self, split, annotation_generator=None, key_group=0, 
+        replace_key_set=True, **kwargs):
+        """
+        Executes the candidate ids query, then runs AnnotatorUDF(s), passing
+        along :param annotation_generator: as kwarg in UDFRunner.apply call.
+
+>>>>>>> b238d36fd1a40352864853978e0b9eb6707e5949
         Note that annotation_generator can be configured / compiled in a
         sub-class.
         """

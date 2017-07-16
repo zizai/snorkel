@@ -19,7 +19,11 @@ from ...learning.utils import print_scores
 
 class BratAnnotator(object):
     """
+<<<<<<< HEAD
     Snorkel Interface for
+=======
+    Snorkel Interface fo
+>>>>>>> b238d36fd1a40352864853978e0b9eb6707e5949
     Brat Rapid Annotation Tool
     http://brat.nlplab.org/
 
@@ -288,6 +292,12 @@ class BratAnnotator(object):
         y_true = [1 if c in mapped_cands else 0 for c in subset_cands]
         y_pred = [1 if marginals[c.id] > b else 0 for c in subset_cands]
 
+<<<<<<< HEAD
+=======
+        print y_true
+        print y_pred
+
+>>>>>>> b238d36fd1a40352864853978e0b9eb6707e5949
         missed = 0 if not recall_correction else missed
         title = "{} BRAT Scores ({} Documents)".format("Unadjusted" if not recall_correction else "Adjusted",
                                                        len(doc_names))
@@ -304,7 +314,11 @@ class BratAnnotator(object):
     def import_gold_labels(self, session, annotation_dir, candidates,
                            symmetric_relations=True,  annotator_name='brat'):
         """
+<<<<<<< HEAD
 
+=======
+        We assume all candidates provided to this function are true instances
+>>>>>>> b238d36fd1a40352864853978e0b9eb6707e5949
         :param session:
         :param candidates:
         :param annotator_name:
@@ -445,7 +459,11 @@ class BratAnnotator(object):
 
     def _create_relations(self, document, annotations):
         """
+<<<<<<< HEAD
         Initialize temporary Span objects for all our named entity labels
+=======
+        Initalize temporary Span objects for all our named entity labels
+>>>>>>> b238d36fd1a40352864853978e0b9eb6707e5949
         and then create lists of Span pairs for each relation label.
 
         :return:
