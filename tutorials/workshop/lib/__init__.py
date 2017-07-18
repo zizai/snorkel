@@ -3,3 +3,4 @@ from .util import *
 from .scoring import *
 from .viz import *
 from .lf_generators import *
+from .features import *
