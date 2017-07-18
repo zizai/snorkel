@@ -88,12 +88,11 @@ class Spacy(Parser):
         :return:
         '''
         if Spacy.model_installed(lang):
-            print "Model installed", lang
+            print "Language model [{}] installed".format(lang)
             model = spacy.load(lang)
         else:
-            print "download"
+            print "Downloading language model [{}]...".format(lang)
             download(lang)
-            print "?"
             model = spacy.load(lang)
         return model
 
