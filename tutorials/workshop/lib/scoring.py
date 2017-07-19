@@ -82,6 +82,28 @@ def score(session, lf, split, gold, unlabled_as_neg=False):
 
     print_scores(len(tp), len(fp), len(tn), len(fn), title='LF Score')
 
+
+def error_analysis(session, lf, split, gold, unlabled_as_neg=False):
+
+    cands = session.query(Candidate).filter(Candidate.split == split).order_by(Candidate.id).all()
+
+    tp, fp, tn, fn = [], [], [], []
+    for i,c in enumerate(cands):
+        label = lf(c)
+        label = -1 if label == 0 and unlabled_as_neg else label
+
+        if label == -1 and gold[i, 0] == 1:
+            fn += [c]
+        elif label == -1 and gold[i, 0] == -1:
+            tn += [c]
+        elif label == 1 and gold[i, 0] == 1:
+            tp += [c]
+        elif label == 1 and gold[i, 0] == -1:
+            fp += [c]
+
+    print_scores(len(tp), len(fp), len(tn), len(fn), title='LF Score')
+    return tp, fp, tn, fn
+
 def print_top_k_features(session, model, F_matrix, top_k=25):
     """
     Print the top k positive and negatively weighted features.
