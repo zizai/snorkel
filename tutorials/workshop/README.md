@@ -1,35 +1,33 @@
-# Day 1 Snorkel Workshop
+# Snorkel Workshop
 ## Extracting Spouse Relations from the News
 
-In this tutorial, we will walk through the process of using Snorkel to identify mentions of
-spouses in a corpus of news articles.
-The tutorial is broken up into 4 notebooks, each covering a step in the pipeline, and 3 advanced notebooks covering more 
+In this tutorial, we will walk through the process of using Snorkel to identify mentions of spouses in a corpus of news articles.
 
-1. **Preprocessing [[Intro_Tutorial_1](Intro_Tutorial_1.ipynb)]:**
-First we parse the raw input documents into _contexts_ (documents, sentences), and extract
-consituent linguistic attributes.
+**Lecture Slides**: [PDF] (slide/Snorkel-Workshop-FINAL.pdf)
 
-2. **Candidate Extraction [[Intro_Tutorial_2](Intro_Tutorial_2.ipynb)]:**
-Next, we use _matcher_ operators to extract sets of _candidate_ spouse relation mentions from the
-preprocessed input. We will use these sets as training, development, and test data.
+**Workshop Videos**: Coming soon!
 
-3. **Annotating Evaluation Data [[Intro_Tutorial_3](Intro_Tutorial_3.ipynb)]:**
-Next, we use the `Viewer` to label a test set to evaluate against, and/or use helpers to
-load external test labels.
+### Tutorials
 
-4. **Learning [[Intro_Tutorial_4](Intro_Tutorial_4.ipynb)]:**
-Here, we go through the process of writing _labeling functions_, learning a generative
-model over them, using the generative model to train a _noise-aware_ discriminative
-model to make predictions over the candidates, and evaluating the discriminative model
-on the development candidate set.
+1. **Snorkel API [[Workshop Tutorial 1](Workshop_1_Snorkel_API.ipynb)]:**
+We introduct `Candidate` and `Context` objects (documents, sentences) and then show how to interact with candidates using the Snorkel helper function API. 
 
-5. **Evaluation [[Intro_Tutorial_5](Intro_Tutorial_5.ipynb)]:**
-Finally, we evaluate the learned model on the test candidate set.
+2. **Writing Labeling Functions [[Workshop Tutorial 2](Workshop_2_Writing_Labeling_Functions.ipynb)]:**
+We discuss how to write how to explore our training data, write _labeling functions_, and use _labeling function factories_ to autogenerate LFs from simple dictionaries and regular expressions.
 
-## Example
+3. **Training the Generative Model [[Workshop Tutorial 3](Workshop_3_Generative_Model_Training.ipynb)]:**
+We discuss how to unify the supervision provided by lableing functions in the previous notebook. We show how using a generative model 
 
-For example, in the sentence (specifically, a photograph caption)
-> Prime Minister Lee Hsien Loong and his wife Ho Ching leave a polling station after
-> casting their votes in Singapore (Photo: AFP)
+4. **Traiing the Discrimintive [[Workshop Tutorial 4](Workshop_4_Discriminative_Model_Training.ipynb)]:**
+Using the output of the generative model above, we train a _noise-aware_ discriminative model (here a deep neural network) to make predictions over the candidates, and evaluating the discriminative model on the development candidate set.
 
-our goal is to extract the spouse relation pair ("Lee Hsien Loong", "Ho Ching").
+### Advanced Tutorials
+
+5. **Preprocessing [[Workshop Tutorial 5](Workshop_5_Advanced_Preprocessing.ipynb)]:**
+How to preprocess a corpus of documents and initialize a Snorkel database.
+
+6. **Grid Search [[Workshop Tutorial 6](Workshop_6_Advanced_Grid_Search.ipynb)]:**
+Model tuning through grid search.
+
+7. **BRAT Annotator [[Workshop Tutorial 7](Workshop_7_Advanced_BRAT_Annotator.ipynb)]:**
+How to construct a validation set of human annotated data using BRAT (Brat Rapid Annotation Tool).
