@@ -3,7 +3,7 @@ Configure database connection for all workshop notebooks
 """
 import os
 
-USE_SQLITE = False
+USE_SQLITE = True
 
 if not USE_SQLITE:
     os.environ['SNORKELDB'] = "postgresql://ubuntu:snorkel@localhost/spouse"
