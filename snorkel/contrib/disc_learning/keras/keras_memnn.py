@@ -1,23 +1,48 @@
 import keras
 
 from keras.layers import (
-	concatenate, Bidirectional, Dense, Embedding, Input, LSTM, RepeatVector
+    concatenate, Bidirectional, Dense, Embedding, Input, LSTM, RepeatVector
 )
 from keras.models import Model
 
 from .keras_disc_learning import KerasNoiseAwareModel
 
 
+def get_centered_subseq(seq, s, e, w, max_subseq_len):
+    effective_l_w = s if s < w else w
+    effective_r_w = len(seq) - 1 - e if (len(seq) - 1 - e < w) else w
+    while (e - s + 1 + effective_l_w + effective_r_w) > max_subseq_len:
+        if effective_r_w > effective_l_w:
+            effective_r_w -= 1
+        else:
+            effective_l_w -= 1
+    return seq[max(0, s - effective_l_w) : e + 1 + effective_r_w]
+
+
 class KerasMemNNExtractor(KerasNoiseAwareModel):
 
-	def _process_candidate(self, c):
-		w = self.window_size
-		
-	
-	def _build_model(self, arg_len, side_len, btwn_len, arg_vocab_size,
-		text_vocab_size, embedding_dim=100, rnn_hidden_dim=50, keep_prob=0.5,
-		mlp_n_hidden=1, mlp_hidden_dim=50, mlp_activation='relu', 
-		cell_type=LSTM, word_dict=SymbolTable(), **kwargs):
+    def _process_candidate(self, c, index_f, max_arg_len=None,
+        max_side_len=None, max_btwn_len=None):
+        w = self.window_size
+        s = c.candidate.get_parent().words
+        # Get arg windows
+        arg_windows = []
+        for k in [0, 1]:
+            # Get window around argument
+            s = max(0, c[k].get_word_start() - w)
+            e = min(len(s), c[k].get_word_end() + w)
+            # Trim if needed
+            
+
+            # Add arg window
+            arg_windows.append(words[s : e+1])
+
+        
+    
+    def _build_model(self, arg_len, side_len, btwn_len, arg_vocab_size,
+        text_vocab_size, embedding_dim=100, rnn_hidden_dim=50, keep_prob=0.5,
+        mlp_n_hidden=1, mlp_hidden_dim=50, mlp_activation='relu', 
+        cell_type=LSTM, word_dict=SymbolTable(), **kwargs):
         """
         Build RNN model
         
@@ -76,14 +101,14 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
 
         # Add MLP
         for _ in range(mlp_n_hidden):
-        	h = Dense(mlp_hidden_dim, activation=mlp_activation)(h)
-        	h = Dropout(1. - keep_prob)(h)
+            h = Dense(mlp_hidden_dim, activation=mlp_activation)(h)
+            h = Dropout(1. - keep_prob)(h)
         
         # Prediction layer
         predictions = Dense(1, activation='sigmoid')(h)
 
         # Construct model
         self.model = Model(
-        	inputs=[arg1_input, arg2_input, l_input, r_input, btwn_input],
-        	outputs=predictions
+            inputs=[arg1_input, arg2_input, l_input, r_input, btwn_input],
+            outputs=predictions
         )
