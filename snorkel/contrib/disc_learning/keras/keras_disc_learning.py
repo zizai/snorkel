@@ -1,4 +1,5 @@
 import keras
+import numpy as np
 import os
 import tensorflow as tf
 
@@ -35,14 +36,14 @@ class KerasNoiseAwareModel(Classifier):
         """
         raise NotImplementedError()
 
-    def _compile_model(self, optimizer, metrics):
+    def _compile_model(self, opt, opt_kwargs, metrics=None):
         """Compiles Keras model"""
         # Define loss and marginals ops
         if self.cardinality > 2:
             loss_fn = keras.losses.categorical_crossentropy
         else:
             loss_fn = keras.losses.binary_crossentropy
-        self.model.compile(self, optimizer(self.lr), loss_fn, metrics=metrics)
+        self.model.compile(opt(**opt_kwargs), loss_fn, metrics=metrics)
 
     def _build_new_graph_session(self, **model_kwargs):
         # Get model kwargs
@@ -63,7 +64,7 @@ class KerasNoiseAwareModel(Classifier):
     def train(self, X_train, Y_train, n_epochs=25, opt=keras.optimizers.Adam,
         lr=0.01, batch_size=256, rebalance=False, X_dev=None, Y_dev=None,
         dev_ckpt=True, dev_ckpt_delay=0.75, callbacks=None,
-        save_dir='checkpoints', **kwargs):
+        save_dir='checkpoints', verbose=True, **kwargs):
         """
         Generic training procedure for TF model
 
@@ -78,8 +79,6 @@ class KerasNoiseAwareModel(Classifier):
                     - if False, no class balancing
         :param X_dev: Candidates for evaluation, same format as X_train
         :param Y_dev: Labels for evaluation, same format as Y_train
-        :param print_freq: number of epochs at which to print status, and if present,
-            evaluate the dev set (X_dev, Y_dev).
         :param dev_ckpt: If True, save a checkpoint whenever highest score
             on (X_dev, Y_dev) reached. Note: currently only evaluates at
             every @print_freq epochs.
@@ -87,6 +86,7 @@ class KerasNoiseAwareModel(Classifier):
             of n_epochs.
         :param callbacks: Keras callbacks
         :param save_dir: Save dir path for checkpointing.
+        :param verbose: Be talkative?
         :param kwargs: All hyperparameters that change how the graph is built 
             must be passed through here to be saved and reloaded to save /
             reload model. *NOTE: If a parameter needed to build the 
@@ -94,8 +94,8 @@ class KerasNoiseAwareModel(Classifier):
             model will not be able to be reloaded!*
         """
         self._check_input(X_train)
+        tf.set_random_seed(self.seed)
         np.random.seed(self.seed)
-        verbose = print_freq > 0
         kwargs['d'] = X_train.shape[1]
 
         # Check that the cardinality of the training marginals and model agree
@@ -129,7 +129,8 @@ class KerasNoiseAwareModel(Classifier):
         self._build_new_graph_session(**kwargs)
 
         # Compile model
-        self._compile_model(optimizer=opt)
+        opt_kwargs = {'lr': lr}
+        self._compile_model(opt=opt, opt_kwargs=opt_kwargs)
 
         # Run mini-batch SGD
         # TODO: add best dev callback
@@ -186,7 +187,7 @@ class KerasNoiseAwareModel(Classifier):
         
         # Create new graph, build network, and start session
         self._build_new_graph_session(**model_kwargs)
-        self.model.load_model(model_dir + '.h5')
+        self.model = keras.models.load_model(model_dir + '.h5')
 
     def _preprocess_data(self, X):
         """Generic preprocessing subclass; may be called by external methods."""

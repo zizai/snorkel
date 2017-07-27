@@ -90,17 +90,23 @@ class KerasRNNBase(KerasNoiseAwareModel):
         if isinstance(test_candidates[0], Candidate):
             X_test, ends = self._preprocess_data(test_candidates, extend=False)
             self._check_max_sentence_length(ends)
-            X_test = sequence.pad_sequences(X_test, maxlen=max_len)
+            X_test = sequence.pad_sequences(X_test, maxlen=self.max_len)
         else:
             X_test = test_candidates
 
         return self.model.predict(X_test, batch_size=256)
 
 
-class KerasreRNN(reRNN, KerasRNNBase): pass
+class KerasreRNN(KerasRNNBase):
+    def _preprocess_data(self, candidates, extend=False):
+        return reRNN._preprocess_data(self, candidates, extend=extend)
 
 
-class KerasTagRNN(TagRNN, KerasRNNBase): pass
+class KerasTagRNN(KerasRNNBase):
+    def _preprocess_data(self, candidates, extend=False):
+        return TagRNN._preprocess_data(self, candidates, extend=extend)
 
 
-class KerasTextRNN(TextRNN, KerasRNNBase): pass
+class KerasTextRNN(KerasRNNBase):
+    def _preprocess_data(self, candidates, extend=False):
+        return TextRNN._preprocess_data(self, candidates, extend=extend)
