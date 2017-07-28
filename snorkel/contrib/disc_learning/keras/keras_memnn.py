@@ -231,8 +231,8 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         """
         # Preprocess if not already preprocessed
         if isinstance(test_candidates[0], Candidate):
-            X_test = self._process_candidates(X_dev, extend=False)
-            X_test = self._pad_inputs(X_dev)
+            X_test = self._process_candidates(X_test, extend=False)
+            X_test = self._pad_inputs(X_test)
         else:
             X_test = test_candidates
         # Run feed-forward
