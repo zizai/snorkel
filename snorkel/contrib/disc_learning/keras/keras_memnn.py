@@ -53,7 +53,54 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         btwn_chunk = list(map(text_index_f, get_centered_subseq(
             s_prox, l_s, r_e, w, max_btwn_len)))
         # Return data
-        return (arg_windows[0], arg_windows[1], l_chunk, r_chunk, btwn_chunk)        
+        return (arg_windows[0], arg_windows[1], l_chunk, r_chunk, btwn_chunk)
+
+    def _process_candidates(self, candidates, init=False):
+        # Initialize word tables and get lookup function
+        if init:
+            self.arg_word_table = SymbolTable()
+            self.text_word_table = SymbolTable()
+            arg_index_f = self.arg_word_table.get
+            text_index_f = self.text_word_table.get
+        else:
+            arg_index_f = self.arg_word_table.lookup
+            text_index_f = self.text_word_table.lookup
+        # Populate data
+        X_arg1, X_arg2, X_l, X_r, X_btwn = [], [], [], [], []
+        for candidate in candidates:
+            arg1, arg2, l, r, btwn = self._process_candidate(
+                candidate, arg_index_f, text_index_f,
+                self.max_arg_len, self.max_side_len, self.max_btwn_len
+            )
+            X_arg1.append(arg1)
+            X_arg2.append(arg2)
+            X_l.append(l)
+            X_r.append(r)
+            X_btwn.append(btwn)
+        return X_arg1, X_arg2, X_l, X_r, X_btwn
+
+    def train(self, X_train, Y_train, X_dev=None, max_sentence_length=None, 
+        max_length_scale=2, **kwargs):
+        """
+        Perform preprocessing of data, construct dataset-specific model, then
+        train.
+        """
+        # Text preprocessing
+        X_train, ends = self._preprocess_data(X_train, extend=True)
+        if X_dev is not None:
+            X_dev, _ = self._preprocess_data(X_dev, extend=False)
+        
+        # Get max sentence size
+        max_len = max_sentence_length or 2 * max(len(x) for x in X_train)
+        self._check_max_sentence_length(ends, max_len=max_len)
+        
+        # Convert to arrays
+        X_train = sequence.pad_sequences(X_train, maxlen=max_len)
+        X_dev = sequence.pad_sequences(X_dev, maxlen=max_len)
+
+        # Train model- note we pass word_dict through here so it gets saved...
+        super(KerasRNNBase, self).train(X_train, Y_train, X_dev=X_dev,
+            word_dict=self.word_dict, max_len=max_len, **kwargs)
     
     def _build_model(self, arg_len, side_len, btwn_len, arg_vocab_size,
         text_vocab_size, embedding_dim=100, rnn_hidden_dim=50, keep_prob=0.5,
