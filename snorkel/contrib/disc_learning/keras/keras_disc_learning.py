@@ -96,7 +96,6 @@ class KerasNoiseAwareModel(Classifier):
         self._check_input(X_train)
         tf.set_random_seed(self.seed)
         np.random.seed(self.seed)
-        kwargs['d'] = X_train.shape[1]
 
         # Check that the cardinality of the training marginals and model agree
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
@@ -122,7 +121,11 @@ class KerasNoiseAwareModel(Classifier):
             # In categorical setting, just remove unlabeled
             diffs = Y_train.max(axis=1) - Y_train.min(axis=1)
             train_idxs = np.where(diffs > 1e-6)[0]
-        X_train = X_train[train_idxs, :]
+        # Input is either a NumPy array or a list of them for multi-input
+        if isinstance(X_train, list):
+            X_train = [X[train_idxs, :] for X in X_train]
+        else:
+            X_train = X_train[train_idxs, :]
         Y_train = Y_train[train_idxs]
 
         # Create new graph, build network, and start session
@@ -133,7 +136,6 @@ class KerasNoiseAwareModel(Classifier):
         self._compile_model(opt=opt, opt_kwargs=opt_kwargs)
 
         # Run mini-batch SGD
-        # TODO: add best dev callback
         dev_score_opt = 0.0
         n_delay = dev_ckpt_delay * n_epochs
         for t in range(n_epochs):
