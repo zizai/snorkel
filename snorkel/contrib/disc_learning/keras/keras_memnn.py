@@ -1,7 +1,7 @@
 import keras
 
 from keras.layers import (
-    concatenate, Bidirectional, Dense, Dropout,
+    add, concatenate, Bidirectional, Dense, Dropout,
     Embedding, Input, LSTM, RepeatVector
 )
 from keras.models import Model
@@ -200,7 +200,7 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         btwn_arg2 = RepeatVector(btwn_len)(arg2_embed)
         l_concat = concatenate([l_vectors, side_arg1, side_arg2])
         r_concat = concatenate([r_vectors, side_arg1, side_arg2])
-        btwn_concat = concatenate([btwn_vectors, btwn_arg1, btwn_arg2])
+        btwn_concat = add([btwn_vectors, btwn_arg1, btwn_arg2])
 
         # Embed sentence chunks and merge
         l_embed = Bidirectional(cell_type(rnn_hidden_dim))(l_concat)
