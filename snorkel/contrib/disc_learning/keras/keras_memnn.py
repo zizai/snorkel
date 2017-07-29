@@ -164,6 +164,8 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         """
 
         assert self.cardinality == 2
+        if embedding_dim % 2 != 0:
+            raise Exception("Embedding dimension must be even.")	
 
         arg_len = self.max_arg_len
         side_len = self.max_side_len
@@ -175,12 +177,12 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         arg1_input = Input(shape=(arg_len,), dtype='int32', name='arg1')
         arg2_input = Input(shape=(arg_len,), dtype='int32', name='arg2')
 
-        # Embed argument windows
+        # Embed argument windows in same dim as word vectors for add
         arg_U = Embedding(output_dim=embedding_dim, input_dim=arg_vocab_size)
         arg1_vectors = arg_U(arg1_input)
         arg2_vectors = arg_U(arg2_input)
-        arg1_embed = Bidirectional(cell_type(rnn_hidden_dim))(arg1_vectors)
-        arg2_embed = Bidirectional(cell_type(rnn_hidden_dim))(arg2_vectors)
+        arg1_embed = Bidirectional(cell_type(embedding_dim//2))(arg1_vectors)
+        arg2_embed = Bidirectional(cell_type(embedding_dim//2))(arg2_vectors)
 
         # Input sentence chunks
         l_input = Input(shape=(side_len,), dtype='int32', name='left_chunk')
@@ -198,8 +200,8 @@ class KerasMemNNExtractor(KerasNoiseAwareModel):
         side_arg2 = RepeatVector(side_len)(arg2_embed)
         btwn_arg1 = RepeatVector(btwn_len)(arg1_embed)
         btwn_arg2 = RepeatVector(btwn_len)(arg2_embed)
-        l_concat = concatenate([l_vectors, side_arg1, side_arg2])
-        r_concat = concatenate([r_vectors, side_arg1, side_arg2])
+        l_concat = add([l_vectors, side_arg1, side_arg2])
+        r_concat = add([r_vectors, side_arg1, side_arg2])
         btwn_concat = add([btwn_vectors, btwn_arg1, btwn_arg2])
 
         # Embed sentence chunks and merge
