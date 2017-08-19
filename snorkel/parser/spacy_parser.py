@@ -96,6 +96,7 @@ class Spacy(Parser):
         :param text:
         :return:
         '''
+        text = Parser.strip_null_bytes(text)
         text = self.to_unicode(text)
 
         doc = self.model.tokenizer(text)

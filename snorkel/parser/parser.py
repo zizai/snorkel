@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import sys
 import requests
 
@@ -11,6 +12,16 @@ class Parser(object):
     def __init__(self, name, encoding='utf-8'):
         self.name = name
         self.encoding = encoding
+
+    @staticmethod
+    def strip_null_bytes(text):
+        """
+        Remove NUL (\x00) characters from string. We do this to prevent
+        postgreSQL errors,
+        :param text:
+        :return:
+        """
+        return re.sub("[\x00]+", "", text)
 
     def to_unicode(self, text):
         '''
@@ -26,8 +37,8 @@ class Parser(object):
             text = text.decode('string_escape', errors='ignore')
             text = text.decode('utf-8')
         except Exception as e:
-            sys.stderr.write("unicode error {}".format(e))
-            text = u"<UNICODE PARSING ERROR>"
+            sys.stderr.write("ERROR unicode decoding {}".format(e))
+            text = u"<~~UNICODE PARSING ERROR~~>"
         return text
 
     def connect(self):
