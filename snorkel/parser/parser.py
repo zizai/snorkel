@@ -15,12 +15,19 @@ class Parser(object):
     def to_unicode(self, text):
         '''
         Convert char encoding to unicode
+
+        #  'utf8' codec can't decode byte 0xf3 in position 1048: invalid continuation byte
+
         :param text:
         :return:
         '''
-        text = text.encode('utf-8', 'error')
-        text = text.decode('string_escape', errors='ignore')
-        text = text.decode('utf-8')
+        try:
+            text = text.encode('utf-8', 'error')
+            text = text.decode('string_escape', errors='ignore')
+            text = text.decode('utf-8')
+        except Exception as e:
+            sys.stderr.write("unicode error {}".format(e))
+            text = u"<UNICODE PARSING ERROR>"
         return text
 
     def connect(self):
