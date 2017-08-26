@@ -81,7 +81,9 @@ class SequenceTagCandidateExtractorUDF(UDF):
             tags = self.session.query(SequenceTag).filter(SequenceTag.document_id==context.document.id).all()
             # filter to 1) target concept/entity types and 2) target sources (e.g., PutTator, TaggerOne)
             tags = [t for t in tags if t.concept_type in set(self.entity_types)]
-            tags = [t for t in tags if len([rgx.search(t.source) for rgx in self.tag_sources]) > 0]
+            tags = [t for t in tags if sum([1 for rgx in self.tag_sources if rgx.search(t.source)]) > 0]
+            # HACK: remove any tags that share the same entity type, offsets, but have different concept_uids
+            tags = {(t.abs_char_start, t.abs_char_end):t for t in tags}.values()
             
             tags = self._map_annotations(context.document, tags)
             self.cache[context.document.id] = defaultdict(list)
