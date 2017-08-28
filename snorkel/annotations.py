@@ -406,7 +406,14 @@ class LabelAnnotator(Annotator):
         # Convert lfs to a generator function
         # In particular, catch verbose values and convert to integer ones
         def f_gen(c):
-            for lf_key, label in labels(c):
+            # HACK...
+            try:
+                label_tuples = labels(c)
+            except:
+                print("LF application error!!!")
+                label_tuples = []
+
+            for lf_key, label in label_tuples:
                 # Note: We assume if the LF output is an int, it is already
                 # mapped correctly
                 if type(label) == int:
