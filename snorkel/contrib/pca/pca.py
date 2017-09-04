@@ -138,7 +138,7 @@ class PCA(TFNoiseAwareModel):
 
         l = list()
         for _ in f:
-            if len(_.strip().split(' ')) > self.word_emb_dim + 1:
+            if len(_.strip().split(' ')) > self.char_emb_dim + 1:
                 l.append(' ')
             else:
                 word = _.strip().split(' ')[0]
