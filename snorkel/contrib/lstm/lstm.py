@@ -13,8 +13,8 @@ import torch.utils.data as data_utils
 
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
 
-class LSTM(TFNoiseAwareModel):
 
+class LSTM(TFNoiseAwareModel):
     name = 'LSTM'
     representation = True
 
@@ -41,27 +41,24 @@ class LSTM(TFNoiseAwareModel):
             data.append(np.array(map(f, s)))
         return data
 
-
     def _check_max_sentence_length(self, ends, max_len=None):
         """Check that extraction arguments are within @self.max_len"""
-        mx = max_len or self.max_len
+        mx = max_len or self.max_sentence_length
         for i, end in enumerate(ends):
             if end >= mx:
                 w = "Candidate {0} has argument past max length for model:"
                 info = "[arg ends at index {0}; max len {1}]".format(end, mx)
                 warnings.warn('\t'.join([w.format(i), info]))
 
-
     def load_dict(self):
-        # load dict from glove
+        # load dict from file
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
 
         # Add paddings
         map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
 
-
-        # Word embeddins
+        # Word embeddings
         f = open(self.word_emb_path, 'r')
 
         l = list()
@@ -77,7 +74,6 @@ class LSTM(TFNoiseAwareModel):
         map(self.word_dict.get, l)
         f.close()
 
-
     def load_embeddings(self):
         self.load_dict()
         # Random initial word embeddings
@@ -92,14 +88,15 @@ class LSTM(TFNoiseAwareModel):
                 line[0] = ' '
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
-            self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+            self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray(
+                [float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
-
     def train_model(self, model, optimizer, criterion, x, y):
-        state_word = model.init_hidden()
+        batch_size, max_sent = x.size()
+        state_word = model.init_hidden(batch_size)
         optimizer.zero_grad()
-        y_pred = model(x.transpose(0,1), state_word)
+        y_pred = model(x.transpose(0, 1), state_word)
         loss = criterion(y_pred, y)
         loss.backward()
         optimizer.step()
@@ -134,7 +131,6 @@ class LSTM(TFNoiseAwareModel):
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
-
         print "==============================================="
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
@@ -157,8 +153,8 @@ class LSTM(TFNoiseAwareModel):
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
             raise ValueError("Training marginals cardinality ({0}) does not"
-                "match model cardinality ({1}).".format(Y_train.shape[1],
-                    self.cardinality))
+                             "match model cardinality ({1}).".format(Y_train.shape[1],
+                                                                     self.cardinality))
         # Make sure marginals are in correct default format
         Y_train = reshape_marginals(Y_train)
         # Make sure marginals are in [0,1] (v.s e.g. [-1, 1])
@@ -170,7 +166,7 @@ class LSTM(TFNoiseAwareModel):
         if self.cardinality == 2:
             # This removes unlabeled examples and optionally rebalances
             train_idxs = LabelBalancer(Y_train).get_train_idxs(rebalance,
-                rand_state=self.rand_state)
+                                                               rand_state=self.rand_state)
         else:
             # In categorical setting, just remove unlabeled
             diffs = Y_train.max(axis=1) - Y_train.min(axis=1)
@@ -181,9 +177,7 @@ class LSTM(TFNoiseAwareModel):
 
         print "[%s] n_train= %s" % (self.name, len(X_train))
 
-
-
-        X_train= self._preprocess_data(X_train, extend=False)
+        X_train = self._preprocess_data(X_train, extend=False)
         if X_dev is not None:
             X_dev = self._preprocess_data(X_dev, extend=False)
 
@@ -195,8 +189,9 @@ class LSTM(TFNoiseAwareModel):
         train_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
         n_classes = 1 if self.cardinality == 2 else None
-        self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s, embed_size=self.word_emb_dim,
-                             lstm_hidden=100, bidirectional=True)
+        self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
+                                  embed_size=self.word_emb_dim,
+                                  lstm_hidden=100, bidirectional=True)
 
         self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
@@ -209,17 +204,27 @@ class LSTM(TFNoiseAwareModel):
             cost = 0.
             for x, y in train_loader:
                 x = pad_batch(X_train[x.numpy()], self.max_sentence_length)
-                y = Variable(y.float(), requires_grad = False)
+                y = Variable(y.float(), requires_grad=False)
                 cost += self.train_model(self.model, optimizer, loss, x, y)
             if (idx + 1) % print_freq == 0:
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
                 print msg
 
     def _marginals_batch(self, X):
-        x = self._preprocess_data(X, extend=False)
-        x = pad_batch(x, self.max_sentence_length)
-        state_word = self.model.init_hidden()
-        y_pred = self.model(x.transpose(0,1), state_word)
+        X_w = self._preprocess_data(X, extend=False)
+        X_w = np.array(X_w)
         sigmoid = nn.Sigmoid()
-        return sigmoid(y_pred).data.numpy()
 
+        y = np.array([])
+
+        x = torch.from_numpy(np.arange(len(X_w)))
+        data_set = data_utils.TensorDataset(x, x)
+        data_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
+
+        for x, _ in data_loader:
+            x_w = pad_batch(X_w[x.numpy()], self.max_sentence_length)
+            batch_size, max_sent = x_w.size()
+            w_state_word = self.model.init_hidden(batch_size)
+            y_pred = self.model(x_w.transpose(0, 1), w_state_word)
+            y = np.append(y, sigmoid(y_pred).data.numpy())
+        return y

@@ -10,10 +10,11 @@ sigmoid = nn.Sigmoid()
 
 class SymbolTable(object):
     """Wrapper for dict to encode unknown symbols"""
+
     def __init__(self, starting_symbol=2, unknown_symbol=1):
-        self.s       = starting_symbol
+        self.s = starting_symbol
         self.unknown = unknown_symbol
-        self.d       = dict()
+        self.d = dict()
 
     def get(self, w):
         if w not in self.d:
@@ -69,11 +70,12 @@ def mark_sentence(s, args):
         x.insert(k, v)
     return x
 
+
 def pad_batch(mini_batch, max_len):
     mini_batch_size = len(mini_batch)
     max_sent_len = min(int(np.max([len(x) for x in mini_batch])), max_len)
     # print mini_batch_size, max_sent_len
-    main_matrix = np.zeros((mini_batch_size, max_sent_len), dtype= np.int)
+    main_matrix = np.zeros((mini_batch_size, max_sent_len), dtype=np.int)
     for idx1, i in enumerate(mini_batch):
         for idx2, j in enumerate(i):
             if idx2 >= max_sent_len: break
@@ -88,10 +90,10 @@ def batch_matmul_bias(seq, weight, bias, nonlinearity=''):
     for i in range(seq.size(0)):
         _s = torch.mm(seq[i], weight)
         _s_bias = _s + bias.expand(bias_dim[0], _s.size()[0]).transpose(0, 1)
-        if (nonlinearity == 'tanh'):
+        if nonlinearity == 'tanh':
             _s_bias = torch.tanh(_s_bias)
         _s_bias = _s_bias.unsqueeze(0)
-        if (s is None):
+        if s is None:
             s = _s_bias
         else:
             s = torch.cat((s, _s_bias), 0)
@@ -102,10 +104,10 @@ def batch_matmul(seq, weight, nonlinearity=''):
     s = None
     for i in range(seq.size(0)):
         _s = torch.mm(seq[i], weight)
-        if (nonlinearity == 'tanh'):
+        if nonlinearity == 'tanh':
             _s = torch.tanh(_s)
         _s = _s.unsqueeze(0)
-        if (s is None):
+        if s is None:
             s = _s
         else:
             s = torch.cat((s, _s), 0)
@@ -119,7 +121,7 @@ def attention_mul(rnn_outputs, att_weights):
         a_i = att_weights[i].unsqueeze(1).expand_as(h_i)
         h_i = a_i * h_i
         h_i = h_i.unsqueeze(0)
-        if (attn_vectors is None):
+        if attn_vectors is None:
             attn_vectors = h_i
         else:
             attn_vectors = torch.cat((attn_vectors, h_i), 0)
@@ -139,29 +141,26 @@ class AttentionRNN(nn.Module):
         self.n_classes = n_classes
 
         self.lookup = nn.Embedding(num_tokens, embed_size)
-        if bidirectional == True:
-            self.word_gru = nn.LSTM(embed_size, lstm_hidden, bidirectional=True)
+        if bidirectional:
+            self.word_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=True)
             self.weight_W_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 2 * lstm_hidden))
             self.bias_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
             self.weight_proj_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
             self.linear = nn.Linear(2 * lstm_hidden, n_classes)
         else:
-            self.word_gru = nn.LSTM(embed_size, lstm_hidden, bidirectional=False)
+            self.word_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=False)
             self.weight_W_word = nn.Parameter(torch.Tensor(lstm_hidden, lstm_hidden))
             self.bias_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
             self.weight_proj_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
             self.linear = nn.Linear(lstm_hidden, n_classes)
-
 
         self.softmax_word = nn.Softmax()
         self.weight_W_word.data.uniform_(-0.1, 0.1)
         self.weight_proj_word.data.uniform_(-0.1, 0.1)
 
     def forward(self, embed, state_word):
-        # embeddings
         embedded = self.lookup(embed)
-        # word level gru
-        output_word, state_word = self.word_gru(embedded, state_word)
+        output_word, state_word = self.word_lstm(embedded, state_word)
         word_squish = batch_matmul_bias(output_word, self.weight_W_word, self.bias_word, nonlinearity='tanh')
         word_attn = batch_matmul(word_squish, self.weight_proj_word)
         word_attn_norm = self.softmax_word(word_attn.transpose(1, 0))
@@ -169,8 +168,10 @@ class AttentionRNN(nn.Module):
         final_map = self.linear(word_attn_vectors)
         return final_map
 
-    def init_hidden(self):
-        if self.bidirectional == True:
-            return Variable(torch.zeros(2, self.batch_size, self.lstm_hidden))
+    def init_hidden(self, batch_size):
+        if self.bidirectional:
+            return (Variable(torch.zeros(2, batch_size, self.lstm_hidden)),
+                    Variable(torch.zeros(2, batch_size, self.lstm_hidden)))
         else:
-            return Variable(torch.zeros(1, self.batch_size, self.lstm_hidden))
+            return (Variable(torch.zeros(1, batch_size, self.lstm_hidden)),
+                    Variable(torch.zeros(1, batch_size, self.lstm_hidden)))
