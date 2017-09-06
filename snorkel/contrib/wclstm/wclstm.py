@@ -1,3 +1,4 @@
+import os
 import warnings
 
 import torch
@@ -8,7 +9,7 @@ from torch.autograd import Variable
 from snorkel.learning.disc_learning import TFNoiseAwareModel
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
 from utils import *
-
+from six.moves.cPickle import dump, load
 
 class WCLSTM(TFNoiseAwareModel):
     name = 'WCLSTM'
@@ -154,12 +155,9 @@ class WCLSTM(TFNoiseAwareModel):
         optimizer.step()
         return loss.data[0]
 
-    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, rebalance=False, print_freq=5, **kwargs):
+    def _init_kwargs(self, **kwargs):
 
-        """
-        Perform preprocessing of data, construct dataset-specific model, then
-        train.
-        """
+        self.model_kwargs = kwargs
 
         # Set word embedding dimension
         self.word_emb_dim = kwargs.get('word_emb_dim', 300)
@@ -179,6 +177,9 @@ class WCLSTM(TFNoiseAwareModel):
 
         # Set learning batch size
         self.batch_size = kwargs.get('batch_size', 100)
+
+        # Set rebalance setting
+        self.rebalance = kwargs.get('rebalance', False)
 
         # Set char gram k
         self.char_gram = kwargs.get('char_gram', 3)
@@ -202,7 +203,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
         print "Batch size:                    ", self.batch_size
-        print "Rebalance:                     ", rebalance
+        print "Rebalance:                     ", self.rebalance
         print "Char gram                      ", self.char_gram
         print "Max word length                ", self.max_word_length
         print "Max sentence length            ", self.max_sentence_length
@@ -215,6 +216,16 @@ class WCLSTM(TFNoiseAwareModel):
 
         assert self.word_emb_path is not None
         assert self.char_emb_path is not None
+
+
+    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, **kwargs):
+
+        """
+        Perform preprocessing of data, construct dataset-specific model, then
+        train.
+        """
+
+        self._init_kwargs(**kwargs)
 
         # Set random seed
         torch.manual_seed(self.seed)
@@ -239,7 +250,7 @@ class WCLSTM(TFNoiseAwareModel):
 
         if self.cardinality == 2:
             # This removes unlabeled examples and optionally rebalances
-            train_idxs = LabelBalancer(Y_train).get_train_idxs(rebalance,
+            train_idxs = LabelBalancer(Y_train).get_train_idxs(self.rebalance,
                                                                rand_state=self.rand_state)
         else:
             # In categorical setting, just remove unlabeled
@@ -329,3 +340,52 @@ class WCLSTM(TFNoiseAwareModel):
             y_pred = self.word_model(x_w, s, w_state_word)
             y = np.append(y, sigmoid(y_pred).data.numpy())
         return y
+
+
+    def save(self, model_name=None, save_dir='checkpoints', verbose=True,
+             global_step=0):
+        """Save current model."""
+        model_name = model_name or self.name
+
+        # Note: Model checkpoints need to be saved in separate directories!
+        model_dir = os.path.join(save_dir, model_name)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+
+        # Save model kwargs needed to rebuild model
+        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
+            dump(self.model_kwargs, f)
+
+        # Save model dicts needed to rebuild model
+        with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+            dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb, 'word_emb': self.word_emb}, f)
+
+        torch.save(self.word_model, os.path.join(model_dir, model_name + '_word_model'))
+        torch.save(self.char_model, os.path.join(model_dir, model_name + '_char_model'))
+
+        if verbose:
+            print("[{0}] Model saved as <{1}>".format(self.name, model_name))
+
+    def load(self, model_name=None, save_dir='checkpoints', verbose=True):
+        """Load model from file and rebuild in new graph / session."""
+        model_name = model_name or self.name
+        model_dir = os.path.join(save_dir, model_name)
+
+        # Load model kwargs needed to rebuild model
+        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'rb') as f:
+            model_kwargs = load(f)
+            self._init_kwargs(**model_kwargs)
+
+        # Save model dicts needed to rebuild model
+        with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+            d = load(f)
+            self.char_dict = d['char_dict']
+            self.word_dict = d['word_dict']
+            self.char_emb = d['char_emb']
+            self.word_emb = d['word_emb']
+
+        self.word_model = torch.load(os.path.join(model_dir, model_name + '_word_model'))
+        self.char_model = torch.load(os.path.join(model_dir, model_name + '_char_model'))
+
+        if verbose:
+            print("[{0}] Loaded model <{1}>".format(self.name, model_name))
