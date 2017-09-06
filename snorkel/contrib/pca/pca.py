@@ -210,11 +210,12 @@ class PCA(TFNoiseAwareModel):
         return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
 
     def gen_feature(self, X):
-        sent = self.get_principal_components(X[0])
-        m1 = self.get_principal_components(X[1])
-        m2 = self.get_principal_components(X[2])
+
+        sent     = self.get_principal_components(X[0])
+        m1       = self.get_principal_components(X[1])
+        m2       = self.get_principal_components(X[2])
         word_seq = self.get_principal_components(X[3])
-        feature = torch.cat((sent, m1, m2, word_seq)).view(1, -1)
+        feature  = torch.cat((sent, m1, m2, word_seq)).view(1, -1)
 
         # add indicator feature for asymmetric relation
         if self.asymmetric:
@@ -389,9 +390,7 @@ class PCA(TFNoiseAwareModel):
                 new_X_train = torch.from_numpy(np.zeros((len(X), feature.size(1))))
             new_X_train[i] = feature
 
-        new_X_train = new_X_train.float()
-
-        return new_X_train.numpy()
+        return new_X_train.float().numpy()
 
     def save(self, model_name=None, save_dir='checkpoints', verbose=True,
              global_step=0):
@@ -438,3 +437,4 @@ class PCA(TFNoiseAwareModel):
 
         if verbose:
             print("[{0}] Loaded model <{1}>".format(self.name, model_name))
+
