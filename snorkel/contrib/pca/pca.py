@@ -378,6 +378,21 @@ class PCA(TFNoiseAwareModel):
         sigmoid = nn.Sigmoid()
         return sigmoid(predict(self.model, new_X_train)).data.numpy()
 
+    def embed(self, X):
+
+        new_X_train = None
+        X = self._preprocess_data_combination(X, extend=False)
+
+        for i in range(len(X)):
+            feature = self.gen_feature(X[i])
+            if new_X_train is None:
+                new_X_train = torch.from_numpy(np.zeros((len(X), feature.size(1))))
+            new_X_train[i] = feature
+
+        new_X_train = new_X_train.float()
+
+        return new_X_train.numpy()
+
     def save(self, model_name=None, save_dir='checkpoints', verbose=True,
              global_step=0):
         """Save current model."""
