@@ -5,6 +5,7 @@ import warnings
 
 from snorkel.learning.disc_learning import TFNoiseAwareModel
 from utils import *
+from six.moves.cPickle import dump, load
 
 import torch
 import torch.nn as nn
@@ -102,13 +103,9 @@ class LSTM(TFNoiseAwareModel):
         optimizer.step()
         return loss.data[0]
 
-    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, rebalance=False, print_freq=5, max_sentence_length=None,
-              **kwargs):
+    def _init_kwargs(self, **kwargs):
 
-        """
-        Perform preprocessing of data, construct dataset-specific model, then
-        train.
-        """
+        self.model_kwargs = kwargs
 
         # Set word embedding dimension
         self.word_emb_dim = kwargs.get('word_emb_dim', 300)
@@ -125,6 +122,9 @@ class LSTM(TFNoiseAwareModel):
         # Set learning batch size
         self.batch_size = kwargs.get('batch_size', 100)
 
+        # Set rebalance setting
+        self.rebalance = kwargs.get('rebalance', False)
+
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
 
@@ -135,12 +135,54 @@ class LSTM(TFNoiseAwareModel):
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
         print "Batch size:                    ", self.batch_size
-        print "Rebalance:                     ", rebalance
+        print "Rebalance:                     ", self.rebalance
         print "Word embedding size:           ", self.word_emb_dim
         print "Word embedding:                ", self.word_emb_path
         print "==============================================="
 
         assert self.word_emb_path is not None
+
+    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, rebalance=False, print_freq=5, max_sentence_length=None,
+              **kwargs):
+
+        """
+        Perform preprocessing of data, construct dataset-specific model, then
+        train.
+        """
+
+        self._init_kwargs(**kwargs)
+        #
+        # # Set word embedding dimension
+        # self.word_emb_dim = kwargs.get('word_emb_dim', 300)
+        #
+        # # Set word embedding path
+        # self.word_emb_path = kwargs.get('word_emb_path', None)
+        #
+        # # Set learning rate
+        # self.lr = kwargs.get('lr', 1e-3)
+        #
+        # # Set learning epoch
+        # self.n_epochs = kwargs.get('n_epochs', 100)
+        #
+        # # Set learning batch size
+        # self.batch_size = kwargs.get('batch_size', 100)
+        #
+        # # Set max sentence length
+        # self.max_sentence_length = kwargs.get('max_sentence_length', 100)
+        #
+        # # Replace placeholders in embedding files
+        # self.replace = kwargs.get('replace', {})
+        #
+        # print "==============================================="
+        # print "Number of learning epochs:     ", self.n_epochs
+        # print "Learning rate:                 ", self.lr
+        # print "Batch size:                    ", self.batch_size
+        # print "Rebalance:                     ", rebalance
+        # print "Word embedding size:           ", self.word_emb_dim
+        # print "Word embedding:                ", self.word_emb_path
+        # print "==============================================="
+        #
+        # assert self.word_emb_path is not None
 
         # Set random seed
         torch.manual_seed(self.seed)
@@ -165,7 +207,7 @@ class LSTM(TFNoiseAwareModel):
 
         if self.cardinality == 2:
             # This removes unlabeled examples and optionally rebalances
-            train_idxs = LabelBalancer(Y_train).get_train_idxs(rebalance,
+            train_idxs = LabelBalancer(Y_train).get_train_idxs(self.rebalance,
                                                                rand_state=self.rand_state)
         else:
             # In categorical setting, just remove unlabeled
@@ -228,3 +270,48 @@ class LSTM(TFNoiseAwareModel):
             y_pred = self.model(x_w.transpose(0, 1), w_state_word)
             y = np.append(y, sigmoid(y_pred).data.numpy())
         return y
+
+
+    def save(self, model_name=None, save_dir='checkpoints', verbose=True,
+             global_step=0):
+        """Save current model."""
+        model_name = model_name or self.name
+
+        # Note: Model checkpoints need to be saved in separate directories!
+        model_dir = os.path.join(save_dir, model_name)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+
+        # Save model kwargs needed to rebuild model
+        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
+            dump(self.model_kwargs, f)
+
+        # Save model dicts needed to rebuild model
+        with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+            dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
+
+        torch.save(self.model, os.path.join(model_dir, model_name))
+
+        if verbose:
+            print("[{0}] Model saved as <{1}>".format(self.name, model_name))
+
+    def load(self, model_name=None, save_dir='checkpoints', verbose=True):
+        """Load model from file and rebuild in new graph / session."""
+        model_name = model_name or self.name
+        model_dir = os.path.join(save_dir, model_name)
+
+        # Load model kwargs needed to rebuild model
+        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'rb') as f:
+            model_kwargs = load(f)
+            self._init_kwargs(**model_kwargs)
+
+        # Save model dicts needed to rebuild model
+        with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+            d = load(f)
+            self.word_dict = d['word_dict']
+            self.word_emb = d['word_emb']
+
+        self.model = torch.load(os.path.join(model_dir, model_name))
+
+        if verbose:
+            print("[{0}] Loaded model <{1}>".format(self.name, model_name))
