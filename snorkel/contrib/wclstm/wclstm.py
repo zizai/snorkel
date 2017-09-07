@@ -26,6 +26,13 @@ class WCLSTM(TFNoiseAwareModel):
         """
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
+            # Add paddings for words
+            map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
+
+            self.char_dict = SymbolTable()
+            # Add paddings for chars
+            map(self.char_dict.get, ['<', '>'])
+
         word_seq_data = []
         char_seq_data = []
         for candidate in candidates:
@@ -159,6 +166,9 @@ class WCLSTM(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        # Set use pre-trained embedding or not
+        self.load_emb = kwargs.get('load_emb', False)
+
         # Set word embedding dimension
         self.word_emb_dim = kwargs.get('word_emb_dim', 300)
         # Set char embedding dimension
@@ -211,6 +221,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "Char gram                      ", self.char_gram
         print "Max word length                ", self.max_word_length
         print "Max sentence length            ", self.max_sentence_length
+        print "Load pre-trained embedding     ", self.load_emb
         print "Word embedding size:           ", self.word_emb_dim
         print "Char embedding size:           ", self.char_emb_dim
         print "Word embedding:                ", self.word_emb_path
@@ -218,8 +229,9 @@ class WCLSTM(TFNoiseAwareModel):
         print "LSTM hidden dimension          ", self.lstm_hidden_dim
         print "==============================================="
 
-        assert self.word_emb_path is not None
-        assert self.char_emb_path is not None
+        if self.load_emb:
+            assert self.word_emb_path is not None
+            assert self.char_emb_path is not None
 
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, **kwargs):
@@ -234,10 +246,11 @@ class WCLSTM(TFNoiseAwareModel):
         # Set random seed
         torch.manual_seed(self.seed)
 
-        # load embeddings from file
-        self.load_embeddings()
+        if self.load_emb:
+            # load embeddings from file
+            self.load_embeddings()
 
-        print "Done loading embeddings..."
+            print "Done loading embeddings..."
 
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
@@ -266,7 +279,7 @@ class WCLSTM(TFNoiseAwareModel):
 
         print "[%s] n_train= %s" % (self.name, len(X_train))
 
-        X_w_train, X_c_train = self._preprocess_data(X_train, extend=False)
+        X_w_train, X_c_train = self._preprocess_data(X_train, extend=not self.load_emb)
         if X_dev is not None:
             X_w_dev, X_c_dev = self._preprocess_data(X_dev, extend=False)
 
@@ -285,8 +298,9 @@ class WCLSTM(TFNoiseAwareModel):
                                            lstm_hidden=self.lstm_hidden_dim,
                                            attention=self.attention,
                                            bidirectional=self.bidirectional)
-        # Set pre-trained embedding weights
-        self.char_model.lookup.weight.data.copy_(torch.from_numpy(self.char_emb))
+        if self.load_emb:
+            # Set pre-trained embedding weights
+            self.char_model.lookup.weight.data.copy_(torch.from_numpy(self.char_emb))
 
         if self.bidirectional:
             self.word_model = AttentionWordRNN(n_classes=n_classes, batch_size=self.batch_size,
@@ -304,8 +318,9 @@ class WCLSTM(TFNoiseAwareModel):
                                                lstm_hidden=self.lstm_hidden_dim,
                                                attention=self.attention,
                                                bidirectional=False)
-        # Set pre-trained embedding weights
-        self.word_model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
+        if self.load_emb:
+            # Set pre-trained embedding weights
+            self.word_model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
         n_examples = len(X_w_train)
 
