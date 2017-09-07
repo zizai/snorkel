@@ -129,7 +129,7 @@ def attention_mul(rnn_outputs, att_weights):
 
 
 class AttentionRNN(nn.Module):
-    def __init__(self, n_classes, batch_size, num_tokens, embed_size, lstm_hidden, bidirectional=True):
+    def __init__(self, n_classes, batch_size, num_tokens, embed_size, lstm_hidden, attention=True, bidirectional=True):
 
         super(AttentionRNN, self).__init__()
 
@@ -139,33 +139,40 @@ class AttentionRNN(nn.Module):
         self.lstm_hidden = lstm_hidden
         self.bidirectional = bidirectional
         self.n_classes = n_classes
+        self.attention = attention
 
         self.lookup = nn.Embedding(num_tokens, embed_size)
         if bidirectional:
             self.word_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=True)
-            self.weight_W_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 2 * lstm_hidden))
-            self.bias_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
-            self.weight_proj_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
+            if attention:
+                self.weight_W_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 2 * lstm_hidden))
+                self.bias_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
+                self.weight_proj_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
             self.linear = nn.Linear(2 * lstm_hidden, n_classes)
         else:
             self.word_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=False)
-            self.weight_W_word = nn.Parameter(torch.Tensor(lstm_hidden, lstm_hidden))
-            self.bias_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
-            self.weight_proj_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
+            if attention:
+                self.weight_W_word = nn.Parameter(torch.Tensor(lstm_hidden, lstm_hidden))
+                self.bias_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
+                self.weight_proj_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
             self.linear = nn.Linear(lstm_hidden, n_classes)
 
         self.softmax_word = nn.Softmax()
-        self.weight_W_word.data.uniform_(-0.1, 0.1)
-        self.weight_proj_word.data.uniform_(-0.1, 0.1)
+        if attention:
+            self.weight_W_word.data.uniform_(-0.1, 0.1)
+            self.weight_proj_word.data.uniform_(-0.1, 0.1)
 
     def forward(self, embed, state_word):
         embedded = self.lookup(embed)
         output_word, state_word = self.word_lstm(embedded, state_word)
-        word_squish = batch_matmul_bias(output_word, self.weight_W_word, self.bias_word, nonlinearity='tanh')
-        word_attn = batch_matmul(word_squish, self.weight_proj_word)
-        word_attn_norm = self.softmax_word(word_attn.transpose(1, 0))
-        word_attn_vectors = attention_mul(output_word, word_attn_norm.transpose(1, 0))
-        final_map = self.linear(word_attn_vectors)
+        if self.attention:
+            word_squish = batch_matmul_bias(output_word, self.weight_W_word, self.bias_word, nonlinearity='tanh')
+            word_attn = batch_matmul(word_squish, self.weight_proj_word)
+            word_attn_norm = self.softmax_word(word_attn.transpose(1, 0))
+            word_attn_vectors = attention_mul(output_word, word_attn_norm.transpose(1, 0))
+            final_map = self.linear(word_attn_vectors)
+        else:
+            final_map = self.linear(torch.mean(output_word.transpose(0, 1).transpose(1, 2), 2))
         return final_map
 
     def init_hidden(self, batch_size):
