@@ -188,6 +188,9 @@ class WCLSTM(TFNoiseAwareModel):
         # Set learning epoch
         self.n_epochs = kwargs.get('n_epochs', 100)
 
+        # Set dropout
+        self.dropout = kwargs.get('dropout', 0.0)
+
         # Set learning batch size
         self.batch_size = kwargs.get('batch_size', 100)
 
@@ -216,6 +219,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
         print "Use attention                  ", self.attention
+        print "dropout                        ", self.dropout
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Char gram                      ", self.char_gram
@@ -297,6 +301,7 @@ class WCLSTM(TFNoiseAwareModel):
                                            embed_size=self.char_emb_dim,
                                            lstm_hidden=self.lstm_hidden_dim,
                                            attention=self.attention,
+                                           dropout=self.dropout,
                                            bidirectional=self.bidirectional)
         if self.load_emb:
             # Set pre-trained embedding weights
@@ -309,6 +314,7 @@ class WCLSTM(TFNoiseAwareModel):
                                                input_size=self.word_emb_dim + 2 * self.lstm_hidden_dim,
                                                lstm_hidden=self.lstm_hidden_dim,
                                                attention=self.attention,
+                                               dropout=self.dropout,
                                                bidirectional=True)
         else:
             self.word_model = AttentionWordRNN(n_classes=n_classes, batch_size=self.batch_size,
@@ -317,6 +323,7 @@ class WCLSTM(TFNoiseAwareModel):
                                                input_size=self.word_emb_dim + self.lstm_hidden_dim,
                                                lstm_hidden=self.lstm_hidden_dim,
                                                attention=self.attention,
+                                               dropout=self.dropout,
                                                bidirectional=False)
         if self.load_emb:
             # Set pre-trained embedding weights

@@ -141,7 +141,7 @@ def attention_mul(rnn_outputs, att_weights):
 
 
 class AttentionCharRNN(nn.Module):
-    def __init__(self, batch_size, num_tokens, embed_size, lstm_hidden, attention=True, bidirectional=True):
+    def __init__(self, batch_size, num_tokens, embed_size, lstm_hidden, dropout=0.0, attention=True, bidirectional=True):
 
         super(AttentionCharRNN, self).__init__()
 
@@ -152,16 +152,16 @@ class AttentionCharRNN(nn.Module):
         self.bidirectional = bidirectional
         self.attention= attention
 
+        self.drop = nn.Dropout(dropout)
         self.lookup = nn.Embedding(num_tokens, embed_size)
-
         if bidirectional:
-            self.char_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=True)
+            self.char_lstm = nn.LSTM(embed_size, lstm_hidden, dropout=dropout, bidirectional=True)
             if attention:
                 self.weight_W_char = nn.Parameter(torch.Tensor(2 * lstm_hidden, 2 * lstm_hidden))
                 self.bias_char = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
                 self.weight_proj_char = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
         else:
-            self.char_lstm = nn.LSTM(embed_size, lstm_hidden, bidirectional=False)
+            self.char_lstm = nn.LSTM(embed_size, lstm_hidden, dropout=dropout, bidirectional=False)
             if attention:
                 self.weight_W_char = nn.Parameter(torch.Tensor(lstm_hidden, lstm_hidden))
                 self.bias_char = nn.Parameter(torch.Tensor(lstm_hidden, 1))
@@ -174,8 +174,9 @@ class AttentionCharRNN(nn.Module):
             self.weight_proj_char.data.uniform_(-0.1, 0.1)
 
     def forward(self, embed, state_char):
-        embedded = self.lookup(embed)
+        embedded = self.drop(self.lookup(embed))
         output_char, state_char = self.char_lstm(embedded, state_char)
+        output_char = self.drop(output_char)
         if self.attention:
             char_squish = batch_matmul_bias(output_char, self.weight_W_char, self.bias_char, nonlinearity='tanh')
             char_attn = batch_matmul(char_squish, self.weight_proj_char)
@@ -195,7 +196,7 @@ class AttentionCharRNN(nn.Module):
 
 
 class AttentionWordRNN(nn.Module):
-    def __init__(self, n_classes, batch_size, num_tokens, embed_size, input_size, lstm_hidden, attention=True, bidirectional=True):
+    def __init__(self, n_classes, batch_size, num_tokens, embed_size, input_size, lstm_hidden, dropout=0.0, attention=True, bidirectional=True):
 
         super(AttentionWordRNN, self).__init__()
 
@@ -206,18 +207,18 @@ class AttentionWordRNN(nn.Module):
         self.bidirectional = bidirectional
         self.attention= attention
 
+        self.drop = nn.Dropout(dropout)
         self.n_classes = n_classes
-
         self.lookup = nn.Embedding(num_tokens, embed_size)
         if bidirectional:
-            self.word_lstm = nn.LSTM(input_size, lstm_hidden, bidirectional=True)
+            self.word_lstm = nn.LSTM(input_size, lstm_hidden, dropout=dropout, bidirectional=True)
             if attention:
                 self.weight_W_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 2 * lstm_hidden))
                 self.bias_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
                 self.weight_proj_word = nn.Parameter(torch.Tensor(2 * lstm_hidden, 1))
             self.linear = nn.Linear(2 * lstm_hidden, n_classes)
         else:
-            self.word_lstm = nn.LSTM(input_size, lstm_hidden, bidirectional=False)
+            self.word_lstm = nn.LSTM(input_size, lstm_hidden, dropout=dropout, bidirectional=False)
             if attention:
                 self.weight_W_word = nn.Parameter(torch.Tensor(lstm_hidden, lstm_hidden))
                 self.bias_word = nn.Parameter(torch.Tensor(lstm_hidden, 1))
@@ -232,7 +233,9 @@ class AttentionWordRNN(nn.Module):
     def forward(self, embed, c_embed, state_word):
         embedded = self.lookup(embed)
         cat_embed = torch.cat((embedded, c_embed), 2)
+        cat_embed = self.drop(cat_embed)
         output_word, state_word = self.word_lstm(cat_embed, state_word)
+        output_word = self.drop(output_word)
         if self.attention:
             word_squish = batch_matmul_bias(output_word, self.weight_W_word, self.bias_word, nonlinearity='tanh')
             word_attn = batch_matmul(word_squish, self.weight_proj_word)
