@@ -29,6 +29,8 @@ class LSTM(TFNoiseAwareModel):
         """
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
+            # Add paddings
+            map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
         data = []
         for candidate in candidates:
             # Mark sentence
@@ -107,6 +109,9 @@ class LSTM(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        # Set use pre-trained embedding or not
+        self.load_emb = kwargs.get('load_emb', False)
+
         # Set word embedding dimension
         self.word_emb_dim = kwargs.get('word_emb_dim', 300)
 
@@ -140,11 +145,13 @@ class LSTM(TFNoiseAwareModel):
         print "Use attention                  ", self.attention
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
+        print "Load pre-trained embedding     ", self.load_emb
         print "Word embedding size:           ", self.word_emb_dim
         print "Word embedding:                ", self.word_emb_path
         print "==============================================="
 
-        assert self.word_emb_path is not None
+        if self.load_emb:
+            assert self.word_emb_path is not None
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, rebalance=False, print_freq=5, max_sentence_length=None,
               **kwargs):
@@ -155,46 +162,15 @@ class LSTM(TFNoiseAwareModel):
         """
 
         self._init_kwargs(**kwargs)
-        #
-        # # Set word embedding dimension
-        # self.word_emb_dim = kwargs.get('word_emb_dim', 300)
-        #
-        # # Set word embedding path
-        # self.word_emb_path = kwargs.get('word_emb_path', None)
-        #
-        # # Set learning rate
-        # self.lr = kwargs.get('lr', 1e-3)
-        #
-        # # Set learning epoch
-        # self.n_epochs = kwargs.get('n_epochs', 100)
-        #
-        # # Set learning batch size
-        # self.batch_size = kwargs.get('batch_size', 100)
-        #
-        # # Set max sentence length
-        # self.max_sentence_length = kwargs.get('max_sentence_length', 100)
-        #
-        # # Replace placeholders in embedding files
-        # self.replace = kwargs.get('replace', {})
-        #
-        # print "==============================================="
-        # print "Number of learning epochs:     ", self.n_epochs
-        # print "Learning rate:                 ", self.lr
-        # print "Batch size:                    ", self.batch_size
-        # print "Rebalance:                     ", rebalance
-        # print "Word embedding size:           ", self.word_emb_dim
-        # print "Word embedding:                ", self.word_emb_path
-        # print "==============================================="
-        #
-        # assert self.word_emb_path is not None
 
         # Set random seed
         torch.manual_seed(self.seed)
 
-        # load embeddings from file
-        self.load_embeddings()
+        if self.load_emb:
+            # load embeddings from file
+            self.load_embeddings()
 
-        print "Done loading embeddings..."
+            print "Done loading embeddings..."
 
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
@@ -223,7 +199,7 @@ class LSTM(TFNoiseAwareModel):
 
         print "[%s] n_train= %s" % (self.name, len(X_train))
 
-        X_train = self._preprocess_data(X_train, extend=False)
+        X_train = self._preprocess_data(X_train, extend=not self.load_emb)
         if X_dev is not None:
             X_dev = self._preprocess_data(X_dev, extend=False)
 
@@ -238,8 +214,8 @@ class LSTM(TFNoiseAwareModel):
         self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
                                   embed_size=self.word_emb_dim,
                                   lstm_hidden=100, attention=self.attention, bidirectional=True)
-
-        self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
+        if self.load_emb:
+            self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
         n_examples = len(X_train)
 
