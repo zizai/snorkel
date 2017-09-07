@@ -170,12 +170,6 @@ class LSTM(TFNoiseAwareModel):
         # Set random seed
         torch.manual_seed(self.seed)
 
-        if self.load_emb:
-            # load embeddings from file
-            self.load_embeddings()
-
-            print "Done loading embeddings..."
-
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
             raise ValueError("Training marginals cardinality ({0}) does not"
@@ -203,9 +197,15 @@ class LSTM(TFNoiseAwareModel):
 
         print "[%s] n_train= %s" % (self.name, len(X_train))
 
-        X_train = self._preprocess_data(X_train, extend=not self.load_emb)
+        X_train = self._preprocess_data(X_train, extend=True)
         if X_dev is not None:
             X_dev = self._preprocess_data(X_dev, extend=False)
+
+        if self.load_emb:
+            # load embeddings from file
+            self.load_embeddings()
+
+            print "Done loading pre-trained embeddings..."
 
         X_train = np.array(X_train)
         Y_train = torch.from_numpy(Y_train).float()
