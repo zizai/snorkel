@@ -115,7 +115,8 @@ class PCA(TFNoiseAwareModel):
         # load dict from glove
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
-        if not hasattr(self, 'char_dict'):
+
+        if self.char and not hasattr(self, 'char_dict'):
             self.char_dict = SymbolTable()
 
         # Word embeddins
@@ -134,29 +135,31 @@ class PCA(TFNoiseAwareModel):
         map(self.word_dict.get, l)
         f.close()
 
-        # Char embeddings
-        f = open(self.char_emb_path, 'r')
+        if self.char:
+            # Char embeddings
+            f = open(self.char_emb_path, 'r')
 
-        l = list()
-        for _ in f:
-            if len(_.strip().split(' ')) > self.char_emb_dim + 1:
-                l.append(' ')
-            else:
-                word = _.strip().split(' ')[0]
-                # Replace placeholder to original word defined by user.
-                for key in self.replace.keys():
-                    word = word.replace(key, self.replace[key])
-                l.append(word)
-        map(self.char_dict.get, l)
-        f.close()
+            l = list()
+            for _ in f:
+                if len(_.strip().split(' ')) > self.char_emb_dim + 1:
+                    l.append(' ')
+                else:
+                    word = _.strip().split(' ')[0]
+                    # Replace placeholder to original word defined by user.
+                    for key in self.replace.keys():
+                        word = word.replace(key, self.replace[key])
+                    l.append(word)
+            map(self.char_dict.get, l)
+            f.close()
 
     def load_embeddings(self):
         self.load_dict()
         # Random initial word embeddings
         self.word_emb = np.random.uniform(-0.01, 0.01, (self.word_dict.s, self.word_emb_dim)).astype(np.float)
 
-        # Random initial char embeddings
-        self.char_emb = np.random.uniform(-0.01, 0.01, (self.char_dict.s, self.char_emb_dim)).astype(np.float)
+        if self.char:
+            # Random initial char embeddings
+            self.char_emb = np.random.uniform(-0.01, 0.01, (self.char_dict.s, self.char_emb_dim)).astype(np.float)
 
         # Word embeddings
         f = open(self.word_emb_path, 'r')
@@ -170,17 +173,18 @@ class PCA(TFNoiseAwareModel):
             self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
-        # Char embeddings
-        f = open(self.char_emb_path, 'r')
+        if self.char:
+            # Char embeddings
+            f = open(self.char_emb_path, 'r')
 
-        for line in f:
-            line = line.strip().split(' ')
-            if len(line) > self.char_emb_dim + 1:
-                line[0] = ' '
-            for key in self.replace.keys():
-                line[0] = line[0].replace(key, self.replace[key])
-            self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
-        f.close()
+            for line in f:
+                line = line.strip().split(' ')
+                if len(line) > self.char_emb_dim + 1:
+                    line[0] = ' '
+                for key in self.replace.keys():
+                    line[0] = line[0].replace(key, self.replace[key])
+                self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
+            f.close()
 
     def get_principal_components(self, x):
         # word level features
@@ -195,26 +199,36 @@ class PCA(TFNoiseAwareModel):
                 k = self.r if v.size(1) > self.r else v.size(1)
                 ret1[1:k+1,] = v.transpose(0, 1)[0:k, ]
 
-        # char level features
-        ret2 = torch.zeros(self.r + 1, self.char_emb_dim).double()
-        if len(''.join(x)) > 0:
-            f = self.char_dict.lookup
-            x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(' '.join(x)))]))
-            mu = torch.mean(x_, 0, keepdim=True)
-            ret2[0,] = mu / torch.norm(mu)
-            if self.r > 0:
-                u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
-                k = self.r if v.size(1) > self.r else v.size(1)
-                ret2[1:k+1,] = v.transpose(0, 1)[0:k, ]
+        if self.char:
+            # char level features
+            ret2 = torch.zeros(self.r + 1, self.char_emb_dim).double()
+            if len(''.join(x)) > 0:
+                f = self.char_dict.lookup
+                x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(' '.join(x)))]))
+                mu = torch.mean(x_, 0, keepdim=True)
+                ret2[0,] = mu / torch.norm(mu)
+                if self.r > 0:
+                    u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                    k = self.r if v.size(1) > self.r else v.size(1)
+                    ret2[1:k+1,] = v.transpose(0, 1)[0:k, ]
 
-        return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
+        if self.char:
+            return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
+        else:
+            return ret1.view(1, -1)
 
     def gen_feature(self, X):
-        sent = self.get_principal_components(X[0])
         m1 = self.get_principal_components(X[1])
         m2 = self.get_principal_components(X[2])
-        word_seq = self.get_principal_components(X[3])
-        feature = torch.cat((sent, m1, m2, word_seq)).view(1, -1)
+        feature = torch.cat((m1, m2))
+        if self.sent_feat:
+            sent = self.get_principal_components(X[0])
+            feature = torch.cat((feature, sent))
+        if self.cont_feat:
+            word_seq = self.get_principal_components(X[3])
+            feature = torch.cat((feature, word_seq))
+
+        feature = feature.view(1, -1)
 
         # add indicator feature for asymmetric relation
         if self.asymmetric:
@@ -231,13 +245,24 @@ class PCA(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        # Set if use char embeddings
+        self.char = kwargs.get('char', True)
+
+        # Set if use whole sentence feature
+        self.sent_feat = kwargs.get('sent_feat', True)
+
+        # Set if use whole context feature
+        self.cont_feat = kwargs.get('cont_feat', True)
+
         # Set word embedding dimension
-        self.word_emb_dim = kwargs.get('word_emb_dim', 300)
-        # Set char embedding dimension
-        self.char_emb_dim = kwargs.get('char_emb_dim', 300)
+        self.word_emb_dim = kwargs.get('word_emb_dim', None)
 
         # Set word embedding path
         self.word_emb_path = kwargs.get('word_emb_path', None)
+
+        # Set char embedding dimension
+        self.char_emb_dim = kwargs.get('char_emb_dim', None)
+
         # Set char embedding path
         self.char_emb_path = kwargs.get('char_emb_path', None)
 
@@ -275,6 +300,9 @@ class PCA(TFNoiseAwareModel):
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Surrounding window size:       ", self.window_size
+        print "Use sentence sequence          ", self.sent_feat
+        print "Use window sequence            ", self.cont_feat
+        print "Use char embeddings            ", self.char
         print "Word embedding size:           ", self.word_emb_dim
         print "Char embedding size:           ", self.char_emb_dim
         print "Word embedding:                ", self.word_emb_path
@@ -282,7 +310,8 @@ class PCA(TFNoiseAwareModel):
         print "==============================================="
 
         assert self.word_emb_path is not None
-        assert self.char_emb_path is not None
+        if self.char:
+            assert self.char_emb_path is not None
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, **kwargs):
 
@@ -340,6 +369,7 @@ class PCA(TFNoiseAwareModel):
             feature = self.gen_feature(X_train[i])
             if new_X_train is None:
                 new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1))))
+                print feature.size()
             new_X_train[i] = feature
 
         new_X_train = new_X_train.float()
@@ -394,7 +424,11 @@ class PCA(TFNoiseAwareModel):
 
         # Save model dicts needed to rebuild model
         with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
-            dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb, 'word_emb': self.word_emb}, f)
+            if self.char:
+                dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb,
+                      'word_emb': self.word_emb}, f)
+            else:
+                dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
 
         torch.save(self.model, os.path.join(model_dir, model_name))
 
@@ -414,10 +448,11 @@ class PCA(TFNoiseAwareModel):
         # Save model dicts needed to rebuild model
         with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
             d = load(f)
-            self.char_dict = d['char_dict']
             self.word_dict = d['word_dict']
-            self.char_emb = d['char_emb']
             self.word_emb = d['word_emb']
+            if self.char:
+                self.char_dict = d['char_dict']
+                self.char_emb = d['char_emb']
 
         self.model = torch.load(os.path.join(model_dir, model_name))
 
