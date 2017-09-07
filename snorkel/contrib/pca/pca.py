@@ -369,7 +369,6 @@ class PCA(TFNoiseAwareModel):
             feature = self.gen_feature(X_train[i])
             if new_X_train is None:
                 new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1))))
-                print feature.size()
             new_X_train[i] = feature
 
         new_X_train = new_X_train.float()
