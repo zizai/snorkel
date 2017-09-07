@@ -18,6 +18,7 @@ from snorkel.learning.utils import reshape_marginals, LabelBalancer
 class LSTM(TFNoiseAwareModel):
     name = 'LSTM'
     representation = True
+    gpu = ['gpu', 'GPU']
 
     """LSTM for relation extraction"""
 
@@ -99,8 +100,15 @@ class LSTM(TFNoiseAwareModel):
         batch_size, max_sent = x.size()
         state_word = model.init_hidden(batch_size)
         optimizer.zero_grad()
+        if self.host_device in self.gpu:
+            x = x.cuda()
+            y = y.cuda()
+            state_word = (state_word[0].cuda(), state_word[1].cuda())
         y_pred = model(x.transpose(0, 1), state_word)
-        loss = criterion(y_pred, y)
+        if self.host_device in self.gpu:
+            loss = criterion(y_pred.cuda(), y)
+        else:
+            loss = criterion(y_pred, y)
         loss.backward()
         optimizer.step()
         return loss.data[0]
@@ -139,6 +147,9 @@ class LSTM(TFNoiseAwareModel):
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
 
+        # Set host device
+        self.host_device = kwargs.get('host_device', 'cpu')
+
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
@@ -150,6 +161,7 @@ class LSTM(TFNoiseAwareModel):
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Load pre-trained embedding     ", self.load_emb
+        print "Host device                    ", self.host_device
         print "Word embedding size:           ", self.word_emb_dim
         print "Word embedding:                ", self.word_emb_path
         print "==============================================="
@@ -224,6 +236,9 @@ class LSTM(TFNoiseAwareModel):
         if self.load_emb:
             self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
+        if self.host_device in self.gpu:
+            self.model.cuda()
+
         n_examples = len(X_train)
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -254,6 +269,9 @@ class LSTM(TFNoiseAwareModel):
             x_w = pad_batch(X_w[x.numpy()], self.max_sentence_length)
             batch_size, max_sent = x_w.size()
             w_state_word = self.model.init_hidden(batch_size)
+            if self.host_device in self.gpu:
+                x_w = x_w.cuda()
+                w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
             y_pred = self.model(x_w.transpose(0, 1), w_state_word)
             y = np.append(y, sigmoid(y_pred).data.numpy())
         return y

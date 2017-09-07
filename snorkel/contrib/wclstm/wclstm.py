@@ -15,6 +15,7 @@ class WCLSTM(TFNoiseAwareModel):
     name = 'WCLSTM'
     representation = True
     char_marker = ['<', '>']
+    gpu = ['gpu', 'GPU']
 
     """LSTM for relation extraction"""
 
@@ -149,6 +150,14 @@ class WCLSTM(TFNoiseAwareModel):
         max_sent, batch_size, max_token = x_c.size()
         w_state_word = w_model.init_hidden(batch_size)
         c_state_word = c_model.init_hidden(batch_size)
+
+        if self.host_device in self.gpu:
+            x_w = x_w.cuda()
+            x_c = x_c.cuda()
+            y = y.cuda()
+            w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
+            c_state_word = (c_state_word[0].cuda(), c_state_word[1].cuda())
+
         optimizer.zero_grad()
         s = None
         for i in xrange(max_sent):
@@ -157,7 +166,11 @@ class WCLSTM(TFNoiseAwareModel):
             s = _s if s is None else torch.cat((s, _s), 0)
         y_pred = w_model(x_w, s, w_state_word)
 
-        loss = criterion(y_pred, y)
+        if self.host_device in self.gpu:
+            loss = criterion(y_pred.cuda(), y)
+        else:
+            loss = criterion(y_pred, y)
+
         loss.backward()
         optimizer.step()
         return loss.data[0]
@@ -212,6 +225,9 @@ class WCLSTM(TFNoiseAwareModel):
         # Set max word length
         self.max_word_length = kwargs.get('max_word_length', 20)
 
+        # Set host device
+        self.host_device = kwargs.get('host_device', 'cpu')
+
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
@@ -226,6 +242,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "Max word length                ", self.max_word_length
         print "Max sentence length            ", self.max_sentence_length
         print "Load pre-trained embedding     ", self.load_emb
+        print "Host device                    ", self.host_device
         print "Word embedding size:           ", self.word_emb_dim
         print "Char embedding size:           ", self.char_emb_dim
         print "Word embedding:                ", self.word_emb_path
@@ -329,6 +346,10 @@ class WCLSTM(TFNoiseAwareModel):
             # Set pre-trained embedding weights
             self.word_model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
+        if self.host_device in self.gpu:
+            self.char_model.cuda()
+            self.word_model.cuda()
+
         n_examples = len(X_w_train)
 
         optimizer = torch.optim.Adam(list(self.char_model.parameters()) + list(self.word_model.parameters()),
@@ -364,6 +385,13 @@ class WCLSTM(TFNoiseAwareModel):
             max_sent, batch_size, max_token = x_c.size()
             w_state_word = self.word_model.init_hidden(batch_size)
             c_state_word = self.char_model.init_hidden(batch_size)
+
+            if self.host_device in self.gpu:
+                x_w = x_w.cuda()
+                x_c = x_c.cuda()
+                w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
+                c_state_word = (c_state_word[0].cuda(), c_state_word[1].cuda())
+
             s = None
             for i in xrange(max_sent):
                 _s = self.char_model(x_c[i, :, :].transpose(0, 1), c_state_word)
