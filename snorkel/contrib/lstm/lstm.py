@@ -124,6 +124,9 @@ class LSTM(TFNoiseAwareModel):
         # Set use attention or not
         self.attention = kwargs.get('attention', True)
 
+        # Set dropout
+        self.dropout = kwargs.get('dropout', 0.0)
+
         # Set learning epoch
         self.n_epochs = kwargs.get('n_epochs', 100)
 
@@ -143,6 +146,7 @@ class LSTM(TFNoiseAwareModel):
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
         print "Use attention                  ", self.attention
+        print "dropout                        ", self.dropout
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Load pre-trained embedding     ", self.load_emb
@@ -213,7 +217,10 @@ class LSTM(TFNoiseAwareModel):
         n_classes = 1 if self.cardinality == 2 else None
         self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
                                   embed_size=self.word_emb_dim,
-                                  lstm_hidden=100, attention=self.attention, bidirectional=True)
+                                  lstm_hidden=100,
+                                  attention=self.attention,
+                                  dropout=self.dropout,
+                                  bidirectional=True)
         if self.load_emb:
             self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
