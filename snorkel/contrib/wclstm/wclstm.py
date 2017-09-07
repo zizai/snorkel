@@ -145,7 +145,7 @@ class WCLSTM(TFNoiseAwareModel):
         optimizer.zero_grad()
         s = None
         for i in xrange(max_sent):
-            _s, c_state_word, _ = c_model(x_c[i, :, :].transpose(0, 1), c_state_word)
+            _s = c_model(x_c[i, :, :].transpose(0, 1), c_state_word)
             _s = _s.unsqueeze(0)
             s = _s if s is None else torch.cat((s, _s), 0)
         y_pred = w_model(x_w, s, w_state_word)
@@ -171,6 +171,9 @@ class WCLSTM(TFNoiseAwareModel):
 
         # Set learning rate
         self.lr = kwargs.get('lr', 1e-3)
+
+        # Set use attention or not
+        self.attention = kwargs.get('attention', True)
 
         # Set learning epoch
         self.n_epochs = kwargs.get('n_epochs', 100)
@@ -202,6 +205,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "==============================================="
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
+        print "Use attention                  ", self.attention
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Char gram                      ", self.char_gram
@@ -278,7 +282,9 @@ class WCLSTM(TFNoiseAwareModel):
 
         self.char_model = AttentionCharRNN(batch_size=self.batch_size, num_tokens=self.char_dict.s,
                                            embed_size=self.char_emb_dim,
-                                           lstm_hidden=self.lstm_hidden_dim, bidirectional=self.bidirectional)
+                                           lstm_hidden=self.lstm_hidden_dim,
+                                           attention=self.attention,
+                                           bidirectional=self.bidirectional)
         # Set pre-trained embedding weights
         self.char_model.lookup.weight.data.copy_(torch.from_numpy(self.char_emb))
 
@@ -287,13 +293,17 @@ class WCLSTM(TFNoiseAwareModel):
                                                num_tokens=self.word_dict.s,
                                                embed_size=self.word_emb_dim,
                                                input_size=self.word_emb_dim + 2 * self.lstm_hidden_dim,
-                                               lstm_hidden=self.lstm_hidden_dim, bidirectional=True)
+                                               lstm_hidden=self.lstm_hidden_dim,
+                                               attention=self.attention,
+                                               bidirectional=True)
         else:
             self.word_model = AttentionWordRNN(n_classes=n_classes, batch_size=self.batch_size,
                                                num_tokens=self.word_dict.s,
                                                embed_size=self.word_emb_dim,
                                                input_size=self.word_emb_dim + self.lstm_hidden_dim,
-                                               lstm_hidden=self.lstm_hidden_dim, bidirectional=False)
+                                               lstm_hidden=self.lstm_hidden_dim,
+                                               attention=self.attention,
+                                               bidirectional=False)
         # Set pre-trained embedding weights
         self.word_model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
@@ -334,7 +344,7 @@ class WCLSTM(TFNoiseAwareModel):
             c_state_word = self.char_model.init_hidden(batch_size)
             s = None
             for i in xrange(max_sent):
-                _s, c_state_word, _ = self.char_model(x_c[i, :, :].transpose(0, 1), c_state_word)
+                _s = self.char_model(x_c[i, :, :].transpose(0, 1), c_state_word)
                 _s = _s.unsqueeze(0)
                 s = _s if s is None else torch.cat((s, _s), 0)
             y_pred = self.word_model(x_w, s, w_state_word)
