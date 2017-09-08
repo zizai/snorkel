@@ -122,8 +122,11 @@ class WCLSTM(TFNoiseAwareModel):
 
         # Word embeddings
         f = open(self.word_emb_path, 'r')
+        fmt = "fastText" if self.word_emb_path.split(".")[-1] == "vec" else "txt"
 
-        for line in f:
+        for i,line in enumerate(f):
+            if fmt == "fastText" and i == 0:
+                continue
             line = line.strip().split(' ')
             if len(line) > self.word_emb_dim + 1:
                 line[0] = ' '
