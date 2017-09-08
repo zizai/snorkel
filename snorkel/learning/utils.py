@@ -1,4 +1,5 @@
 import os
+import time
 import math
 import matplotlib
 import matplotlib.pyplot as plt
@@ -414,6 +415,7 @@ class GridSearch(object):
         run_stats = []
         run_score_opt = -1.0
         for k, param_vals in enumerate(self.search_space()):
+            start_ts = time.time()
             hps = self.model_hyperparams.copy()
 
             # Initiate the model from scratch each time
@@ -465,6 +467,9 @@ class GridSearch(object):
                 model.save(model_name=model_name, save_dir=self.save_dir)
                 opt_model_name = model_name
                 run_score_opt = run_score
+
+            end_ts = time.time()
+            print 'GridSearch Iter: %2.2f sec' % (end_ts - start_ts)
 
         # Set optimal parameter in the learner model
         opt_model = self.model_class(**self.model_class_params)
