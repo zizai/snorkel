@@ -294,9 +294,15 @@ class LSTM(TFNoiseAwareModel):
         with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
             dump(self.model_kwargs, f)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
-            dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
+        if self.load_emb:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+                dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
+        else:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+                dump({'word_dict': self.word_dict}, f)
+
 
         torch.save(self.model, os.path.join(model_dir, model_name))
 
@@ -313,11 +319,17 @@ class LSTM(TFNoiseAwareModel):
             model_kwargs = load(f)
             self._init_kwargs(**model_kwargs)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
-            d = load(f)
-            self.word_dict = d['word_dict']
-            self.word_emb = d['word_emb']
+        if self.load_emb:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+                d = load(f)
+                self.word_dict = d['word_dict']
+                self.word_emb = d['word_emb']
+        else:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+                d = load(f)
+                self.word_dict = d['word_dict']
 
         self.model = torch.load(os.path.join(model_dir, model_name))
 

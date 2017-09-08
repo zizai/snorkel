@@ -419,9 +419,14 @@ class WCLSTM(TFNoiseAwareModel):
         with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
             dump(self.model_kwargs, f)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
-            dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb, 'word_emb': self.word_emb}, f)
+        if self.load_emb:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+                dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb, 'word_emb': self.word_emb}, f)
+        else:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+                dump({'char_dict': self.char_dict, 'word_dict': self.word_dict}, f)
 
         torch.save(self.word_model, os.path.join(model_dir, model_name + '_word_model'))
         torch.save(self.char_model, os.path.join(model_dir, model_name + '_char_model'))
@@ -439,13 +444,20 @@ class WCLSTM(TFNoiseAwareModel):
             model_kwargs = load(f)
             self._init_kwargs(**model_kwargs)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
-            d = load(f)
-            self.char_dict = d['char_dict']
-            self.word_dict = d['word_dict']
-            self.char_emb = d['char_emb']
-            self.word_emb = d['word_emb']
+        if self.load_emb:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+                d = load(f)
+                self.char_dict = d['char_dict']
+                self.word_dict = d['word_dict']
+                self.char_emb = d['char_emb']
+                self.word_emb = d['word_emb']
+        else:
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+                d = load(f)
+                self.char_dict = d['char_dict']
+                self.word_dict = d['word_dict']
 
         self.word_model = torch.load(os.path.join(model_dir, model_name + '_word_model'))
         self.char_model = torch.load(os.path.join(model_dir, model_name + '_char_model'))
