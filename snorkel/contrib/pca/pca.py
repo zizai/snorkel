@@ -6,6 +6,7 @@ import warnings
 from snorkel.learning.disc_learning import TFNoiseAwareModel
 from utils import candidate_to_tokens, SymbolTable
 from six.moves.cPickle import dump, load
+from time import time
 
 import torch
 import torch.nn as nn
@@ -313,7 +314,8 @@ class PCA(TFNoiseAwareModel):
         if self.char:
             assert self.char_emb_path is not None
 
-    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, **kwargs):
+    def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, dev_ckpt=True,
+              dev_ckpt_delay=0.75, save_dir='checkpoints', **kwargs):
 
         """
         Perform preprocessing of data, construct dataset-specific model, then
@@ -321,6 +323,8 @@ class PCA(TFNoiseAwareModel):
         """
 
         self._init_kwargs(**kwargs)
+
+        verbose = print_freq > 0
 
         # Set random seed
         torch.manual_seed(self.seed)
@@ -355,12 +359,11 @@ class PCA(TFNoiseAwareModel):
             else X_train[train_idxs, :]
         Y_train = Y_train[train_idxs]
 
-
-        print "[%s] n_train= %s" % (self.name, len(X_train))
+        if verbose:
+            st = time()
+            print "[%s] n_train= %s" % (self.name, len(X_train))
 
         X_train= self._preprocess_data_combination(X_train, extend=False)
-        if X_dev is not None:
-            X_dev = self._preprocess_data_combination(X_dev, extend=False)
 
         Y_train = torch.from_numpy(Y_train).float()
 
@@ -384,13 +387,32 @@ class PCA(TFNoiseAwareModel):
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
+        dev_score_opt = 0.0
+
         for idx in range(self.n_epochs):
             cost = 0.
             for x, y in train_loader:
                 cost += train_model(self.model, loss, optimizer, x, y.float())
-            if (idx + 1) % print_freq == 0:
+            if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
+                if X_dev is not None:
+                    scores = self.score(X_dev, Y_dev, batch_size=self.batch_size)
+                    score = scores if self.cardinality > 2 else scores[-1]
+                    score_label = "Acc." if self.cardinality > 2 else "F1"
+                    msg += '\tDev {0}={1:.2f}'.format(score_label, 100. * score)
                 print msg
+
+                if X_dev is not None and dev_ckpt and idx > dev_ckpt_delay * self.n_epochs and score > dev_score_opt:
+                    dev_score_opt = score
+                    self.save(save_dir=save_dir, only_param=True)
+
+        # Conclude training
+        if verbose:
+            print("[{0}] Training done ({1:.2f}s)".format(self.name, time() - st))
+
+        # If checkpointing on, load last checkpoint (i.e. best on dev set)
+        if dev_ckpt and X_dev is not None and verbose and dev_score_opt > 0:
+            self.load(save_dir=save_dir, only_param=True)
 
     def _marginals_batch(self, X):
         new_X_train = None
@@ -421,7 +443,7 @@ class PCA(TFNoiseAwareModel):
         return new_X_train.float().numpy()
 
     def save(self, model_name=None, save_dir='checkpoints', verbose=True,
-             global_step=0):
+             only_param=False):
         """Save current model."""
         model_name = model_name or self.name
 
@@ -430,44 +452,46 @@ class PCA(TFNoiseAwareModel):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
-        # Save model kwargs needed to rebuild model
-        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
-            dump(self.model_kwargs, f)
+        if not only_param:
+            # Save model kwargs needed to rebuild model
+            with open(os.path.join(model_dir, "model_kwargs.pkl"), 'wb') as f:
+                dump(self.model_kwargs, f)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
-            if self.char:
-                dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb,
-                      'word_emb': self.word_emb}, f)
-            else:
-                dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
+                if self.char:
+                    dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb,
+                          'word_emb': self.word_emb}, f)
+                else:
+                    dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
 
         torch.save(self.model, os.path.join(model_dir, model_name))
 
         if verbose:
-            print("[{0}] Model saved as <{1}>".format(self.name, model_name))
+            print("[{0}] Model saved as <{1}>, only_param={2}".format(self.name, model_name, only_param))
 
-    def load(self, model_name=None, save_dir='checkpoints', verbose=True):
+    def load(self, model_name=None, save_dir='checkpoints', verbose=True, only_param=False):
         """Load model from file and rebuild in new graph / session."""
         model_name = model_name or self.name
         model_dir = os.path.join(save_dir, model_name)
 
-        # Load model kwargs needed to rebuild model
-        with open(os.path.join(model_dir, "model_kwargs.pkl"), 'rb') as f:
-            model_kwargs = load(f)
-            self._init_kwargs(**model_kwargs)
+        if not only_param:
+            # Load model kwargs needed to rebuild model
+            with open(os.path.join(model_dir, "model_kwargs.pkl"), 'rb') as f:
+                model_kwargs = load(f)
+                self._init_kwargs(**model_kwargs)
 
-        # Save model dicts needed to rebuild model
-        with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
-            d = load(f)
-            self.word_dict = d['word_dict']
-            self.word_emb = d['word_emb']
-            if self.char:
-                self.char_dict = d['char_dict']
-                self.char_emb = d['char_emb']
+            # Save model dicts needed to rebuild model
+            with open(os.path.join(model_dir, "model_dicts.pkl"), 'rb') as f:
+                d = load(f)
+                self.word_dict = d['word_dict']
+                self.word_emb = d['word_emb']
+                if self.char:
+                    self.char_dict = d['char_dict']
+                    self.char_emb = d['char_emb']
 
         self.model = torch.load(os.path.join(model_dir, model_name))
 
         if verbose:
-            print("[{0}] Loaded model <{1}>".format(self.name, model_name))
+            print("[{0}] Loaded model <{1}>, only_param={2}".format(self.name, model_name, only_param))
 
