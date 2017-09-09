@@ -16,45 +16,11 @@ import torch.utils.data as data_utils
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
 
 
-def build_model(input_dim, output_dim):
-    # We don't need the softmax layer here since CrossEntropyLoss already
-    # uses it internally.
-    model = torch.nn.Sequential()
-    model.add_module("linear",
-                     torch.nn.Linear(input_dim, output_dim, bias=False))
-    return model
-
-
-def train_model(model, loss, optimizer, x_val, y_val):
-    x = Variable(x_val, requires_grad=False)
-    y = Variable(y_val, requires_grad=False)
-
-    # Reset gradient
-    optimizer.zero_grad()
-
-    # Forward
-    fx = model.forward(x)
-    output = loss.forward(fx, y)
-
-    # Backward
-    output.backward()
-
-    # Update parameters
-    optimizer.step()
-
-    return output.data[0]
-
-
-def predict(model, x_val):
-    x = Variable(x_val, requires_grad=False)
-    output = model.forward(x)
-    return output
-
-
 class PCA(TFNoiseAwareModel):
 
     name = 'PCA'
     representation = True
+    gpu = ['gpu', 'GPU']
 
     """SVD for relation extraction"""
 
@@ -262,6 +228,55 @@ class PCA(TFNoiseAwareModel):
 
         return feature
 
+    def build_model(self, input_dim, output_dim):
+        # We don't need the softmax layer here since CrossEntropyLoss already
+        # uses it internally.
+        model = torch.nn.Sequential()
+        model.add_module("linear",
+                         torch.nn.Linear(input_dim, output_dim, bias=False))
+        if self.host_device in self.gpu: model.cuda()
+        return model
+
+    def train_model(self, model, loss, optimizer, x_val, y_val):
+        if self.host_device in self.gpu:
+            x = Variable(x_val, requires_grad=False).cuda()
+            y = Variable(y_val, requires_grad=False).cuda()
+        else:
+            x = Variable(x_val, requires_grad=False)
+            y = Variable(y_val, requires_grad=False)
+
+        # Reset gradient
+        optimizer.zero_grad()
+
+        # Forward
+        fx = model.forward(x)
+
+        if self.host_device in self.gpu:
+            output = loss.forward(fx.cuda(), y)
+        else:
+            output = loss.forward(fx, y)
+
+        # Backward
+        output.backward()
+
+        # Update parameters
+        optimizer.step()
+
+        return output.data[0]
+
+    def predict(self, model, x_val):
+        if self.host_device in self.gpu:
+            x = Variable(x_val, requires_grad=False).cuda()
+        else:
+            x = Variable(x_val, requires_grad=False)
+        output = model.forward(x)
+        sigmoid = nn.Sigmoid()
+        if self.host_device in self.gpu:
+            pred = sigmoid(output).data.cpu().numpy()
+        else:
+            pred = sigmoid(output).data.numpy()
+        return pred
+
     def _init_kwargs(self, **kwargs):
 
         self.model_kwargs = kwargs
@@ -311,6 +326,9 @@ class PCA(TFNoiseAwareModel):
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
 
+        # Set host device
+        self.host_device = kwargs.get('host_device', 'cpu')
+
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
@@ -323,6 +341,7 @@ class PCA(TFNoiseAwareModel):
         print "Surrounding window size:       ", self.window_size
         print "Use sentence sequence          ", self.sent_feat
         print "Use window sequence            ", self.cont_feat
+        print "Host device                    ", self.host_device
         print "Use char embeddings            ", self.char
         print "Word embedding size:           ", self.word_emb_dim
         print "Char embedding size:           ", self.char_emb_dim
@@ -402,7 +421,7 @@ class PCA(TFNoiseAwareModel):
         n_examples, n_features = new_X_train.size()
         n_classes = 1 if self.cardinality == 2 else None
 
-        self.model = build_model(n_features, n_classes)
+        self.model = self.build_model(n_features, n_classes)
         loss = nn.MultiLabelSoftMarginLoss(size_average=False)
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -412,7 +431,7 @@ class PCA(TFNoiseAwareModel):
         for idx in range(self.n_epochs):
             cost = 0.
             for x, y in train_loader:
-                cost += train_model(self.model, loss, optimizer, x, y.float())
+                cost += self.train_model(self.model, loss, optimizer, x, y.float())
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
                 if X_dev is not None:
@@ -446,8 +465,7 @@ class PCA(TFNoiseAwareModel):
 
         new_X_train = new_X_train.float()
 
-        sigmoid = nn.Sigmoid()
-        return sigmoid(predict(self.model, new_X_train)).data.numpy()
+        return self.predict(self.model, new_X_train)
 
     def embed(self, X):
 
