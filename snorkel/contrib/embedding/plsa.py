@@ -45,7 +45,7 @@ def plsa(count, n_dim, n_iter, learning_rate=1e-3):
         # Manually zero the gradients after updating weights
         L.grad.data.zero_()
 
-    return L, R
+    return L
 
 
 def init_matrix(n_terms, sparsity):
