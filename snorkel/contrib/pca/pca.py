@@ -58,14 +58,12 @@ class PCA(TFNoiseAwareModel):
 
     """SVD for relation extraction"""
 
-    def _preprocess_data_combination(self, candidates, extend=False):
+    def _preprocess_data_combination(self, candidates):
         """Convert candidate sentences to lookup sequences
 
         :param candidates: candidates to process
         :param extend: extend symbol table for tokens (train), or lookup (test)?
         """
-        if not hasattr(self, 'word_dict'):
-            self.word_dict = SymbolTable()
         data = []
         for candidate in candidates:
             words = candidate_to_tokens(candidate)
@@ -112,31 +110,48 @@ class PCA(TFNoiseAwareModel):
     def _build_model(self, **model_kwargs):
         pass
 
+    def create_dict(self, data, word=True, char=True):
+        if word: self.word_dict = SymbolTable()
+        if char: self.char_dict = SymbolTable()
+
+        for candidates in data:
+            for candidate in candidates:
+                words = candidate_to_tokens(candidate)
+                if word: map(self.word_dict.get, words)
+                if char: map(self.char_dict.get, list(' '.join(words)))
+
     def load_dict(self):
         # load dict from glove
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
+            extend_word = True
+        else:
+            extend_word = False
 
         if self.char and not hasattr(self, 'char_dict'):
             self.char_dict = SymbolTable()
+            extend_char = True
+        else:
+            extend_char = False
 
-        # Word embeddins
-        f = open(self.word_emb_path, 'r')
+        if extend_word:
+            # Word embeddins
+            f = open(self.word_emb_path, 'r')
 
-        l = list()
-        for _ in f:
-            if len(_.strip().split(' ')) > self.word_emb_dim + 1:
-                l.append(' ')
-            else:
-                word = _.strip().split(' ')[0]
-                # Replace placeholder to original word defined by user.
-                for key in self.replace.keys():
-                    word = word.replace(key, self.replace[key])
-                l.append(word)
-        map(self.word_dict.get, l)
-        f.close()
+            l = list()
+            for _ in f:
+                if len(_.strip().split(' ')) > self.word_emb_dim + 1:
+                    l.append(' ')
+                else:
+                    word = _.strip().split(' ')[0]
+                    # Replace placeholder to original word defined by user.
+                    for key in self.replace.keys():
+                        word = word.replace(key, self.replace[key])
+                    l.append(word)
+            map(self.word_dict.get, l)
+            f.close()
 
-        if self.char:
+        if self.char and extend_char:
             # Char embeddings
             f = open(self.char_emb_path, 'r')
 
@@ -162,6 +177,9 @@ class PCA(TFNoiseAwareModel):
             # Random initial char embeddings
             self.char_emb = np.random.uniform(-0.01, 0.01, (self.char_dict.s, self.char_emb_dim)).astype(np.float)
 
+        # Set unknown
+        unknown_symbol = 1
+
         # Word embeddings
         f = open(self.word_emb_path, 'r')
 
@@ -171,7 +189,8 @@ class PCA(TFNoiseAwareModel):
                 line[0] = ' '
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
-            self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+            if self.word_dict.lookup(line[0]) != unknown_symbol:
+                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
         if self.char:
@@ -184,7 +203,8 @@ class PCA(TFNoiseAwareModel):
                     line[0] = ' '
                 for key in self.replace.keys():
                     line[0] = line[0].replace(key, self.replace[key])
-                self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
+                if self.char_dict.lookup(line[0]) != unknown_symbol:
+                    self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
             f.close()
 
     def get_principal_components(self, x):
@@ -363,7 +383,7 @@ class PCA(TFNoiseAwareModel):
             st = time()
             print "[%s] n_train= %s" % (self.name, len(X_train))
 
-        X_train= self._preprocess_data_combination(X_train, extend=False)
+        X_train= self._preprocess_data_combination(X_train)
 
         Y_train = torch.from_numpy(Y_train).float()
 
@@ -416,7 +436,7 @@ class PCA(TFNoiseAwareModel):
 
     def _marginals_batch(self, X):
         new_X_train = None
-        X = self._preprocess_data_combination(X, extend=False)
+        X = self._preprocess_data_combination(X)
 
         for i in range(len(X)):
             feature = self.gen_feature(X[i])
@@ -432,7 +452,7 @@ class PCA(TFNoiseAwareModel):
     def embed(self, X):
 
         new_X_train = None
-        X = self._preprocess_data_combination(X, extend=False)
+        X = self._preprocess_data_combination(X)
 
         for i in range(len(X)):
             feature = self.gen_feature(X[i])
