@@ -27,7 +27,6 @@ def plsa(count, n_dim, n_iter, learning_rate=1e-3):
         # Now loss is a Variable of shape (1,) and loss.data is a Tensor of shape
         # (1,); loss.data[0] is a scalar value holding the loss.
         loss = (count_pred - count).pow(2).sum()
-        print(t, loss.data[0] / n_terms ** 2)
         if t % 100 == 0:
             print(t, loss.data[0] / n_terms ** 2)
 
