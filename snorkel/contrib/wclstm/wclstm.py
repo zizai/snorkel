@@ -19,6 +19,9 @@ class WCLSTM(TFNoiseAwareModel):
     char_marker = ['<', '>']
     gpu = ['gpu', 'GPU']
 
+    # Set unknown
+    unknown_symbol = 1
+
     """LSTM for relation extraction"""
 
     def _preprocess_data(self, candidates, extend=False):
@@ -32,6 +35,7 @@ class WCLSTM(TFNoiseAwareModel):
             # Add paddings for words
             map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
 
+        if not hasattr(self, 'char_dict'):
             self.char_dict = SymbolTable()
             # Add paddings for chars
             map(self.char_dict.get, ['<', '>'])
@@ -69,10 +73,31 @@ class WCLSTM(TFNoiseAwareModel):
                 info = "[arg ends at index {0}; max len {1}]".format(end, mx)
                 warnings.warn('\t'.join([w.format(i), info]))
 
+    def create_dict(self, whole_data, word=True, char=True):
+        """Create global dict from user input"""
+        if word:
+            self.word_dict_all = SymbolTable()
+
+            # Add paddings for words
+            map(self.word_dict_all.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
+
+        if char:
+            self.char_dict_all = SymbolTable()
+
+            # Add paddings for chars
+            map(self.char_dict_all.get, ['<', '>'])
+
+        for candidates in whole_data:
+            for candidate in candidates:
+                words = candidate_to_tokens(candidate)
+                if word: map(self.word_dict_all.get, words)
+                if char: map(self.char_dict_all.get, list(' '.join(words)))
+
     def load_dict(self):
         # load dict from glove
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
+
         if not hasattr(self, 'char_dict'):
             self.char_dict = SymbolTable()
 
@@ -87,13 +112,13 @@ class WCLSTM(TFNoiseAwareModel):
 
         l = list()
         for _ in f:
-            if len(_.strip().split(' ')) > self.word_emb_dim + 1:
-                l.append(' ')
-            else:
-                word = _.strip().split(' ')[0]
-                # Replace placeholder to original word defined by user.
-                for key in self.replace.keys():
-                    word = word.replace(key, self.replace[key])
+            line = _.strip().split(' ')
+            assert (len(line) == self.word_emb_dim + 1), "Word embedding dimension doesn't match!"
+            word = line[0]
+            # Replace placeholder to original word defined by user.
+            for key in self.replace.keys():
+                word = word.replace(key, self.replace[key])
+            if hasattr(self, 'word_dict_all') and self.word_dict_all.lookup(word) != self.unknown_symbol:
                 l.append(word)
         map(self.word_dict.get, l)
         f.close()
@@ -103,14 +128,14 @@ class WCLSTM(TFNoiseAwareModel):
 
         l = list()
         for _ in f:
-            if len(_.strip().split(' ')) > self.char_emb_dim + 1:
-                l.append(' ')
-            else:
-                word = _.strip().split(' ')[0]
-                # Replace placeholder to original word defined by user.
-                for key in self.replace.keys():
-                    word = word.replace(key, self.replace[key])
-                l.append(word)
+            line =  _.strip().split(' ')
+            assert (len(line) == self.char_emb_dim + 1), "Char embedding dimension doesn't match!"
+            char = line[0]
+            # Replace placeholder to original word defined by user.
+            for key in self.replace.keys():
+                char = char.replace(key, self.replace[key])
+            if hasattr(self, 'char_dict_all') and self.char_dict_all.lookup(char) != self.unknown_symbol:
+                l.append(char)
         map(self.char_dict.get, l)
         f.close()
 
@@ -130,12 +155,11 @@ class WCLSTM(TFNoiseAwareModel):
             if fmt == "fastText" and i == 0:
                 continue
             line = line.strip().split(' ')
-            if len(line) > self.word_emb_dim + 1:
-                line[0] = ' '
+            assert (len(line) == self.word_emb_dim + 1), "Word embedding dimension doesn't match!"
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
-            self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray(
-                [float(_) for _ in line[-self.word_emb_dim:]])
+            if self.word_dict.lookup(line[0]) != self.unknown_symbol:
+                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
         # Char embeddings
@@ -143,12 +167,11 @@ class WCLSTM(TFNoiseAwareModel):
 
         for line in f:
             line = line.strip().split(' ')
-            if len(line) > self.char_emb_dim + 1:
-                line[0] = ' '
+            assert (len(line) == self.char_emb_dim + 1), "Char embedding dimension doesn't match!"
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
-            self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray(
-                [float(_) for _ in line[-self.char_emb_dim:]])
+            if self.char_dict.lookup(line[0]) != self.unknown_symbol:
+                self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
         f.close()
 
     def train_model(self, w_model, c_model, optimizer, criterion, x_w, x_c, y):
