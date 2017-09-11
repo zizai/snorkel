@@ -92,11 +92,13 @@ class LSTM(TFNoiseAwareModel):
 
         # Word embeddings
         f = open(self.word_emb_path, 'r')
+        fmt = "fastText" if self.word_emb_path.split(".")[-1] == "vec" else "txt"
 
         n, N = 0.0, 0.0
 
         l = list()
-        for _ in f:
+        for i,_ in enumerate(f):
+            if fmt == "fastText" and i == 0: continue
             line = _.strip().split(' ')
             assert (len(line) == self.word_emb_dim + 1), "Word embedding dimension doesn't match!"
             word = line[0]
