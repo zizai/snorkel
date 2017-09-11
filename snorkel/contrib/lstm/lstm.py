@@ -25,7 +25,6 @@ class LSTM(TFNoiseAwareModel):
     unknown_symbol = 1
 
     """LSTM for relation extraction"""
-
     def _preprocess_data(self, candidates, extend=False):
         """Convert candidate sentences to lookup sequences
 
@@ -58,20 +57,32 @@ class LSTM(TFNoiseAwareModel):
                 info = "[arg ends at index {0}; max len {1}]".format(end, mx)
                 warnings.warn('\t'.join([w.format(i), info]))
 
-    def create_dict(self, whole_data, word=True):
+    def create_dict(self, splits, word=True):
         """Create global dict from user input"""
         if word:
-            self.word_dict_all = SymbolTable()
+            self.word_dict = SymbolTable()
+            self.word_dict_all = {}
 
             # Add paddings for words
-            map(self.word_dict_all.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
+            map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
 
-        for candidates in whole_data:
-            for candidate in candidates:
+        # initalize training vocabulary
+        for candidate in splits["train"]:
+            words = candidate_to_tokens(candidate)
+            if word: map(self.word_dict.get, words)
+
+        # initialize pretrained vocabulary
+        for candset in splits["test"]:
+            for candidate in candset:
                 words = candidate_to_tokens(candidate)
-                if word: map(self.word_dict_all.get, words)
+                if word:
+                    self.word_dict_all.update(dict.fromkeys(words))
+
+        print "|Train Vocab|    = {}".format(self.word_dict.s)
+        print "|Dev/Test Vocab| = {}".format(len(self.word_dict_all))
 
     def load_dict(self):
+
         # load dict from file
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
@@ -82,6 +93,8 @@ class LSTM(TFNoiseAwareModel):
         # Word embeddings
         f = open(self.word_emb_path, 'r')
 
+        n, N = 0.0, 0.0
+
         l = list()
         for _ in f:
             line = _.strip().split(' ')
@@ -90,9 +103,15 @@ class LSTM(TFNoiseAwareModel):
             # Replace placeholder to original word defined by user.
             for key in self.replace.keys():
                 word = word.replace(key, self.replace[key])
-            if hasattr(self, 'word_dict_all') and self.word_dict_all.lookup(word) != self.unknown_symbol:
+            if hasattr(self, 'word_dict_all') and word in self.word_dict_all:
                 l.append(word)
+                n += 1
+
         map(self.word_dict.get, l)
+        N = len(self.word_dict_all)
+        print "|Dev/Test Vocab|                   = {}".format(N)
+        print "|Dev/Test Vocab ^ Pretrained Embs| = {} {:2.2f}%".format(n, n / float(N) * 100)
+        print "|Vocab|                            = {}".format(self.word_dict.s)
         f.close()
 
     def load_embeddings(self):
@@ -104,6 +123,7 @@ class LSTM(TFNoiseAwareModel):
         f = open(self.word_emb_path, 'r')
         fmt = "fastText" if self.word_emb_path.split(".")[-1] == "vec" else "txt"
 
+        n, N = 0.0, 0.0
         for i,line in enumerate(f):
             if fmt == "fastText" and i == 0:
                 continue
@@ -113,6 +133,7 @@ class LSTM(TFNoiseAwareModel):
                 line[0] = line[0].replace(key, self.replace[key])
             if self.word_dict.lookup(line[0]) != self.unknown_symbol:
                 self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+
         f.close()
 
     def train_model(self, model, optimizer, criterion, x, y):
@@ -135,6 +156,10 @@ class LSTM(TFNoiseAwareModel):
     def _init_kwargs(self, **kwargs):
 
         self.model_kwargs = kwargs
+
+        if kwargs.get('init_pretrained', False):
+            print "Using pretrained embeddings..."
+            self.create_dict(kwargs['init_pretrained'], word=True)
 
         # Set use pre-trained embedding or not
         self.load_emb = kwargs.get('load_emb', False)
