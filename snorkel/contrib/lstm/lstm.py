@@ -110,10 +110,12 @@ class LSTM(TFNoiseAwareModel):
                 n += 1
 
         map(self.word_dict.get, l)
-        N = len(self.word_dict_all)
-        print "|Dev/Test Vocab|                   = {}".format(N)
-        print "|Dev/Test Vocab ^ Pretrained Embs| = {} {:2.2f}%".format(n, n / float(N) * 100)
-        print "|Vocab|                            = {}".format(self.word_dict.s)
+
+        if hasattr(self, 'word_dict_all'):
+            N = len(self.word_dict_all)
+            print "|Dev/Test Vocab|                   = {}".format(N)
+            print "|Dev/Test Vocab ^ Pretrained Embs| = {} {:2.2f}%".format(n, n / float(N) * 100)
+            print "|Vocab|                            = {}".format(self.word_dict.s)
         f.close()
 
     def load_embeddings(self):
@@ -214,6 +216,9 @@ class LSTM(TFNoiseAwareModel):
 
         if self.load_emb:
             assert self.word_emb_path is not None
+
+        if "init_pretrained" in kwargs:
+            del self.model_kwargs["init_pretrained"]
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, dev_ckpt=True,
               dev_ckpt_delay=0.75, save_dir='checkpoints', **kwargs):
