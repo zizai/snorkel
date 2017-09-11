@@ -28,6 +28,7 @@ def scrub(s):
     return ''.join(c for c in s if ord(c) < 128)
 
 
-def candidate_to_tokens(candidate, token_type='words'):
+def candidate_to_tokens(candidate, token_type='words', lowercase=False):
     tokens = candidate.get_parent().__dict__[token_type]
-    return [scrub(w).lower() for w in tokens]
+    return [scrub(w).lower() if lowercase else scrub(w) for w in tokens]
+
