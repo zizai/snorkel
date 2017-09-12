@@ -4,6 +4,8 @@ import numpy as np
 import warnings
 
 from snorkel.learning.disc_learning import TFNoiseAwareModel
+from snorkel.models import Candidate
+
 from utils import candidate_to_tokens, SymbolTable
 from six.moves.cPickle import dump, load
 from time import time
@@ -30,11 +32,13 @@ class PCA(TFNoiseAwareModel):
         :param candidates: candidates to process
         :param extend: extend symbol table for tokens (train), or lookup (test)?
         """
+
+        if len(candidates) > 0 and not isinstance(candidates[0], Candidate):
+            return candidates
+
         data = []
         for candidate in candidates:
             words = candidate_to_tokens(candidate)
-
-            sent, m1, m2, word_seq = [], [], [], []
 
             # Word level embeddings
             sent = np.array(words)
@@ -76,15 +80,25 @@ class PCA(TFNoiseAwareModel):
     def _build_model(self, **model_kwargs):
         pass
 
-    def create_dict(self, data, word=True, char=True):
+    def create_dict(self, splits, word=True, char=True):
         if word: self.word_dict = SymbolTable()
         if char: self.char_dict = SymbolTable()
 
-        for candidates in data:
+        for candidates in splits['train']:
             for candidate in candidates:
                 words = candidate_to_tokens(candidate)
                 if word: map(self.word_dict.get, words)
                 if char: map(self.char_dict.get, list(' '.join(words)))
+
+        print "|Train Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
+
+        for candidates in splits['test']:
+            for candidate in candidates:
+                words = candidate_to_tokens(candidate)
+                if word: map(self.word_dict.get, words)
+                if char: map(self.char_dict.get, list(' '.join(words)))
+
+        print "|Total Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
 
     def load_dict(self):
         # load dict from glove
@@ -176,28 +190,30 @@ class PCA(TFNoiseAwareModel):
     def get_principal_components(self, x):
         # word level features
         ret1 = torch.zeros(self.r + 1, self.word_emb_dim).double()
-        if len(''.join(x)) > 0:
+        if len(''.join(x)) > 0 and len(x) > self.l:
             f = self.word_dict.lookup
             x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x)]))
             mu = torch.mean(x_, 0, keepdim=True)
             ret1[0,] = mu / torch.norm(mu)
             if self.r > 0:
                 u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
-                k = self.r if v.size(1) > self.r else v.size(1)
-                ret1[1:k+1,] = v.transpose(0, 1)[0:k, ]
+                k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
+                ret1[1:k+1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
             # char level features
             ret2 = torch.zeros(self.r + 1, self.char_emb_dim).double()
-            if len(''.join(x)) > 0:
+            x_c = ''.join(x)
+            if len(x_c) > 0 and len(x_c) > self.l:
                 f = self.char_dict.lookup
-                x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(' '.join(x)))]))
+                x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(x_c))]))
                 mu = torch.mean(x_, 0, keepdim=True)
                 ret2[0,] = mu / torch.norm(mu)
                 if self.r > 0:
                     u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
-                    k = self.r if v.size(1) > self.r else v.size(1)
-                    ret2[1:k+1,] = v.transpose(0, 1)[0:k, ]
+                    k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
+                    # k = self.r if v.size(1) > self.r else v.size(1)
+                    ret2[1:k+1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
             return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
@@ -207,13 +223,19 @@ class PCA(TFNoiseAwareModel):
     def gen_feature(self, X):
         m1 = self.get_principal_components(X[1])
         m2 = self.get_principal_components(X[2])
-        feature = torch.cat((m1, m2))
         if self.sent_feat:
             sent = self.get_principal_components(X[0])
-            feature = torch.cat((feature, sent))
         if self.cont_feat:
             word_seq = self.get_principal_components(X[3])
-            feature = torch.cat((feature, word_seq))
+
+        if self.sent_feat and self.cont_feat:
+            feature = torch.cat((m1, m2, sent, word_seq))
+        elif self.sent_feat:
+            feature = torch.cat((m1, m2, sent))
+        elif self.cont_feat:
+            feature = torch.cat((m1, m2, word_seq))
+        else:
+            feature = torch.cat((m1, m2))
 
         feature = feature.view(1, -1)
 
@@ -281,6 +303,9 @@ class PCA(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        if kwargs.get('init_pretrained', False):
+            self.create_dict(kwargs['init_pretrained'], word=True, char=True)
+
         # Set if use char embeddings
         self.char = kwargs.get('char', True)
 
@@ -308,7 +333,10 @@ class PCA(TFNoiseAwareModel):
         # Set learning epoch
         self.n_epochs = kwargs.get('n_epochs', 100)
 
-        # Set top k principal components
+        # Set ignore first k principal components
+        self.l = kwargs.get('l', 0)
+
+        # Set select top k principal components from the rest
         self.r = kwargs.get('r', 10)
 
         # Set learning batch size
@@ -333,25 +361,29 @@ class PCA(TFNoiseAwareModel):
         self.replace = kwargs.get('replace', {})
 
         print "==============================================="
-        print "Number of learning epochs:     ", self.n_epochs
-        print "Learning rate:                 ", self.lr
-        print "Number of principal components:", self.r
-        print "Batch size:                    ", self.batch_size
-        print "Rebalance:                     ", self.rebalance
-        print "Surrounding window size:       ", self.window_size
-        print "Use sentence sequence          ", self.sent_feat
-        print "Use window sequence            ", self.cont_feat
-        print "Host device                    ", self.host_device
-        print "Use char embeddings            ", self.char
-        print "Word embedding size:           ", self.word_emb_dim
-        print "Char embedding size:           ", self.char_emb_dim
-        print "Word embedding:                ", self.word_emb_path
-        print "Char embedding:                ", self.char_emb_path
+        print "Number of learning epochs:         ", self.n_epochs
+        print "Learning rate:                     ", self.lr
+        print "Ignore top l principal components: ", self.l
+        print "Select top k principal components: ", self.r
+        print "Batch size:                        ", self.batch_size
+        print "Rebalance:                         ", self.rebalance
+        print "Surrounding window size:           ", self.window_size
+        print "Use sentence sequence              ", self.sent_feat
+        print "Use window sequence                ", self.cont_feat
+        print "Host device                        ", self.host_device
+        print "Use char embeddings                ", self.char
+        print "Word embedding size:               ", self.word_emb_dim
+        print "Char embedding size:               ", self.char_emb_dim
+        print "Word embedding:                    ", self.word_emb_path
+        print "Char embedding:                    ", self.char_emb_path
         print "==============================================="
 
         assert self.word_emb_path is not None
         if self.char:
             assert self.char_emb_path is not None
+
+        if "init_pretrained" in kwargs:
+            del self.model_kwargs["init_pretrained"]
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, dev_ckpt=True,
               dev_ckpt_delay=0.75, save_dir='checkpoints', **kwargs):
@@ -402,19 +434,17 @@ class PCA(TFNoiseAwareModel):
             st = time()
             print "[%s] n_train= %s" % (self.name, len(X_train))
 
-        X_train= self._preprocess_data_combination(X_train)
-
+        X_train = self._preprocess_data_combination(X_train)
+        if X_dev is not None:
+            X_dev = self._preprocess_data_combination(X_dev)
         Y_train = torch.from_numpy(Y_train).float()
 
         new_X_train = None
         for i in range(len(X_train)):
             feature = self.gen_feature(X_train[i])
             if new_X_train is None:
-                new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1))))
+                new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1)), dtype=np.float)).float()
             new_X_train[i] = feature
-
-        new_X_train = new_X_train.float()
-
         data_set = data_utils.TensorDataset(new_X_train, Y_train)
         train_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
