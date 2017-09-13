@@ -141,6 +141,7 @@ class LSTM(TFNoiseAwareModel):
         f.close()
 
     def train_model(self, model, optimizer, criterion, x, y):
+        model.train()
         batch_size, max_sent = x.size()
         state_word = model.init_hidden(batch_size)
         optimizer.zero_grad()
@@ -234,6 +235,10 @@ class LSTM(TFNoiseAwareModel):
 
         # Set random seed
         torch.manual_seed(self.seed)
+        if self.host_device in self.gpu:
+            torch.cuda.manual_seed(self.seed)
+
+        np.random.seed(seed=int(self.seed))
 
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
@@ -328,6 +333,7 @@ class LSTM(TFNoiseAwareModel):
             self.load(save_dir=save_dir, only_param=True)
 
     def _marginals_batch(self, X):
+        self.model.eval()
         X_w = self._preprocess_data(X, extend=False)
         X_w = np.array(X_w)
         sigmoid = nn.Sigmoid()
