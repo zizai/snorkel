@@ -637,11 +637,13 @@ class RandomSearch(GridSearch):
         self.rand_state = np.random.RandomState()
         self.rand_state.seed(seed)
         self.n = n
+        self.seed = seed
         super(RandomSearch, self).__init__(model_class, parameter_dict, X_train,
             Y_train=Y_train, model_class_params=model_class_params,
             model_hyperparams=model_hyperparams, save_dir=save_dir)
 
     def search_space(self):
+        self.rand_state.seed(self.seed)
         return zip(*[self.rand_state.choice(self.parameter_dict[pn], self.n)
             for pn in self.param_names])
 
