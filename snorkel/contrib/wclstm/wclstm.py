@@ -277,6 +277,8 @@ class WCLSTM(TFNoiseAwareModel):
         f.close()
 
     def train_model(self, w_model, c_model, optimizer, criterion, x_w, x_c, y):
+        w_model.train()
+        c_model.train()
         max_sent, batch_size, max_token = x_c.size()
         w_state_word = w_model.init_hidden(batch_size)
         c_state_word = c_model.init_hidden(batch_size)
@@ -404,6 +406,10 @@ class WCLSTM(TFNoiseAwareModel):
 
         # Set random seed
         torch.manual_seed(self.seed)
+        if self.host_device in self.gpu:
+            torch.cuda.manual_seed(self.seed)
+
+        np.random.seed(seed=int(self.seed))
 
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
@@ -525,6 +531,9 @@ class WCLSTM(TFNoiseAwareModel):
             self.load(save_dir=save_dir, only_param=True)
 
     def _marginals_batch(self, X):
+        self.char_model.eval()
+        self.word_model.eval()
+
         X_w, X_c = self._preprocess_data(X, extend=False)
         X_w = np.array(X_w)
         X_c = np.array(X_c)
