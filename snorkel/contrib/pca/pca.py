@@ -399,6 +399,10 @@ class PCA(TFNoiseAwareModel):
 
         # Set random seed
         torch.manual_seed(self.seed)
+        if self.host_device in self.gpu:
+            torch.cuda.manual_seed(self.seed)
+
+        np.random.seed(seed=int(self.seed))
 
         # load embeddings from file
         self.load_embeddings()
