@@ -2,7 +2,8 @@ from __future__ import print_function
 import torch
 import numpy as np
 import scipy.sparse
-import numba
+import timeit
+
 
 def plsa(count, n_dim, n_iter, learning_rate=1e-3):
     n_terms = count.shape[0]
@@ -47,6 +48,77 @@ def plsa(count, n_dim, n_iter, learning_rate=1e-3):
     return L
 
 
+def plsa_sparse(count, n_dim, n_iter, M=None, learning_rate=1e-3, batch_size=100, negatives=10):
+    n_terms = count.shape[0]
+    nnz = count._nnz()
+
+    batch_size = min(batch_size, nnz + negatives)
+    negatives = min(negatives, batch_size)
+
+    if M is None:
+        M = np.random.rand(n_terms, n_dim)
+        M /= M.sum(axis=1, keepdims=True)
+        M = torch.FloatTensor(M)
+        M = torch.autograd.Variable(M, requires_grad=True)
+
+    alpha = (negatives / float(batch_size)) * (1 - (nnz / float(n_terms * n_terms)))
+    beta = 1 - alpha
+    print(negatives)
+    print(batch_size)
+    print(alpha)
+    print(beta)
+
+    for t in range(n_iter):
+        # Gather mini-batch
+        batch = torch.LongTensor(np.random.choice(nnz, batch_size - negatives, replace=False))
+        i = torch.cat((count._indices()[0][batch], torch.LongTensor(np.random.randint(n_terms, size=negatives))))
+        j = torch.cat((count._indices()[1][batch], torch.LongTensor(np.random.randint(n_terms, size=negatives))))
+        L = M[i][:]
+        R = M[j][:]
+        C = torch.cat((torch.FloatTensor(count._values()[batch]) / beta, torch.FloatTensor(negatives).zero_()))
+        C = torch.autograd.Variable(C, requires_grad=False)
+        W = torch.cat((beta * torch.ones(batch_size - negatives), alpha * torch.ones(negatives)))
+        W = torch.autograd.Variable(W, requires_grad=False)
+        print(i)
+        print(j)
+        print(C)
+        print(W)
+
+        # Forward pass: compute predicted y using operations on Variables; these
+        # are exactly the same operations we used to compute the forward pass using
+        # Tensors, but we do not need to keep references to intermediate values since
+        # we are not implementing the backward pass by hand.
+        C_pred = (L * R).sum(1)
+
+        # Compute and print loss using operations on Variables.
+        # Now loss is a Variable of shape (1,) and loss.data is a Tensor of shape
+        # (1,); loss.data[0] is a scalar value holding the loss.
+        loss = (W * (C_pred - C)).pow(2).sum()
+        # if t % 100 == 0:
+        if t == 0:
+            print(t)
+            print(loss.data[0] / n_terms ** 2)
+            print((M.data.mm(M.data.t()) - count.to_dense()).pow(2).sum() / n_terms ** 2)
+            print(M.data.mm(M.data.t()) - count.to_dense())
+            print()
+
+        # Use autograd to compute the backward pass. This call will compute the
+        # gradient of loss with respect to all Variables with requires_grad=True.
+        # After this call w1.grad and w2.grad will be Variables holding the gradient
+        # of the loss with respect to w1 and w2 respectively.
+        loss.backward()
+
+        # Update weights using gradient descent; w1.data and w2.data are Tensors,
+        # w1.grad and w2.grad are Variables and w1.grad.data and w2.grad.data are
+        # Tensors.
+        M.data -= learning_rate * M.grad.data
+
+        # Manually zero the gradients after updating weights
+        M.grad.data.zero_()
+
+    return M
+
+
 def init_matrix(n_terms, sparsity):
     m = int(n_terms ** 2 * sparsity)
 
@@ -59,12 +131,19 @@ def init_matrix(n_terms, sparsity):
     count = count.coalesce()
     return count
 
+
 def main():
-    n_terms, sparsity = 1000, 0.01
+    # n_terms, sparsity = 10, 0.01
+    n_terms, sparsity = 10, 0.5
+    n_terms, sparsity = 2, 0.5
 
     count = init_matrix(n_terms, sparsity)
 
-    plsa(count, 5, 1000)
+    print(count.to_dense())
+    M = None
+    for lr in [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]:
+        M = plsa_sparse(count, 5, 1, M, lr, 2, 1)
+
 
 if __name__ == "__main__":
     main()
