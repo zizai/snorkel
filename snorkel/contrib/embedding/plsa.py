@@ -61,13 +61,6 @@ def plsa_sparse(count, n_dim, n_iter, M=None, learning_rate=1e-3, batch_size=100
         M = torch.FloatTensor(M)
         M = torch.autograd.Variable(M, requires_grad=True)
 
-    alpha = (negatives / float(batch_size)) * (1 - (nnz / float(n_terms * n_terms)))
-    beta = 1 - alpha
-    print(negatives)
-    print(batch_size)
-    print(alpha)
-    print(beta)
-
     for t in range(n_iter):
         # Gather mini-batch
         batch = torch.LongTensor(np.random.choice(nnz, batch_size - negatives, replace=False))
@@ -75,14 +68,8 @@ def plsa_sparse(count, n_dim, n_iter, M=None, learning_rate=1e-3, batch_size=100
         j = torch.cat((count._indices()[1][batch], torch.LongTensor(np.random.randint(n_terms, size=negatives))))
         L = M[i][:]
         R = M[j][:]
-        C = torch.cat((torch.FloatTensor(count._values()[batch]) / beta, torch.FloatTensor(negatives).zero_()))
+        C = torch.cat((torch.FloatTensor(count._values()[batch]), torch.FloatTensor(negatives).zero_()))
         C = torch.autograd.Variable(C, requires_grad=False)
-        W = torch.cat((beta * torch.ones(batch_size - negatives), alpha * torch.ones(negatives)))
-        W = torch.autograd.Variable(W, requires_grad=False)
-        print(i)
-        print(j)
-        print(C)
-        print(W)
 
         # Forward pass: compute predicted y using operations on Variables; these
         # are exactly the same operations we used to compute the forward pass using
@@ -93,14 +80,11 @@ def plsa_sparse(count, n_dim, n_iter, M=None, learning_rate=1e-3, batch_size=100
         # Compute and print loss using operations on Variables.
         # Now loss is a Variable of shape (1,) and loss.data is a Tensor of shape
         # (1,); loss.data[0] is a scalar value holding the loss.
-        loss = (W * (C_pred - C)).pow(2).sum()
-        # if t % 100 == 0:
-        if t == 0:
-            print(t)
-            print(loss.data[0] / n_terms ** 2)
-            print((M.data.mm(M.data.t()) - count.to_dense()).pow(2).sum() / n_terms ** 2)
-            print(M.data.mm(M.data.t()) - count.to_dense())
-            print()
+        loss = (C_pred - C).pow(2).sum()
+        if t % 100 == 0:
+            print(t, loss.data[0] / batch_size)
+            # print((M.data.mm(M.data.t()) - count.to_dense()).pow(2).sum() / n_terms ** 2)
+            # print()
 
         # Use autograd to compute the backward pass. This call will compute the
         # gradient of loss with respect to all Variables with requires_grad=True.
@@ -133,16 +117,13 @@ def init_matrix(n_terms, sparsity):
 
 
 def main():
-    # n_terms, sparsity = 10, 0.01
-    n_terms, sparsity = 10, 0.5
-    n_terms, sparsity = 2, 0.5
+    n_terms, sparsity = 1000, 0.01
 
     count = init_matrix(n_terms, sparsity)
 
-    print(count.to_dense())
     M = None
     for lr in [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]:
-        M = plsa_sparse(count, 5, 1, M, lr, 2, 1)
+        M = plsa_sparse(count, 5, 1000, M, lr)
 
 
 if __name__ == "__main__":
