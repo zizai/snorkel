@@ -75,7 +75,6 @@ def mark_sentence(s, args):
 def pad_batch(mini_batch, max_len):
     mini_batch_size = len(mini_batch)
     max_sent_len = min(int(np.max([len(x) for x in mini_batch])), max_len)
-    # print mini_batch_size, max_sent_len
     main_matrix = np.zeros((mini_batch_size, max_sent_len), dtype=np.int)
     for idx1, i in enumerate(mini_batch):
         for idx2, j in enumerate(i):
@@ -98,7 +97,7 @@ def batch_matmul_bias(seq, weight, bias, nonlinearity=''):
             s = _s_bias
         else:
             s = torch.cat((s, _s_bias), 0)
-    return s.squeeze()
+    return s
 
 
 def batch_matmul(seq, weight, nonlinearity=''):
@@ -112,7 +111,7 @@ def batch_matmul(seq, weight, nonlinearity=''):
             s = _s
         else:
             s = torch.cat((s, _s), 0)
-    return s.squeeze()
+    return s
 
 
 def attention_mul(rnn_outputs, att_weights):
@@ -171,7 +170,7 @@ class AttentionRNN(nn.Module):
         if self.attention:
             word_squish = batch_matmul_bias(output_word, self.weight_W_word, self.bias_word, nonlinearity='tanh')
             word_attn = batch_matmul(word_squish, self.weight_proj_word)
-            word_attn_norm = self.softmax_word(word_attn.transpose(1, 0))
+            word_attn_norm = self.softmax_word(word_attn.transpose(1, 0).squeeze(2))
             word_attn_vectors = attention_mul(output_word, word_attn_norm.transpose(1, 0))
             final_map = self.linear(word_attn_vectors)
         else:

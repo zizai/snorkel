@@ -25,6 +25,7 @@ class LSTM(TFNoiseAwareModel):
     unknown_symbol = 1
 
     """LSTM for relation extraction"""
+
     def _preprocess_data(self, candidates, extend=False):
         """Convert candidate sentences to lookup sequences
 
@@ -82,7 +83,7 @@ class LSTM(TFNoiseAwareModel):
         print "|Dev/Test Vocab| = {}".format(len(self.word_dict_all))
 
     def load_dict(self):
-
+        """Load dict from user input embeddings"""
         # load dict from file
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
@@ -97,7 +98,7 @@ class LSTM(TFNoiseAwareModel):
         n, N = 0.0, 0.0
 
         l = list()
-        for i,_ in enumerate(f):
+        for i, _ in enumerate(f):
             if fmt == "fastText" and i == 0: continue
             line = _.strip().split(' ')
             assert (len(line) == self.word_emb_dim + 1), "Word embedding dimension doesn't match!"
@@ -119,6 +120,7 @@ class LSTM(TFNoiseAwareModel):
         f.close()
 
     def load_embeddings(self):
+        """Load pre-trained embeddings from user input"""
         self.load_dict()
         # Random initial word embeddings
         self.word_emb = np.random.uniform(-0.1, 0.1, (self.word_dict.s, self.word_emb_dim)).astype(np.float)
@@ -127,8 +129,7 @@ class LSTM(TFNoiseAwareModel):
         f = open(self.word_emb_path, 'r')
         fmt = "fastText" if self.word_emb_path.split(".")[-1] == "vec" else "txt"
 
-        n, N = 0.0, 0.0
-        for i,line in enumerate(f):
+        for i, line in enumerate(f):
             if fmt == "fastText" and i == 0:
                 continue
             line = line.strip().split(' ')
@@ -136,11 +137,13 @@ class LSTM(TFNoiseAwareModel):
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
             if self.word_dict.lookup(line[0]) != self.unknown_symbol:
-                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray(
+                    [float(_) for _ in line[-self.word_emb_dim:]])
 
         f.close()
 
     def train_model(self, model, optimizer, criterion, x, y):
+        """Train LSTM model"""
         model.train()
         batch_size, max_sent = x.size()
         state_word = model.init_hidden(batch_size)
@@ -159,7 +162,7 @@ class LSTM(TFNoiseAwareModel):
         return loss.data[0]
 
     def _init_kwargs(self, **kwargs):
-
+        """Parse user input arguments"""
         self.model_kwargs = kwargs
 
         if kwargs.get('init_pretrained', False):
@@ -333,6 +336,7 @@ class LSTM(TFNoiseAwareModel):
             self.load(save_dir=save_dir, only_param=True)
 
     def _marginals_batch(self, X):
+        """Predict class based on user input"""
         self.model.eval()
         X_w = self._preprocess_data(X, extend=False)
         X_w = np.array(X_w)
@@ -358,10 +362,8 @@ class LSTM(TFNoiseAwareModel):
                 y = np.append(y, sigmoid(y_pred).data.numpy())
         return y
 
-
-    def save(self, model_name=None, save_dir='checkpoints', verbose=True,
-             only_param=False):
-        """Save current model."""
+    def save(self, model_name=None, save_dir='checkpoints', verbose=True, only_param=False):
+        """Save current model"""
         model_name = model_name or self.name
 
         # Note: Model checkpoints need to be saved in separate directories!
@@ -389,7 +391,7 @@ class LSTM(TFNoiseAwareModel):
             print("[{0}] Model saved as <{1}>, only_param={2}".format(self.name, model_name, only_param))
 
     def load(self, model_name=None, save_dir='checkpoints', verbose=True, only_param=False):
-        """Load model from file and rebuild in new graph / session."""
+        """Load model from file and rebuild in new model"""
         model_name = model_name or self.name
         model_dir = os.path.join(save_dir, model_name)
 

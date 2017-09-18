@@ -19,7 +19,6 @@ from snorkel.learning.utils import reshape_marginals, LabelBalancer
 
 
 class PCA(TFNoiseAwareModel):
-
     name = 'PCA'
     representation = True
     gpu = ['gpu', 'GPU']
@@ -30,7 +29,6 @@ class PCA(TFNoiseAwareModel):
         """Convert candidate sentences to lookup sequences
 
         :param candidates: candidates to process
-        :param extend: extend symbol table for tokens (train), or lookup (test)?
         """
 
         if len(candidates) > 0 and not isinstance(candidates[0], Candidate):
@@ -69,8 +67,8 @@ class PCA(TFNoiseAwareModel):
         return data
 
     def _check_max_sentence_length(self, ends, max_len=None):
-        """Check that extraction arguments are within @self.max_len"""
-        mx = max_len or self.max_len
+        """Check that extraction arguments are within @self.max_sentence_length"""
+        mx = max_len or self.max_sentence_length
         for i, end in enumerate(ends):
             if end >= mx:
                 w = "Candidate {0} has argument past max length for model:"
@@ -175,7 +173,8 @@ class PCA(TFNoiseAwareModel):
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
             if self.word_dict.lookup(line[0]) != unknown_symbol:
-                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray(
+                    [float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
         if self.char:
@@ -189,7 +188,8 @@ class PCA(TFNoiseAwareModel):
                 for key in self.replace.keys():
                     line[0] = line[0].replace(key, self.replace[key])
                 if self.char_dict.lookup(line[0]) != unknown_symbol:
-                    self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
+                    self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray(
+                        [float(_) for _ in line[-self.char_emb_dim:]])
             f.close()
 
     def get_principal_components(self, x):
@@ -199,11 +199,11 @@ class PCA(TFNoiseAwareModel):
             f = self.word_dict.lookup
             x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x)]))
             mu = torch.mean(x_, 0, keepdim=True)
-            ret1[0,] = mu / torch.norm(mu)
+            ret1[0, ] = mu / torch.norm(mu)
             if self.r > 0:
                 u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
                 k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                ret1[1:k+1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+                ret1[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
             # char level features
@@ -213,12 +213,12 @@ class PCA(TFNoiseAwareModel):
                 f = self.char_dict.lookup
                 x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(x_c))]))
                 mu = torch.mean(x_, 0, keepdim=True)
-                ret2[0,] = mu / torch.norm(mu)
+                ret2[0, ] = mu / torch.norm(mu)
                 if self.r > 0:
                     u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
                     k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                     # k = self.r if v.size(1) > self.r else v.size(1)
-                    ret2[1:k+1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+                    ret2[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
             return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
@@ -404,6 +404,10 @@ class PCA(TFNoiseAwareModel):
 
         # Set random seed
         torch.manual_seed(self.seed)
+        if self.host_device in self.gpu:
+            torch.cuda.manual_seed(self.seed)
+
+        np.random.seed(seed=int(self.seed))
 
         # load embeddings from file
         self.load_embeddings()
@@ -413,8 +417,8 @@ class PCA(TFNoiseAwareModel):
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
             raise ValueError("Training marginals cardinality ({0}) does not"
-                "match model cardinality ({1}).".format(Y_train.shape[1],
-                    self.cardinality))
+                             "match model cardinality ({1}).".format(Y_train.shape[1],
+                                                                     self.cardinality))
         # Make sure marginals are in correct default format
         Y_train = reshape_marginals(Y_train)
         # Make sure marginals are in [0,1] (v.s e.g. [-1, 1])
@@ -426,7 +430,7 @@ class PCA(TFNoiseAwareModel):
         if self.cardinality == 2:
             # This removes unlabeled examples and optionally rebalances
             train_idxs = LabelBalancer(Y_train).get_train_idxs(self.rebalance,
-                rand_state=self.rand_state)
+                                                               rand_state=self.rand_state)
         else:
             # In categorical setting, just remove unlabeled
             diffs = Y_train.max(axis=1) - Y_train.min(axis=1)
@@ -567,4 +571,3 @@ class PCA(TFNoiseAwareModel):
 
         if verbose:
             print("[{0}] Loaded model <{1}>, only_param={2}".format(self.name, model_name, only_param))
-

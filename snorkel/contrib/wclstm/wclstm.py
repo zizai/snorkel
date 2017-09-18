@@ -73,28 +73,6 @@ class WCLSTM(TFNoiseAwareModel):
                 info = "[arg ends at index {0}; max len {1}]".format(end, mx)
                 warnings.warn('\t'.join([w.format(i), info]))
 
-    # def create_dict(self, whole_data, word=True, char=True):
-    #     """Create global dict from user input"""
-    #     if word:
-    #         self.word_dict_all = SymbolTable()
-    #
-    #         # Add paddings for words
-    #         map(self.word_dict_all.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
-    #
-    #     if char:
-    #         self.char_dict_all = SymbolTable()
-    #
-    #         # Add paddings for chars
-    #         map(self.char_dict_all.get, ['<', '>'])
-    #
-    #     for candidates in whole_data:
-    #         for candidate in candidates:
-    #             words = candidate_to_tokens(candidate)
-    #             if word: map(self.word_dict_all.get, words)
-    #             if char: map(self.char_dict_all.get, list(' '.join(words)))
-
-
-
     def create_dict(self, splits, word=True, char=True):
         """Create global dict from user input"""
         if word:
@@ -111,13 +89,13 @@ class WCLSTM(TFNoiseAwareModel):
             # Add paddings for chars
             map(self.char_dict_all.get, ['<', '>'])
 
-        # initalize training vocabulary
+        # Initialize training vocabulary
         for candidate in splits["train"]:
             words = candidate_to_tokens(candidate)
             if word: map(self.word_dict.get, words)
             if char: map(self.char_dict.get, list(' '.join(words)))
 
-        # initialize pretrained vocabulary
+        # Initialize pre-trained vocabulary
         for candset in splits["test"]:
             for candidate in candset:
                 words = candidate_to_tokens(candidate)
@@ -129,12 +107,8 @@ class WCLSTM(TFNoiseAwareModel):
         print "|Train Vocab|    = {}".format(self.word_dict.s)
         print "|Dev/Test Vocab| = {}".format(len(self.word_dict_all))
 
-
-
-
     def load_dict(self):
-
-        # load dict from file
+        """Load dict from user input embeddings"""
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
 
@@ -179,69 +153,20 @@ class WCLSTM(TFNoiseAwareModel):
 
         l = list()
         for _ in f:
-            line =  _.strip().split(' ')
-            assert (len(line) == self.char_emb_dim + 1), "Char embedding dimension doesn't match!"
+            line = _.strip().split(' ')
+            assert (self.char_emb_dim + 1 == len(line)), "Char embedding dimension doesn't match!"
             char = line[0]
             # Replace placeholder to original word defined by user.
             for key in self.replace.keys():
                 char = char.replace(key, self.replace[key])
-            #if hasattr(self, 'char_dict_all') and self.char_dict_all.lookup(char) != self.unknown_symbol:
-            #    l.append(char)
             if hasattr(self, 'char_dict_all') and char in self.char_dict_all:
                 l.append(char)
 
         map(self.char_dict.get, l)
         f.close()
 
-    # def load_dict(self):
-    #     # load dict from glove
-    #     if not hasattr(self, 'word_dict'):
-    #         self.word_dict = SymbolTable()
-    #
-    #     if not hasattr(self, 'char_dict'):
-    #         self.char_dict = SymbolTable()
-    #
-    #     # Add paddings for words
-    #     map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
-    #
-    #     # Add paddings for chars
-    #     map(self.char_dict.get, ['<', '>'])
-    #
-    #     # Word embeddings
-    #     f = open(self.word_emb_path, 'r')
-    #     fmt = "fastText" if self.word_emb_path.split(".")[-1] == "vec" else "txt"
-    #
-    #     l = list()
-    #     for i,_ in enumerate(f):
-    #         if fmt == "fastText" and i == 0: continue
-    #         line = _.strip().split(' ')
-    #         assert (len(line) == self.word_emb_dim + 1), "Word embedding dimension doesn't match!"
-    #         word = line[0]
-    #         # Replace placeholder to original word defined by user.
-    #         for key in self.replace.keys():
-    #             word = word.replace(key, self.replace[key])
-    #         if hasattr(self, 'word_dict_all') and self.word_dict_all.lookup(word) != self.unknown_symbol:
-    #             l.append(word)
-    #     map(self.word_dict.get, l)
-    #     f.close()
-    #
-    #     # Char embeddings
-    #     f = open(self.char_emb_path, 'r')
-    #
-    #     l = list()
-    #     for _ in f:
-    #         line =  _.strip().split(' ')
-    #         assert (len(line) == self.char_emb_dim + 1), "Char embedding dimension doesn't match!"
-    #         char = line[0]
-    #         # Replace placeholder to original word defined by user.
-    #         for key in self.replace.keys():
-    #             char = char.replace(key, self.replace[key])
-    #         if hasattr(self, 'char_dict_all') and self.char_dict_all.lookup(char) != self.unknown_symbol:
-    #             l.append(char)
-    #     map(self.char_dict.get, l)
-    #     f.close()
-
     def load_embeddings(self):
+        """Load pre-trained embeddings from user input"""
         self.load_dict()
         # Random initial word embeddings
         self.word_emb = np.random.uniform(-0.1, 0.1, (self.word_dict.s, self.word_emb_dim)).astype(np.float)
@@ -261,7 +186,8 @@ class WCLSTM(TFNoiseAwareModel):
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
             if self.word_dict.lookup(line[0]) != self.unknown_symbol:
-                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.word_emb_dim:]])
+                self.word_emb[self.word_dict.lookup_strict(line[0])] = np.asarray(
+                    [float(_) for _ in line[-self.word_emb_dim:]])
         f.close()
 
         # Char embeddings
@@ -273,10 +199,12 @@ class WCLSTM(TFNoiseAwareModel):
             for key in self.replace.keys():
                 line[0] = line[0].replace(key, self.replace[key])
             if self.char_dict.lookup(line[0]) != self.unknown_symbol:
-                self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray([float(_) for _ in line[-self.char_emb_dim:]])
+                self.char_emb[self.char_dict.lookup_strict(line[0])] = np.asarray(
+                    [float(_) for _ in line[-self.char_emb_dim:]])
         f.close()
 
     def train_model(self, w_model, c_model, optimizer, criterion, x_w, x_c, y):
+        """Train LSTM model"""
         w_model.train()
         c_model.train()
         max_sent, batch_size, max_token = x_c.size()
@@ -308,7 +236,7 @@ class WCLSTM(TFNoiseAwareModel):
         return loss.data[0]
 
     def _init_kwargs(self, **kwargs):
-
+        """Parse user input arguments"""
         self.model_kwargs = kwargs
 
         if kwargs.get('init_pretrained', False):
@@ -531,6 +459,7 @@ class WCLSTM(TFNoiseAwareModel):
             self.load(save_dir=save_dir, only_param=True)
 
     def _marginals_batch(self, X):
+        """Predict class based on user input"""
         self.char_model.eval()
         self.word_model.eval()
 
@@ -571,7 +500,7 @@ class WCLSTM(TFNoiseAwareModel):
         return y
 
     def save(self, model_name=None, save_dir='checkpoints', verbose=True, only_param=False):
-        """Save current model."""
+        """Save current model"""
         model_name = model_name or self.name
 
         # Note: Model checkpoints need to be saved in separate directories!
@@ -601,7 +530,7 @@ class WCLSTM(TFNoiseAwareModel):
             print("[{0}] Model saved as <{1}>, only_param={2}".format(self.name, model_name, only_param))
 
     def load(self, model_name=None, save_dir='checkpoints', verbose=True, only_param=False):
-        """Load model from file and rebuild in new graph / session."""
+        """Load model from file and rebuild in new model"""
         model_name = model_name or self.name
         model_dir = os.path.join(save_dir, model_name)
 
