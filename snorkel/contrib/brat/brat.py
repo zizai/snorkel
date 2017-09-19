@@ -183,6 +183,50 @@ class BratAnnotator(object):
         display(HTML("<style>.container { width:100% !important; }</style>"))
         display(IFrame(url, width=width, height=height))
 
+    def map_entity_annotations(self, session, annotation_dir, candidates):
+
+        # load BRAT annotations
+        fpath = self.get_collection_path(annotation_dir)
+        annotations = self.standoff_parser.load_annotations(fpath)
+
+        # load Document objects from session
+        doc_names = [doc_name for doc_name in annotations if annotations[doc_name]]
+        documents = session.query(Document).filter(Document.name.in_(doc_names)).all()
+        documents = {doc.name: doc for doc in documents}
+
+        # TODO: make faster!!
+        # create stable IDs for all candidates
+        candidate_stable_ids = {}
+        for c in candidates:
+            if len(c) == 1:
+                stable_id = c[0].get_stable_id()
+            else:
+                print "ERROR cardinality != 1"
+                continue
+            candidate_stable_ids[stable_id] = c
+
+        brat_stable_ids = []
+        for doc_name in documents:
+            spans, relations = self._create_relations(documents[doc_name], annotations[doc_name])
+            for key in spans:
+                brat_stable_ids.append(spans[key].get_stable_id())
+
+        mapped_cands, missed = [], []
+        for span in brat_stable_ids:
+            # otherwise just test if this relation is in our candidate set
+            if span in candidate_stable_ids:
+
+                mapped_cands.append(candidate_stable_ids[span])
+            else:
+                missed.append(span)
+
+        n, N = len(mapped_cands), len(missed) + len(mapped_cands)
+        p = len(mapped_cands) / float(N)
+        print>> sys.stderr, "Mapped {}/{} ({:2.0f}%) of BRAT labels to candidates".format(n, N, p * 100)
+        return mapped_cands, len(missed)
+
+
+
     def map_annotations(self, session, annotation_dir, candidates, symmetric_relations=True):
         """
         Import a collection of BRAT annotations,  map it onto the provided set
@@ -214,7 +258,13 @@ class BratAnnotator(object):
         # create stable IDs for all candidates
         candidate_stable_ids = {}
         for c in candidates:
-            candidate_stable_ids[(c[0].get_stable_id(), c[1].get_stable_id())] = c
+            if len(c) == 2:
+                stable_id = (c[0].get_stable_id(), c[1].get_stable_id())
+            else:
+                print "ERROR cardinality != 2"
+                continue
+
+            candidate_stable_ids[stable_id] = c
 
         # build BRAT span/relation objects
         brat_stable_ids = []
@@ -301,7 +351,7 @@ class BratAnnotator(object):
         """
         return "{}/{}".format(self.data_root, annotation_dir)
 
-    def import_gold_labels(self, session, annotation_dir, candidates,
+    def import_gold_labels(self, session, annotation_dir, candidate_class, candidates,
                            symmetric_relations=True,  annotator_name='brat'):
         """
         We assume all candidates provided to this function are true instances
@@ -310,7 +360,11 @@ class BratAnnotator(object):
         :param annotator_name:
         :return:
         """
-        mapped_cands, _ = self.map_annotations(session, annotation_dir, candidates, symmetric_relations)
+
+        if len(candidate_class.__argnames__) == 1:
+            mapped_cands, _ = self.map_entity_annotations(session, annotation_dir, candidates)
+        else:
+            mapped_cands, _ = self.map_annotations(session, annotation_dir, candidates, symmetric_relations)
 
         for c in mapped_cands:
             if self.session.query(GoldLabel).filter(and_(GoldLabel.key_id == self.annotator.id,
