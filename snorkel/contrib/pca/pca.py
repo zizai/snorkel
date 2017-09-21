@@ -409,6 +409,9 @@ class PCA(TFNoiseAwareModel):
 
         np.random.seed(seed=int(self.seed))
 
+        # Set random seed for all numpy operations
+        self.rand_state.seed(self.seed)
+
         # load embeddings from file
         self.load_embeddings()
 

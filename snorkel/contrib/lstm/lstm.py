@@ -243,6 +243,9 @@ class LSTM(TFNoiseAwareModel):
 
         np.random.seed(seed=int(self.seed))
 
+        # Set random seed for all numpy operations
+        self.rand_state.seed(self.seed)
+
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
             raise ValueError("Training marginals cardinality ({0}) does not"
