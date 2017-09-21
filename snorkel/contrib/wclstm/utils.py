@@ -72,6 +72,7 @@ def mark_sentence(s, args):
 
 
 def pad_batch(mini_batch_w, mini_batch_c, max_sentence_length, max_word_length):
+    """Pad the batch into matrix"""
     mini_batch_size = len(mini_batch_w)
     max_sent_len = min(int(np.max([len(x) for x in mini_batch_w])), max_sentence_length)
     max_word_len = min(int(np.max([len(w) for words in mini_batch_c for w in words])), max_word_length)

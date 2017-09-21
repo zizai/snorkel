@@ -73,6 +73,7 @@ def mark_sentence(s, args):
 
 
 def pad_batch(mini_batch, max_len):
+    """Pad the batch into matrix"""
     mini_batch_size = len(mini_batch)
     max_sent_len = min(int(np.max([len(x) for x in mini_batch])), max_len)
     main_matrix = np.zeros((mini_batch_size, max_sent_len), dtype=np.int)
