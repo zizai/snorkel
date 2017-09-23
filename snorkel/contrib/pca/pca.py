@@ -25,6 +25,28 @@ class PCA(TFNoiseAwareModel):
 
     """SVD for relation extraction"""
 
+    def gen_dist_exp(self, length, decay, st, ed):
+        ret = []
+        for i in range(length):
+            if i < st:
+                ret.append(decay ** (st - i))
+            elif i >= ed:
+                ret.append(decay ** (i - ed + 1))
+            else:
+                ret.append(1.)
+        return np.array(ret)
+
+    def gen_dist_linear(self, length, st, ed, window_size):
+        ret = []
+        for i in range(length):
+            if i < st:
+                ret.append(max(0., 1. * (window_size - st + i + 1) / window_size))
+            elif i >= ed:
+                ret.append(max(0., 1. * (window_size + ed - i) / window_size))
+            else:
+                ret.append(1.)
+        return np.array(ret)
+
     def _preprocess_data_combination(self, candidates):
         """Convert candidate sentences to lookup sequences
 
@@ -46,14 +68,31 @@ class PCA(TFNoiseAwareModel):
             m1_start = candidate[0].get_word_start()
             m1_end = candidate[0].get_word_end() + 1
 
+            if self.kernel == 'exp':
+                dist_m1 = self.gen_dist_exp(len(words), self.decay, m1_start, m1_end)
+            elif self.kernel == 'linear':
+                dist_m1 = self.gen_dist_linear(len(words), m1_start, m1_end, self.window_size)
+                dist_m1_sent = self.gen_dist_linear(len(words), m1_start, m1_end, max(m1_start, len(words) - m1_end))
+
             m1_start = max(m1_start - k, 0)
             m1_end = min(m1_end + k, len(words))
 
             m2_start = candidate[1].get_word_start()
             m2_end = candidate[1].get_word_end() + 1
 
+            if self.kernel == 'exp':
+                dist_m2 = self.gen_dist_exp(len(words), self.decay, m2_start, m2_end)
+            elif self.kernel == 'linear':
+                dist_m2 = self.gen_dist_linear(len(words), m2_start, m2_end, self.window_size)
+                dist_m2_sent = self.gen_dist_linear(len(words), m2_start, m2_end, max(m2_start, len(words) - m2_end))
+
             m2_start = max(m2_start - k, 0)
             m2_end = min(m2_end + k, len(words))
+
+            if self.kernel == 'exp':
+                dist_sent = np.maximum(dist_m1, dist_m2)
+            elif self.kernel == 'linear':
+                dist_sent = np.maximum(dist_m1_sent, dist_m2_sent)
 
             m1 = np.array(words[m1_start: m1_end])
             m2 = np.array(words[m2_start: m2_end])
@@ -62,7 +101,13 @@ class PCA(TFNoiseAwareModel):
             word_seq = np.array(words[st + 1: ed])
 
             order = 0 if m1_start < m2_start else 1
-            data.append((sent, m1, m2, word_seq, order))
+            if self.kernel is None:
+                data.append((sent, m1, m2, word_seq, order))
+            else:
+                dm1 = dist_m1[m1_start: m1_end]
+                dm2 = dist_m2[m2_start: m2_end]
+                dword_seq = dist_sent[st + 1: ed]
+                data.append((sent, m1, m2, word_seq, order, dist_sent, dm1, dm2, dword_seq))
 
         return data
 
@@ -192,12 +237,15 @@ class PCA(TFNoiseAwareModel):
                         [float(_) for _ in line[-self.char_emb_dim:]])
             f.close()
 
-    def get_principal_components(self, x):
+    def get_principal_components(self, x, y=None):
         # word level features
         ret1 = torch.zeros(self.r + 1, self.word_emb_dim).double()
         if len(''.join(x)) > 0 and len(x) > self.l:
             f = self.word_dict.lookup
-            x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x)]))
+            if y is None:
+                x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x)]))
+            else:
+                x_ = torch.from_numpy(np.diag(y).dot(np.array([self.word_emb[_] for _ in map(f, x)])))
             mu = torch.mean(x_, 0, keepdim=True)
             ret1[0, ] = mu / torch.norm(mu)
             if self.r > 0:
@@ -226,12 +274,20 @@ class PCA(TFNoiseAwareModel):
             return ret1.view(1, -1)
 
     def gen_feature(self, X):
-        m1 = self.get_principal_components(X[1])
-        m2 = self.get_principal_components(X[2])
-        if self.sent_feat:
-            sent = self.get_principal_components(X[0])
-        if self.cont_feat:
-            word_seq = self.get_principal_components(X[3])
+        if self.kernel is None:
+            m1 = self.get_principal_components(X[1])
+            m2 = self.get_principal_components(X[2])
+            if self.sent_feat:
+                sent = self.get_principal_components(X[0])
+            if self.cont_feat:
+                word_seq = self.get_principal_components(X[3])
+        else:
+            m1 = self.get_principal_components(X[1], X[6])
+            m2 = self.get_principal_components(X[2], X[7])
+            if self.sent_feat:
+                sent = self.get_principal_components(X[0], X[5])
+            if self.cont_feat:
+                word_seq = self.get_principal_components(X[3], X[8])
 
         if self.sent_feat and self.cont_feat:
             feature = torch.cat((m1, m2, sent, word_seq))
@@ -359,6 +415,13 @@ class PCA(TFNoiseAwareModel):
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
 
+        # Set kernel
+        self.kernel = kwargs.get('kernel', None)
+
+        # Set exp
+        if self.kernel == 'exp':
+            self.decay = kwargs.get('decay', 1.0)
+
         # Set host device
         self.host_device = kwargs.get('host_device', 'cpu')
 
@@ -373,10 +436,13 @@ class PCA(TFNoiseAwareModel):
         print "Batch size:                        ", self.batch_size
         print "Rebalance:                         ", self.rebalance
         print "Surrounding window size:           ", self.window_size
-        print "Use sentence sequence              ", self.sent_feat
-        print "Use window sequence                ", self.cont_feat
-        print "Host device                        ", self.host_device
-        print "Use char embeddings                ", self.char
+        print "Use sentence sequence:             ", self.sent_feat
+        print "Use window sequence:               ", self.cont_feat
+        print "Host device:                       ", self.host_device
+        print "Use char embeddings:               ", self.char
+        print "Kernel:                            ", self.kernel
+        if self.kernel == 'exp':
+            print "Exp kernel decay:                  ", self.decay
         print "Word embedding size:               ", self.word_emb_dim
         print "Char embedding size:               ", self.char_emb_dim
         print "Word embedding:                    ", self.word_emb_path
