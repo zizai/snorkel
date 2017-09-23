@@ -184,6 +184,9 @@ class LSTM(TFNoiseAwareModel):
         # Set use attention or not
         self.attention = kwargs.get('attention', True)
 
+        # Set lstm hidden dimension
+        self.lstm_hidden_dim = kwargs.get('lstm_hidden_dim', 100)
+
         # Set dropout
         self.dropout = kwargs.get('dropout', 0.0)
 
@@ -208,12 +211,13 @@ class LSTM(TFNoiseAwareModel):
         print "==============================================="
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
-        print "Use attention                  ", self.attention
-        print "dropout                        ", self.dropout
+        print "Use attention:                 ", self.attention
+        print "LSTM hidden dimension:         ", self.lstm_hidden_dim
+        print "dropout:                       ", self.dropout
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
-        print "Load pre-trained embedding     ", self.load_emb
-        print "Host device                    ", self.host_device
+        print "Load pre-trained embedding:    ", self.load_emb
+        print "Host device:                   ", self.host_device
         print "Word embedding size:           ", self.word_emb_dim
         print "Word embedding:                ", self.word_emb_path
         print "==============================================="
@@ -294,7 +298,7 @@ class LSTM(TFNoiseAwareModel):
         n_classes = 1 if self.cardinality == 2 else None
         self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
                                   embed_size=self.word_emb_dim,
-                                  lstm_hidden=100,
+                                  lstm_hidden=self.lstm_hidden_dim,
                                   attention=self.attention,
                                   dropout=self.dropout,
                                   bidirectional=True)

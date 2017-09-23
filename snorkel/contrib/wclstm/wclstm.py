@@ -297,20 +297,20 @@ class WCLSTM(TFNoiseAwareModel):
         print "==============================================="
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
-        print "Use attention                  ", self.attention
-        print "dropout                        ", self.dropout
+        print "Use attention:                 ", self.attention
+        print "LSTM hidden dimension:         ", self.lstm_hidden_dim
+        print "dropout:                       ", self.dropout
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
-        print "Char gram                      ", self.char_gram
-        print "Max word length                ", self.max_word_length
-        print "Max sentence length            ", self.max_sentence_length
-        print "Load pre-trained embedding     ", self.load_emb
-        print "Host device                    ", self.host_device
+        print "Char gram:                     ", self.char_gram
+        print "Max word length:               ", self.max_word_length
+        print "Max sentence length:           ", self.max_sentence_length
+        print "Load pre-trained embedding:    ", self.load_emb
+        print "Host device:                   ", self.host_device
         print "Word embedding size:           ", self.word_emb_dim
         print "Char embedding size:           ", self.char_emb_dim
         print "Word embedding:                ", self.word_emb_path
         print "Char embedding:                ", self.char_emb_path
-        print "LSTM hidden dimension          ", self.lstm_hidden_dim
         print "==============================================="
 
         if self.load_emb:
