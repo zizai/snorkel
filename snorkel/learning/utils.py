@@ -644,8 +644,11 @@ class RandomSearch(GridSearch):
 
     def search_space(self):
         self.rand_state.seed(self.seed)
-        return zip(*[self.rand_state.choice(self.parameter_dict[pn], self.n)
-            for pn in self.param_names])
+        # fetch entire search space, shuffle it and return self.n param sets
+        # we do this so that param sets are always proper subsets of larger self.n values
+        params = list(super(RandomSearch, self).search_space())
+        self.rand_state.shuffle(params)
+        return params[:self.n]
 
 
 ############################################################
