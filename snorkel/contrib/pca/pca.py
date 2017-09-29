@@ -253,6 +253,24 @@ class PCA(TFNoiseAwareModel):
                 k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                 ret1[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
+        if self.bidirectional:
+            # word level features
+            x_b = list(reversed(x))
+            ret1_b = torch.zeros(self.r + 1, self.word_emb_dim).double()
+            if len(''.join(x_b)) > 0 and len(x_b) > self.l:
+                f = self.word_dict.lookup
+                if y is None:
+                    x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x_b)]))
+                else:
+                    y_b = list(reversed(y))
+                    x_ = torch.from_numpy(np.diag(y_b).dot(np.array([self.word_emb[_] for _ in map(f, x_b)])))
+                mu = torch.mean(x_, 0, keepdim=True)
+                ret1_b[0,] = mu / torch.norm(mu)
+                if self.r > 0:
+                    u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                    k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
+                    ret1_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+
         if self.char:
             # char level features
             ret2 = torch.zeros(self.r + 1, self.char_emb_dim).double()
@@ -267,11 +285,31 @@ class PCA(TFNoiseAwareModel):
                     k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                     # k = self.r if v.size(1) > self.r else v.size(1)
                     ret2[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+            if self.bidirectional:
+                # char level features
+                ret2_b = torch.zeros(self.r + 1, self.char_emb_dim).double()
+                x_c_b = ''.join(x)[::-1]
+                if len(x_c_b) > 0 and len(x_c_b) > self.l:
+                    f = self.char_dict.lookup
+                    x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(x_c_b))]))
+                    mu = torch.mean(x_, 0, keepdim=True)
+                    ret2_b[0, ] = mu / torch.norm(mu)
+                    if self.r > 0:
+                        u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                        k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
+                        # k = self.r if v.size(1) > self.r else v.size(1)
+                        ret2_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
-            return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
+            if self.bidirectional:
+                return torch.cat((ret1.view(1, -1), ret2.view(1, -1), ret1_b.view(1, -1), ret2_b.view(1, -1)), 1)
+            else:
+                return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
         else:
-            return ret1.view(1, -1)
+            if self.bidirectional:
+                return torch.cat((ret1.view(1, -1), ret1_b.view(1, -1)), 1)
+            else:
+                return ret1.view(1, -1)
 
     def gen_feature(self, X):
         if self.kernel is None:
@@ -376,6 +414,9 @@ class PCA(TFNoiseAwareModel):
         # Set if use whole context feature
         self.cont_feat = kwargs.get('cont_feat', True)
 
+        # Set bidirectional
+        self.bidirectional = kwargs.get('bidirectional', False)
+
         # Set word embedding dimension
         self.word_emb_dim = kwargs.get('word_emb_dim', None)
 
@@ -438,6 +479,7 @@ class PCA(TFNoiseAwareModel):
         print "Surrounding window size:           ", self.window_size
         print "Use sentence sequence:             ", self.sent_feat
         print "Use window sequence:               ", self.cont_feat
+        print "Bidirectional:                     ", self.bidirectional
         print "Host device:                       ", self.host_device
         print "Use char embeddings:               ", self.char
         print "Kernel:                            ", self.kernel
