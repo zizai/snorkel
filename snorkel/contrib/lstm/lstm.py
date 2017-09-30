@@ -199,6 +199,9 @@ class LSTM(TFNoiseAwareModel):
         # Set rebalance setting
         self.rebalance = kwargs.get('rebalance', False)
 
+        # Set patience (number of epochs to wait without model improvement)
+        self.patience = kwargs.get('patience', 100)
+
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
 
@@ -213,7 +216,8 @@ class LSTM(TFNoiseAwareModel):
         print "Learning rate:                 ", self.lr
         print "Use attention:                 ", self.attention
         print "LSTM hidden dimension:         ", self.lstm_hidden_dim
-        print "dropout:                       ", self.dropout
+        print "Dropout:                       ", self.dropout
+        print "Checkpoint Patience:           ", self.patience
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
         print "Load pre-trained embedding:    ", self.load_emb
@@ -315,12 +319,14 @@ class LSTM(TFNoiseAwareModel):
 
         dev_score_opt = 0.0
 
+        last_epoch_opt = None
         for idx in range(self.n_epochs):
             cost = 0.
             for x, y in train_loader:
                 x = pad_batch(X_train[x.numpy()], self.max_sentence_length)
                 y = Variable(y.float(), requires_grad=False)
                 cost += self.train_model(self.model, optimizer, loss, x, y)
+
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
                 if X_dev is not None:
@@ -333,6 +339,11 @@ class LSTM(TFNoiseAwareModel):
                 if X_dev is not None and dev_ckpt and idx > dev_ckpt_delay * self.n_epochs and score > dev_score_opt:
                     dev_score_opt = score
                     self.save(save_dir=save_dir, only_param=True)
+                    last_epoch_opt = idx
+
+                if last_epoch_opt is not None and (idx - last_epoch_opt > self.patience) and (dev_ckpt and idx > dev_ckpt_delay * self.n_epochs):
+                    print "[] No model improvement after {} epochs, halting".format(self.name, idx - last_epoch_opt)
+                    break
 
         # Conclude training
         if verbose:

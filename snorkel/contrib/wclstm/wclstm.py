@@ -294,6 +294,9 @@ class WCLSTM(TFNoiseAwareModel):
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
+        # Set patience (number of epochs to wait without model improvement)
+        self.patience = kwargs.get('patience', 100)
+
         print "==============================================="
         print "Number of learning epochs:     ", self.n_epochs
         print "Learning rate:                 ", self.lr
@@ -302,6 +305,7 @@ class WCLSTM(TFNoiseAwareModel):
         print "dropout:                       ", self.dropout
         print "Batch size:                    ", self.batch_size
         print "Rebalance:                     ", self.rebalance
+        print "Checkpoint Patience:           ", self.patience
         print "Char gram:                     ", self.char_gram
         print "Max word length:               ", self.max_word_length
         print "Max sentence length:           ", self.max_sentence_length
@@ -432,6 +436,7 @@ class WCLSTM(TFNoiseAwareModel):
         loss = nn.MultiLabelSoftMarginLoss(size_average=False)
 
         dev_score_opt = 0.0
+        last_epoch_opt = None
 
         for idx in range(self.n_epochs):
             cost = 0.
@@ -452,6 +457,11 @@ class WCLSTM(TFNoiseAwareModel):
                 if X_dev is not None and dev_ckpt and idx > dev_ckpt_delay * self.n_epochs and score > dev_score_opt:
                     dev_score_opt = score
                     self.save(save_dir=save_dir, only_param=True)
+                    last_epoch_opt = idx
+
+                if last_epoch_opt is not None and (idx - last_epoch_opt > self.patience) and (dev_ckpt and idx > dev_ckpt_delay * self.n_epochs):
+                    print "[] No model improvement after {} epochs, halting".format(self.name, idx - last_epoch_opt)
+                    break
 
         # Conclude training
         if verbose:
