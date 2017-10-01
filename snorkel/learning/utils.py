@@ -453,6 +453,7 @@ class GridSearch(object):
             run_scores = model.score(X_valid, Y_valid, b=b, beta=beta,
                 set_unlabeled_as_neg=set_unlabeled_as_neg,
                 batch_size=eval_batch_size)
+
             if model.cardinality > 2:
                 run_score, run_score_label = run_scores, "Accuracy"
                 run_scores = [run_score]
@@ -461,7 +462,7 @@ class GridSearch(object):
                 run_score_label = "F-{0} Score".format(beta)
 
             # Add scores to running stats, print, and set as optimal if best
-            print("[{0}] {1}: {2}".format(model.name,run_score_label,run_score))
+            print("[{0}] {1}: {2}".format(model.name, run_score_label, run_score))
             run_stats.append(list(param_vals) + list(run_scores))
             if run_score > run_score_opt or k == 0:
                 model.save(model_name=model_name, save_dir=self.save_dir)
@@ -632,23 +633,35 @@ class RandomSearch(GridSearch):
     """
     def __init__(self, model_class, parameter_dict, X_train, Y_train=None, n=10,
         model_class_params={}, model_hyperparams={}, seed=123, 
-        save_dir='checkpoints'):
+        save_dir='checkpoints', manual_param_grid=None):
         """Search a random sample of size n from a parameter grid"""
         self.rand_state = np.random.RandomState()
         self.rand_state.seed(seed)
         self.n = n
         self.seed = seed
+        self.manual_param_grid = manual_param_grid
         super(RandomSearch, self).__init__(model_class, parameter_dict, X_train,
             Y_train=Y_train, model_class_params=model_class_params,
             model_hyperparams=model_hyperparams, save_dir=save_dir)
 
     def search_space(self):
-        self.rand_state.seed(self.seed)
-        # fetch entire search space, shuffle it and return self.n param sets
-        # we do this so that param sets are always proper subsets of larger self.n values
-        params = list(super(RandomSearch, self).search_space())
-        self.rand_state.shuffle(params)
-        return params[:self.n]
+
+        # use manually enumerated parameter grid
+        if self.manual_param_grid:
+            pass
+            ##self.parameter_dict     = parameter_dict
+            # self.param_names        = parameter_dict.keys()
+            self.param_names = self.manual_param_grid['param_names']
+            self.n = len(self.manual_param_grid["params"])
+            return self.manual_param_grid["params"]
+
+        else:
+            self.rand_state.seed(self.seed)
+            # fetch entire search space, shuffle it and return self.n param sets
+            # we do this so that param sets are always proper subsets of larger self.n values
+            params = list(super(RandomSearch, self).search_space())
+            self.rand_state.shuffle(params)
+            return params[:self.n]
 
 
 ############################################################
