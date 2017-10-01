@@ -342,7 +342,7 @@ class LSTM(TFNoiseAwareModel):
                     last_epoch_opt = idx
 
                 if last_epoch_opt is not None and (idx - last_epoch_opt > self.patience) and (dev_ckpt and idx > dev_ckpt_delay * self.n_epochs):
-                    print "[] No model improvement after {} epochs, halting".format(self.name, idx - last_epoch_opt)
+                    print "[{}] No model improvement after {} epochs, halting".format(self.name, idx - last_epoch_opt)
                     break
 
         # Conclude training
