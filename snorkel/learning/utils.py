@@ -443,11 +443,17 @@ class GridSearch(object):
             # score printing, best-score checkpointing
             # Note: Need to set the save directory since passing in
             # (X_dev, Y_dev) will by default trigger checkpoint saving
-            try:
-                model.train(*train_args, X_dev=X_valid, Y_dev=Y_valid, 
-                    save_dir=self.save_dir, **hps)
-            except:
-                model.train(*train_args, **hps)
+            MAX_TRY = 10
+            for idx in range(MAX_TRY):
+                try:
+                    if X_valid is not None:
+                        model.train(*train_args, X_dev=X_valid, Y_dev=Y_valid,
+                                    save_dir=self.save_dir, **hps)
+                    else:
+                        model.train(*train_args, **hps)
+                    break
+                except Exception as e:
+                    print e
 
             # Test the model
             run_scores = model.score(X_valid, Y_valid, b=b, beta=beta,
