@@ -5,6 +5,23 @@ import numpy as np
 
 from snorkel.models import Bbox
 
+SUBJECTIVE_DEFAULTS = {
+    '.near'          : 50.0,
+    '.far'           : 100.0,
+    '.smaller'       : 1.0,
+    '.larger'        : 1.0,
+    '.samearea'      : 20.0,
+    '.wider'         : 1.0,
+    '.skinnier'      : 1.0,
+    '.samewidth'     : 20.0,
+    '.taller'        : 1.0,
+    '.shorter'       : 1.0,
+    '.sameheight'    : 20.0,
+    '.overlaps'      : 25.0,
+    '.aligned'       : 10.0,
+}
+
+
 # Helper Objects
 Point = namedtuple('Point', ['x', 'y'])
 
@@ -82,7 +99,7 @@ def is_left(geom1, geom2):
     return not is_right(point1, point2)
 
 
-def is_near(geom1, geom2, thresh=50.0):
+def is_near(geom1, geom2, thresh=SUBJECTIVE_DEFAULTS['.near']):
     point1, point2 = geoms_to_points([geom1, geom2], 'center')
     if None in [point1.x, point2.x]:
         x_diff = 0 # e.g. "top edge of box x is near box y"
@@ -96,46 +113,46 @@ def is_near(geom1, geom2, thresh=50.0):
     return dist <= thresh
 
 
-def is_far(geom1, geom2):
-    return not is_near(geom1, geom2, thresh=100.0)
+def is_far(geom1, geom2, thresh=SUBJECTIVE_DEFAULTS['.far']):
+    return not is_near(geom1, geom2, thresh=thresh)
 
 
 # Bbox Comparison Helper Functions
-def is_smaller(bbox1, bbox2, mult=1.0):
+def is_smaller(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.smaller']):
     return bbox1.area() < bbox2.area() / mult
 
-def is_larger(bbox1, bbox2, mult=1.0):
+def is_larger(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.larger']):
     return bbox1.area() > bbox2.area() * mult
 
-def is_same_area(bbox1, bbox2, thresh=20.):
+def is_same_area(bbox1, bbox2, thresh=SUBJECTIVE_DEFAULTS['.samearea']):
      return abs(bbox1.area() - bbox2.area()) <= thresh
 
 
 
-def is_wider(bbox1, bbox2, mult=1.0):
+def is_wider(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.wider']):
     return bbox1.width() > bbox2.width() * mult
 
-def is_skinnier(bbox1, bbox2, mult=1.0):
+def is_skinnier(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.skinnier']):
     return bbox1.width() < bbox2.width() / mult
 
-def is_same_width(bbox1, bbox2, thresh=20.):
+def is_same_width(bbox1, bbox2, thresh=SUBJECTIVE_DEFAULTS['.samewidth']):
     return abs(bbox1.width() - bbox2.width()) <= thresh
 
 
 
 
-def is_taller(bbox1, bbox2, mult=1.0):
+def is_taller(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.taller']):
     return bbox1.height() > bbox2.height() * mult
 
-def is_shorter(bbox1, bbox2, mult=1.0):
+def is_shorter(bbox1, bbox2, mult=SUBJECTIVE_DEFAULTS['.shorter']):
     return bbox1.height() < bbox2.height() / mult
 
-def is_same_height(bbox1, bbox2, thresh=20.):
+def is_same_height(bbox1, bbox2, thresh=SUBJECTIVE_DEFAULTS['.sameheight']):
     return abs(bbox1.height() - bbox2.height()) <= thresh
 
 
 
-def is_overlaps(bbox1, bbox2, thresh=0.25):
+def is_overlaps(bbox1, bbox2, thresh=SUBJECTIVE_DEFAULTS['.overlaps']):
     top = max(bbox1.top,bbox2.top)
     bottom = min(bbox1.bottom,bbox2.bottom)
     left = max(bbox1.left, bbox2.left)
@@ -160,8 +177,7 @@ def is_within(bbox1, bbox2):
         is_left(bbox2, bbox1))
 
     
-def is_aligned(bbox1, bbox2, thresh=10.):
-    thresh = 10
+def is_aligned(bbox1, bbox2, thresh=SUBJECTIVE_DEFAULTS['.aligned']):
     raise NotImplementedError
 
 

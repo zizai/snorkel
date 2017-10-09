@@ -1,6 +1,6 @@
 from ..grammar import GrammarMixin, Rule, sems0, sems1, sems_in_order, sems_reversed, flip_dir
 from ..core import PrimitiveTemplate
-from image_helpers import helpers
+from image_helpers import helpers, SUBJECTIVE_DEFAULTS
 
 lexical_rules = (
     # Box features
@@ -115,22 +115,22 @@ ops = {
     '.above': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_above'](g1(c1), g2(c2)),
     '.left': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_left'](g1(c1), g2(c2)),
     '.right': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_right'](g1(c1), g2(c2)),
-    '.near': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_near'](g1(c1), g2(c2)),
-    '.far': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_far'](g1(c1), g2(c2)),
+    '.near': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_near'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.near']),
+    '.far': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_far'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.far']),
 
-    '.smaller': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_smaller'](g1(c1), g2(c2)),
-    '.larger': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_larger'](g1(c1), g2(c2)),
-    '.samearea': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_area'](g1(c1), g2(c2)),
+    '.smaller': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_smaller'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.smaller']),
+    '.larger': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_larger'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.larger']),
+    '.samearea': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_area'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.samearea']),
     
-    '.wider': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_wider'](g1(c1), g2(c2)),
-    '.taller': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_taller'](g1(c1), g2(c2)),
-    '.samewidth': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_width'](g1(c1), g2(c2)),
+    '.wider': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_wider'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.wider']),
+    '.taller': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_taller'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.taller']),
+    '.samewidth': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_width'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.samewidth']),
     
-    '.skinnier': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_skinnier'](g1(c1), g2(c2)),
-    '.shorter': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_shorter'](g1(c1), g2(c2)),
-    '.sameheight': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_height'](g1(c1), g2(c2)),
+    '.skinnier': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_skinnier'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.skinnier']),
+    '.shorter': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_shorter'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.shorter']),
+    '.sameheight': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_same_height'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.sameheight']),
     
-    '.overlaps': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_overlaps'](g1(c1), g2(c2)),
+    '.overlaps': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_overlaps'](g1(c1), g2(c2), SUBJECTIVE_DEFAULTS['.overlaps']),
     
     '.surrounds': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_surrounds'](g1(c1), g2(c2)),
     '.within': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_within'](g1(c1), g2(c2)),
