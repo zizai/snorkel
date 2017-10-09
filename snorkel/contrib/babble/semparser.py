@@ -71,6 +71,11 @@ class SemanticParser(object):
                 isinstance(exp.candidate.get_parent(), Sentence)):
                 exp_normalized = self.mark_implicit_strings(exp_normalized, exp.candidate)
             exp_parses = self.grammar.parse_string(exp_normalized)
+            """
+            Identify any parses with subjective words
+            Expand one parse into many, one per element of the desired range for that word
+            Keep track of what you expanded
+            """
             num_parses_by_exp.append(len(exp_parses))
             for j, parse in enumerate(exp_parses):
                 lf = self.grammar.evaluate(parse)
@@ -80,6 +85,13 @@ class SemanticParser(object):
                 lf.__name__ = "{}_{}".format(exp.name, j)
                 LFs.append(lf)
             self.explanation_counter += 1
+        ###
+        """
+        For all LFs that came from subjective expansion:
+            Check accuracy on the dev set
+            Keep only best
+        """
+        ###
         if verbose:
             return_object = 'parses' if return_parses else "LFs"
             print("{} {} created from {} out of {} explanation(s)".format(
