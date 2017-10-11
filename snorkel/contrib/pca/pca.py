@@ -23,7 +23,7 @@ class PCA(TFNoiseAwareModel):
     representation = True
     gpu = ['gpu', 'GPU']
 
-    """SVD for relation extraction"""
+    """PCA for relation extraction"""
 
     def gen_dist_exp(self, length, decay, st, ed):
         ret = []
@@ -249,6 +249,10 @@ class PCA(TFNoiseAwareModel):
         ret = [_.replace('</s>', '') + '</s>' * (k - len(_.replace('</s>', ''))) for _ in ret]
         return ret
 
+    def get_singular_vectors(self, x):
+        u, s, v = torch.svd(x)
+        return v
+
     def get_principal_components(self, x, y=None):
         # word level features
         ret1 = torch.zeros(self.r + 1, self.word_emb_dim).double()
@@ -261,7 +265,7 @@ class PCA(TFNoiseAwareModel):
             mu = torch.mean(x_, 0, keepdim=True)
             ret1[0, ] = mu / torch.norm(mu)
             if self.r > 0:
-                u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
                 k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                 ret1[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
@@ -279,7 +283,7 @@ class PCA(TFNoiseAwareModel):
                 mu = torch.mean(x_, 0, keepdim=True)
                 ret1_b[0,] = mu / torch.norm(mu)
                 if self.r > 0:
-                    u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                    v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
                     k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                     ret1_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
@@ -293,7 +297,7 @@ class PCA(TFNoiseAwareModel):
                 mu = torch.mean(x_, 0, keepdim=True)
                 ret2[0, ] = mu / torch.norm(mu)
                 if self.r > 0:
-                    u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                    v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
                     k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                     ret2[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
             if self.bidirectional:
@@ -306,7 +310,7 @@ class PCA(TFNoiseAwareModel):
                     mu = torch.mean(x_, 0, keepdim=True)
                     ret2_b[0, ] = mu / torch.norm(mu)
                     if self.r > 0:
-                        u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
+                        v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
                         k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
                         ret2_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
