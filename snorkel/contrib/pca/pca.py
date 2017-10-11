@@ -131,7 +131,7 @@ class PCA(TFNoiseAwareModel):
             for candidate in candidates:
                 words = candidate_to_tokens(candidate)
                 if word: map(self.word_dict.get, words)
-                if char: map(self.char_dict.get, list(' '.join(words)))
+                if char: map(self.char_dict.get, self.gen_char_list(words, self.char_gram))
 
         print "|Train Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
 
@@ -139,12 +139,12 @@ class PCA(TFNoiseAwareModel):
             for candidate in candidates:
                 words = candidate_to_tokens(candidate)
                 if word: map(self.word_dict.get, words)
-                if char: map(self.char_dict.get, list(' '.join(words)))
+                if char: map(self.char_dict.get, self.gen_char_list(words, self.char_gram))
 
         print "|Total Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
 
     def load_dict(self):
-        # load dict from glove
+        # load dict from file
         if not hasattr(self, 'word_dict'):
             self.word_dict = SymbolTable()
             extend_word = True
@@ -295,7 +295,6 @@ class PCA(TFNoiseAwareModel):
                 if self.r > 0:
                     u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
                     k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                    # k = self.r if v.size(1) > self.r else v.size(1)
                     ret2[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
             if self.bidirectional:
                 # char level features
@@ -309,7 +308,6 @@ class PCA(TFNoiseAwareModel):
                     if self.r > 0:
                         u, s, v = torch.svd(x_ - mu.repeat(x_.size(0), 1))
                         k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                        # k = self.r if v.size(1) > self.r else v.size(1)
                         ret2_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
 
         if self.char:
@@ -414,9 +412,6 @@ class PCA(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
-        if kwargs.get('init_pretrained', False):
-            self.create_dict(kwargs['init_pretrained'], word=True, char=True)
-
         # Set if use char embeddings
         self.char = kwargs.get('char', True)
 
@@ -511,7 +506,8 @@ class PCA(TFNoiseAwareModel):
         if self.char:
             assert self.char_emb_path is not None
 
-        if "init_pretrained" in kwargs:
+        if kwargs.get('init_pretrained', False):
+            self.create_dict(kwargs['init_pretrained'], word=True, char=self.char)
             del self.model_kwargs["init_pretrained"]
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, dev_ckpt=True,
