@@ -132,16 +132,20 @@ class PCA(TFNoiseAwareModel):
                 words = candidate_to_tokens(candidate)
                 if word: map(self.word_dict.get, words)
                 if char: map(self.char_dict.get, self.gen_char_list(words, self.char_gram))
-
-        print "|Train Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
+        if char:
+            print "|Train Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
+        else:
+            print "|Train Vocab|    = word:{}".format(self.word_dict.s)
 
         for candidates in splits['test']:
             for candidate in candidates:
                 words = candidate_to_tokens(candidate)
                 if word: map(self.word_dict.get, words)
                 if char: map(self.char_dict.get, self.gen_char_list(words, self.char_gram))
-
-        print "|Total Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
+        if char:
+            print "|Total Vocab|    = word:{}, char:{}".format(self.word_dict.s, self.char_dict.s)
+        else:
+            print "|Total Vocab|    = word:{}".format(self.word_dict.s)
 
     def load_dict(self):
         # load dict from file
@@ -417,7 +421,7 @@ class PCA(TFNoiseAwareModel):
         self.model_kwargs = kwargs
 
         # Set if use char embeddings
-        self.char = kwargs.get('char', True)
+        self.char = kwargs.get('char', False)
 
         # Set if use whole sentence feature
         self.sent_feat = kwargs.get('sent_feat', True)
