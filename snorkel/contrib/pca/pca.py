@@ -9,6 +9,7 @@ from snorkel.models import Candidate
 from utils import candidate_to_tokens, SymbolTable
 from six.moves.cPickle import dump, load
 from time import time
+import scipy
 
 import torch
 import torch.nn as nn
@@ -255,12 +256,24 @@ class PCA(TFNoiseAwareModel):
 
     def get_singular_vectors(self, x):
         u, s, v = torch.svd(x)
-        return v
+        k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
+        z = torch.zeros(self.l + self.r, v.size(0)).double()
+        z[0:self.l + k, ] = v.transpose(0, 1)[:self.l + k, ]
+
+        if self.method in ['magic1', 'magicg']:
+            theta = torch.from_numpy(self.theta[:z.size(0) * z.size(1)]).view(z.size(0), z.size(1)).double()
+            z = torch.mul(z, torch.sign(torch.mul(z, theta)))
+
+        if self.method == 'procrustes':
+            r = scipy.linalg.orthogonal_procrustes(z.numpy().T, self.F[:z.size(0) * z.size(1)].reshape(z.size(0), z.size(1)).T)[0]
+            z = torch.mm(torch.from_numpy(r), z)
+
+        return z[self.l:, ]
 
     def get_principal_components(self, x, y=None):
         # word level features
         ret1 = torch.zeros(self.r + 1, self.word_emb_dim).double()
-        if len(''.join(x)) > 0 and len(x) > self.l:
+        if len(''.join(x)) > 0:
             f = self.word_dict.lookup
             if y is None:
                 x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x)]))
@@ -268,16 +281,14 @@ class PCA(TFNoiseAwareModel):
                 x_ = torch.from_numpy(np.diag(y).dot(np.array([self.word_emb[_] for _ in map(f, x)])))
             mu = torch.mean(x_, 0, keepdim=True)
             ret1[0, ] = mu / torch.norm(mu)
-            if self.r > 0:
-                v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
-                k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                ret1[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+            if self.r > 0 and len(x) > self.l:
+                ret1[1:, ] = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
 
         if self.bidirectional:
             # word level features
             x_b = list(reversed(x))
             ret1_b = torch.zeros(self.r + 1, self.word_emb_dim).double()
-            if len(''.join(x_b)) > 0 and len(x_b) > self.l:
+            if len(''.join(x_b)) > 0:
                 f = self.word_dict.lookup
                 if y is None:
                     x_ = torch.from_numpy(np.array([self.word_emb[_] for _ in map(f, x_b)]))
@@ -285,38 +296,32 @@ class PCA(TFNoiseAwareModel):
                     y_b = list(reversed(y))
                     x_ = torch.from_numpy(np.diag(y_b).dot(np.array([self.word_emb[_] for _ in map(f, x_b)])))
                 mu = torch.mean(x_, 0, keepdim=True)
-                ret1_b[0,] = mu / torch.norm(mu)
-                if self.r > 0:
-                    v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
-                    k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                    ret1_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+                ret1_b[0, ] = mu / torch.norm(mu)
+                if self.r > 0 and len(x_b) > self.l:
+                    ret1_b[1:, ] = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
 
         if self.char:
             # char level features
             ret2 = torch.zeros(self.r + 1, self.char_emb_dim).double()
             x_c = self.gen_char_list(x, self.char_gram)
-            if len(x_c) > 0 and len(x_c) > self.l:
+            if len(x_c) > 0:
                 f = self.char_dict.lookup
                 x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(x_c))]))
                 mu = torch.mean(x_, 0, keepdim=True)
                 ret2[0, ] = mu / torch.norm(mu)
-                if self.r > 0:
-                    v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
-                    k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                    ret2[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+                if self.r > 0 and len(x_c) > self.l:
+                    ret2[1:, ] = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
             if self.bidirectional:
                 # char level features
                 ret2_b = torch.zeros(self.r + 1, self.char_emb_dim).double()
                 x_c_b = x_c[::-1]
-                if len(x_c_b) > 0 and len(x_c_b) > self.l:
+                if len(x_c_b) > 0:
                     f = self.char_dict.lookup
                     x_ = torch.from_numpy(np.array([self.char_emb[_] for _ in map(f, list(x_c_b))]))
                     mu = torch.mean(x_, 0, keepdim=True)
                     ret2_b[0, ] = mu / torch.norm(mu)
-                    if self.r > 0:
-                        v = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
-                        k = self.r if v.size(1) > self.l + self.r else v.size(1) - self.l
-                        ret2_b[1:k + 1, ] = v.transpose(0, 1)[self.l: self.l + k, ]
+                    if self.r > 0 and len(x_c_b) > self.l:
+                        ret2_b[1:, ] = self.get_singular_vectors(x_ - mu.repeat(x_.size(0), 1))
 
         if self.char:
             if self.bidirectional:
@@ -487,6 +492,9 @@ class PCA(TFNoiseAwareModel):
         # Replace placeholders in embedding files
         self.replace = kwargs.get('replace', {})
 
+        # Set method to reduce variance
+        self.method = kwargs.get('method', None)
+
         print "==============================================="
         print "Number of learning epochs:         ", self.n_epochs
         print "Learning rate:                     ", self.lr
@@ -508,6 +516,7 @@ class PCA(TFNoiseAwareModel):
         print "Char embedding size:               ", self.char_emb_dim
         print "Word embedding:                    ", self.word_emb_path
         print "Char embedding:                    ", self.char_emb_path
+        print "Invariance method                  ", self.method
         print "==============================================="
 
         assert self.word_emb_path is not None
@@ -544,6 +553,34 @@ class PCA(TFNoiseAwareModel):
         self.load_embeddings()
 
         print "Done loading embeddings..."
+
+        if self.method == 'magic1':
+            if self.char:
+                self.theta = np.ones((self.l + self.r) * max(self.word_emb_dim, self.char_emb_dim))
+            else:
+                self.theta = np.ones((self.l + self.r) * self.word_emb_dim)
+        elif self.method == 'magicg':
+            if self.char:
+                self.theta = np.random.normal(0, 1.0, (self.l + self.r) * max(self.word_emb_dim, self.char_emb_dim))
+            else:
+                self.theta = np.random.normal(0, 1.0, (self.l + self.r) * self.word_emb_dim)
+        elif self.method == 'procrustes':
+            self.F = None
+            if self.r > 0:
+                while True:
+                    self.F = np.random.normal(0, 1.0, (self.l + self.r) * max(self.word_emb_dim, self.char_emb_dim))
+                    f1 = self.F[:(self.l + self.r) * self.word_emb_dim].reshape(((self.l + self.r), self.word_emb_dim))
+                    product1 = np.dot(f1, f1.T)
+                    product1 = product1 - np.identity(product1.shape[0])
+                    if self.char:
+                        f2 = self.F[:(self.l + self.r) * self.char_emb_dim].reshape(((self.l + self.r), self.char_emb_dim))
+                        product2 = np.dot(f2, f2.T)
+                        product2 = product2 - np.identity(product2.shape[0])
+                    if product1.any() == 0:
+                        continue
+                    if self.char and product2.any() == 0:
+                        continue
+                    break
 
         cardinality = Y_train.shape[1] if len(Y_train.shape) > 1 else 2
         if cardinality != self.cardinality:
@@ -673,6 +710,14 @@ class PCA(TFNoiseAwareModel):
                 else:
                     dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
 
+            if self.method:
+                # Save model invariance data needed to rebuild model
+                with open(os.path.join(model_dir, "model_invariance.pkl"), 'wb') as f:
+                    if self.method in ['magic1', 'magicg']:
+                        dump({'theta': self.theta}, f)
+                    else:
+                        dump({'F': self.F}, f)
+
         torch.save(self.model, os.path.join(model_dir, model_name))
 
         if verbose:
@@ -697,6 +742,15 @@ class PCA(TFNoiseAwareModel):
                 if self.char:
                     self.char_dict = d['char_dict']
                     self.char_emb = d['char_emb']
+
+            if self.method:
+                # Save model invariance data needed to rebuild model
+                with open(os.path.join(model_dir, "model_invariance.pkl"), 'rb') as f:
+                    d = load(f)
+                    if self.method in ['magic1', 'magicg']:
+                        self.theta = d['theta']
+                    else:
+                        self.F = d['F']
 
         self.model = torch.load(os.path.join(model_dir, model_name))
 
