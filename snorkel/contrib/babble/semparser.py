@@ -8,6 +8,7 @@ from text import text_grammar
 from image import image_grammar
 from grammar import Grammar, validate_semantics, stopwords
 from explanation import Explanation
+from snorkel.contrib.babble.image.image_helpers import SUBJECTIVE_DEFAULTS
 
 class SemanticParser(object):
     """
