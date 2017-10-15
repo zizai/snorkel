@@ -24,7 +24,7 @@ class LSTM(TFNoiseAwareModel):
     # Set unknown
     unknown_symbol = 1
 
-    """LSTM for relation extraction"""
+    """LSTM for entity/relation extraction"""
 
     def _preprocess_data(self, candidates, extend=False):
         """Convert candidate sentences to lookup sequences
@@ -38,11 +38,15 @@ class LSTM(TFNoiseAwareModel):
             map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
         data = []
         for candidate in candidates:
-            # Mark sentence
-            args = [
-                (candidate[0].get_word_start(), candidate[0].get_word_end(), 1),
-                (candidate[1].get_word_start(), candidate[1].get_word_end(), 2)
-            ]
+            # Mark sentence based on cadinality of relation
+            if len(candidate) == 2:
+                args = [
+                    (candidate[0].get_word_start(), candidate[0].get_word_end(), 1),
+                    (candidate[1].get_word_start(), candidate[1].get_word_end(), 2)
+                ]
+            else:
+                args = [(candidate[0].get_word_start(), candidate[0].get_word_end(), 1)]
+
             s = mark_sentence(candidate_to_tokens(candidate), args)
             # Either extend word table or retrieve from it
             f = self.word_dict.get if extend else self.word_dict.lookup
