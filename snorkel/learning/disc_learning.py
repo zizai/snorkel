@@ -18,9 +18,10 @@ class TFNoiseAwareModel(Classifier):
         via a RandomState maintained by the class, and into TF as a graph-level
         seed.
     """
-    def __init__(self, n_threads=None, seed=123, **kwargs):
+    def __init__(self, n_threads=None, seed=123, weights = None, **kwargs):
         self.n_threads = n_threads
         self.seed = seed
+        self.weights = weights
         self.rand_state = np.random.RandomState()
         super(TFNoiseAwareModel, self).__init__(**kwargs)
 

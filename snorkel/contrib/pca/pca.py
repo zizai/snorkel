@@ -18,6 +18,34 @@ import torch.utils.data as data_utils
 
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
 
+def train_preds(input_model, X_train):
+    """Return predicted y-values"""
+
+    marginals = input_model.marginals(X_train)
+    Y_train_pred = np.array([0 if marginals[i] < 0.5 else 1 for i in range(len(
+        marginals))])
+    return Y_train_pred
+
+
+class WeightedMultiLabelSoftMarginLoss(torch.nn.modules.loss._WeightedLoss):
+    def forward(self, inp, target):
+        return weighted_MLSMLoss(inp, target, self.weight, self.size_average)
+
+
+def weighted_MLSMLoss(inp, t, weight, size_average=False):
+    """
+    Implementation of torch.nn.MultiLabelSoftMarginLoss with weights
+    for each individual data point.
+    """
+    # todo: account for when weight=None as default
+    o = torch.sigmoid(inp)
+    out = (t.unsqueeze(1) * torch.log(o)) + ((1-t).unsqueeze(1) * (torch.log(1 - o)))
+    out = torch.neg(out * weight.unsqueeze(1))
+    loss = out.sum()
+    if size_average:
+        return torch.mean(out)
+    return loss
+
 
 class PCA(TFNoiseAwareModel):
     name = 'PCA'
@@ -425,6 +453,8 @@ class PCA(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        self.weights = kwargs.get('weights',None)
+
         # Set if use char embeddings
         self.char = kwargs.get('char', False)
 
@@ -607,6 +637,12 @@ class PCA(TFNoiseAwareModel):
             else X_train[train_idxs, :]
         Y_train = Y_train[train_idxs]
 
+        if self.weights is not None:
+            new_weights = self.weights[train_idxs]
+            self.weights = Variable(torch.from_numpy(new_weights).float(), requires_grad=False)
+        else:
+            self.weights = Variable(torch.from_numpy(np.ones(len(Y_train))).float(), requires_grad=False)
+
         if verbose:
             st = time()
             print "[%s] n_train= %s" % (self.name, len(X_train))
@@ -637,7 +673,12 @@ class PCA(TFNoiseAwareModel):
 
         for idx in range(self.n_epochs):
             cost = 0.
-            for x, y in train_loader:
+            for (x, y), j in zip(train_loader, range(0, len(self.weights),
+                                                            self.batch_size)):
+                # match to batch size of torch's DataLoader
+                weights = self.weights[j:(j+self.batch_size)]
+                loss = WeightedMultiLabelSoftMarginLoss(weight=weights,
+                                                        size_average=False)    
                 cost += self.train_model(self.model, loss, optimizer, x, y.float())
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
@@ -706,9 +747,9 @@ class PCA(TFNoiseAwareModel):
             with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
                 if self.char:
                     dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb,
-                          'word_emb': self.word_emb}, f)
+                          'word_emb': self.word_emb, 'weights': self.weights}, f)
                 else:
-                    dump({'word_dict': self.word_dict, 'word_emb': self.word_emb}, f)
+                    dump({'word_dict': self.word_dict, 'word_emb': self.word_emb, 'weights': self.weights}, f)
 
             if self.method:
                 # Save model invariance data needed to rebuild model
@@ -742,6 +783,10 @@ class PCA(TFNoiseAwareModel):
                 if self.char:
                     self.char_dict = d['char_dict']
                     self.char_emb = d['char_emb']
+                try:
+                    self.weights = d['weights']
+                except KeyError:
+                    pass
 
             if self.method:
                 # Save model invariance data needed to rebuild model
