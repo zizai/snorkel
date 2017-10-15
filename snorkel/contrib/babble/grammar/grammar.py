@@ -10,7 +10,7 @@ from snorkel.parser.spacy_parser import Spacy
 from rule import Rule
 from parse import Parse
 import utils
-
+import pdb
 
 class GrammarMixin(object):
     def __init__(self, rules, ops, helpers, annotators, translate_ops):
@@ -264,11 +264,11 @@ class Grammar(object):
         def recurse(sem):
             if isinstance(sem, tuple):
                 op = self.ops[sem[0]]
-                args = [recurse(arg) for arg in sem[1:]]
-                return op(*args) if args else op
+		args = [recurse(arg) for arg in sem[1:]]
+		return op(*args) if args else op
             else:
                 return sem
-        LF = recurse(parse.semantics)
+	LF = recurse(parse.semantics)
         return lambda candidate: LF({'helpers': self.helpers, 'user_lists': self.user_lists, 'candidate': candidate})
 
     def translate(self, sem):

@@ -9,6 +9,7 @@ from image import image_grammar
 from grammar import Grammar, validate_semantics, stopwords
 from explanation import Explanation
 from snorkel.contrib.babble.image.image_helpers import SUBJECTIVE_DEFAULTS
+import pdb
 
 class SemanticParser(object):
     """
@@ -59,7 +60,10 @@ class SemanticParser(object):
 
         :param explanations: An instance or list of Explanation objects
         """
-        LFs = []
+        key='.smaller'
+	"""Need to check if something is in keys. Write helper script to test this."""
+
+	LFs = []
         parses = []
         num_parses_by_exp = []
         explanations = explanations if isinstance(explanations, list) else [explanations]
@@ -79,8 +83,8 @@ class SemanticParser(object):
             """
             num_parses_by_exp.append(len(exp_parses))
             for j, parse in enumerate(exp_parses):
-                lf = self.grammar.evaluate(parse)
-                if return_parses:
+		lf = self.grammar.evaluate(parse)
+		if return_parses:
                     parse.function = lf
                     parses.append(parse)
                 lf.__name__ = "{}_{}".format(exp.name, j)
