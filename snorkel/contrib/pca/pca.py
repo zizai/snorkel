@@ -76,6 +76,66 @@ class PCA(TFNoiseAwareModel):
                 ret.append(1.)
         return np.array(ret)
 
+    def _get_context_seqs(self, candidates):
+        """
+        Given a set of candidates, generate word contexts. This is task-dependant.
+        Each context c_i maps to an embedding matrix W_i in \R^{n \times d} where
+        n is the # of words and d is the embedding dimension
+
+        A) NER / 1-arity relations
+           MENTION | LEFT | RIGHT | SENTENCE
+
+        B) 2-arity relations
+           MENTION_1 | MENTION_2 | M1_INNER_WORDS_M2 | SENTENCE
+
+        We can optionally apply weighting schemes to W
+
+        :param candidates:
+        :return:
+        """
+        context_seqs = []
+        for c in candidates:
+            words    = candidate_to_tokens(c)
+            m1_start = c[0].get_word_start()
+            m1_end   = c[0].get_word_end() + 1
+
+            # optional mention 1 weight decay
+            if self.kernel == 'exp':
+                dist_m1 = self.gen_dist_exp(len(words), self.decay, m1_start, m1_end)
+                dist_sent = dist_m1
+            elif self.kernel == 'linear':
+                dist_m1 = self.gen_dist_linear(len(words), m1_start, m1_end, self.window_size)
+                dist_m1_sent = self.gen_dist_linear(len(words), m1_start, m1_end, max(m1_start, len(words) - m1_end))
+                dist_sent = dist_m1_sent
+
+            # IGNORE FOR NOW
+            # optional expand mention by window size k
+            #k = self.window_size
+            #m1_start = max(m1_start - k, 0)
+            #m1_end = min(m1_end + k, len(words))
+
+            # context sequences
+            sent_seq  = np.array(words)
+            m1_seq    = np.array(words[m1_start: m1_end])
+            left_seq  = np.array(words[0: m1_start])
+            right_seq = np.array(words[m1_end:])
+
+            # use kerney decay?
+            if self.kernel is None:
+                context_seqs.append((sent_seq, m1_seq, left_seq, right_seq, True))
+            else:
+                # TODO -- double Check!!!!!!
+                dm1 = dist_m1[m1_start: m1_end]
+                #dword_seq = dist_sent[m1_start + 1: m1_end]
+
+                dleft_seq  = dist_sent[0: m1_start]
+                dright_seq = dist_sent[m1_end:]
+
+                context_seqs.append((sent_seq, m1_seq, left_seq, right_seq,
+                                     True, dist_sent, dm1, dleft_seq, dright_seq))
+
+        return context_seqs
+
     def _preprocess_data_combination(self, candidates):
         """Convert candidate sentences to lookup sequences
 
@@ -84,6 +144,10 @@ class PCA(TFNoiseAwareModel):
 
         if len(candidates) > 0 and not isinstance(candidates[0], Candidate):
             return candidates
+
+        # HACK for NER/1-arity
+        if len(candidates[0]) == 1:
+            return self._get_context_seqs(candidates)
 
         data = []
         for candidate in candidates:
@@ -191,7 +255,7 @@ class PCA(TFNoiseAwareModel):
             extend_char = False
 
         if extend_word:
-            # Word embeddins
+            # Word embeddings
             f = open(self.word_emb_path, 'r')
 
             l = list()
@@ -362,7 +426,56 @@ class PCA(TFNoiseAwareModel):
             else:
                 return ret1.view(1, -1)
 
+    def _gen_ner_features(self, X):
+        """
+        HACK: Generate NER/1-arity PCA features
+
+        Order of sequences is implicit in the order of the X list
+        NER ordering
+
+        [sent_seq, m1_seq, left_seq, right_seq, order]
+        [sent_seq, m1_seq, left_seq, right_seq, order, dist_sent, dm1, dword_seq]
+
+        ORIGINAL relation ordering
+        [sent_seq, m1_seq, left_seq, right_seq, order, dist_sent, dm1, dleft_seq, dright_seq]
+
+        :return:
+
+        """
+        if self.kernel is None:
+            if self.sent_feat:
+                sent_pca  = self.get_principal_components(X[0])
+            m1_pca        = self.get_principal_components(X[1])
+            if self.cont_feat:
+                left_pca  = self.get_principal_components(X[2])
+                right_pca = self.get_principal_components(X[3])
+        else:
+
+            if self.sent_feat:
+                sent_pca  = self.get_principal_components(X[0], X[5])
+            m1_pca        = self.get_principal_components(X[1], X[6])
+            if self.cont_feat:
+                left_pca  = self.get_principal_components(X[2], X[7])
+                right_pca = self.get_principal_components(X[3], X[8])
+
+        if self.sent_feat and self.cont_feat:
+            feature = torch.cat((m1_pca, left_pca, right_pca, sent_pca))
+        elif self.sent_feat:
+            feature = torch.cat((m1_pca, sent_pca))
+        elif self.cont_feat:
+            feature = torch.cat((m1_pca, left_pca, right_pca))
+        else:
+            feature = torch.cat((m1_pca))
+
+        feature = feature.view(1, -1)
+        return feature
+
     def gen_feature(self, X):
+
+        # HACK - NER/1-arity features
+        if self.ner:
+            return self._gen_ner_features(X)
+
         if self.kernel is None:
             m1 = self.get_principal_components(X[1])
             m2 = self.get_principal_components(X[2])
@@ -454,6 +567,8 @@ class PCA(TFNoiseAwareModel):
         self.model_kwargs = kwargs
 
         self.weights = kwargs.get('weights',None)
+        
+        self.ner = kwargs.get('ner', False)
 
         # Set if use char embeddings
         self.char = kwargs.get('char', False)
@@ -547,6 +662,7 @@ class PCA(TFNoiseAwareModel):
         print "Word embedding:                    ", self.word_emb_path
         print "Char embedding:                    ", self.char_emb_path
         print "Invariance method                  ", self.method
+        print "NER/1-arity candidates             ", self.ner
         print "==============================================="
 
         assert self.word_emb_path is not None
@@ -665,7 +781,6 @@ class PCA(TFNoiseAwareModel):
         n_classes = 1 if self.cardinality == 2 else None
 
         self.model = self.build_model(n_features, n_classes)
-        loss = nn.MultiLabelSoftMarginLoss(size_average=False)
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
