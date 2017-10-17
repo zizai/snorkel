@@ -566,8 +566,12 @@ class PCA(TFNoiseAwareModel):
 
         self.model_kwargs = kwargs
 
+        # weights for boosting
         self.weights = kwargs.get('weights',None)
-        
+
+        # indices of training examples used in case of rebalance
+        self.train_idxs = kwargs.get('train_idxs', None)
+
         self.ner = kwargs.get('ner', False)
 
         # Set if use char embeddings
@@ -752,12 +756,20 @@ class PCA(TFNoiseAwareModel):
         X_train = [X_train[j] for j in train_idxs] if self.representation \
             else X_train[train_idxs, :]
         Y_train = Y_train[train_idxs]
+        # save train_idxs for boosting
+        self.train_idxs = train_idxs
+        print("there are {} values in train_idxs".format(len(train_idxs)))
 
-        if self.weights is not None:
-            new_weights = self.weights[train_idxs]
-            self.weights = Variable(torch.from_numpy(new_weights).float(), requires_grad=False)
+        if self.weights is None:
+            unif_weights = np.ones(len(Y_train))/float(len(Y_train))
+            self.weights = Variable(torch.from_numpy(unif_weights).float(),
+                                    requires_grad=False)
         else:
-            self.weights = Variable(torch.from_numpy(np.ones(len(Y_train))).float(), requires_grad=False)
+            # todo: assumes that dim(weights) match those of X_train and Y_train
+            assert len(self.weights) == len(Y_train)
+            assert len(self.weights) == len(X_train)
+            self.weights = Variable(torch.from_numpy(self.weights).float(),
+                                    requires_grad=False)
 
         if verbose:
             st = time()
@@ -793,7 +805,7 @@ class PCA(TFNoiseAwareModel):
                 # match to batch size of torch's DataLoader
                 weights = self.weights[j:(j+self.batch_size)]
                 loss = WeightedMultiLabelSoftMarginLoss(weight=weights,
-                                                        size_average=False)    
+                                                        size_average=False)
                 cost += self.train_model(self.model, loss, optimizer, x, y.float())
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
@@ -862,9 +874,11 @@ class PCA(TFNoiseAwareModel):
             with open(os.path.join(model_dir, "model_dicts.pkl"), 'wb') as f:
                 if self.char:
                     dump({'char_dict': self.char_dict, 'word_dict': self.word_dict, 'char_emb': self.char_emb,
-                          'word_emb': self.word_emb, 'weights': self.weights}, f)
+                          'word_emb': self.word_emb, 'weights': self.weights,
+                          'train_idxs': self.train_idxs}, f)
                 else:
-                    dump({'word_dict': self.word_dict, 'word_emb': self.word_emb, 'weights': self.weights}, f)
+                    dump({'word_dict': self.word_dict, 'word_emb': self.word_emb,
+                          'weights': self.weights, 'train_idxs': self.train_idxs}, f)
 
             if self.method:
                 # Save model invariance data needed to rebuild model
@@ -900,6 +914,7 @@ class PCA(TFNoiseAwareModel):
                     self.char_emb = d['char_emb']
                 try:
                     self.weights = d['weights']
+                    self.train_idxs = d['train_idxs']
                 except KeyError:
                     pass
 
