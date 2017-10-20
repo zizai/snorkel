@@ -266,7 +266,7 @@ class Grammar(object):
                 if (sem[0]=='.near'):
 		    sem_list=list(sem)
 		    sem_list[0]=('.near_')
-		    ###sem_list.append(45.0)
+		    sem_list.append(45.0)
 		    sem=tuple(sem_list)
 		op = self.ops[sem[0]]
 		args = [recurse(arg) for arg in sem[1:]]

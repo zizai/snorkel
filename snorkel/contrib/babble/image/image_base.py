@@ -136,7 +136,7 @@ ops = {
     '.within': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_within'](g1(c1), g2(c2)),
 
     #########
-    # '.near_': lambda g2: lambda c2: lambda g1: lambda c1: lambda k: lambda c0: c1['helpers']['is_near'](g1(c1), g2(c2), k(c0)),
+    '.near_': lambda g2: lambda c2: lambda g1: lambda c1: lambda k: lambda c0: c1['helpers']['is_near'](g1(c1), g2(c2), k(c0)),
 
 }
 
