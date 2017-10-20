@@ -263,7 +263,12 @@ class Grammar(object):
     def evaluate(self, parse):
         def recurse(sem):
             if isinstance(sem, tuple):
-                op = self.ops[sem[0]]
+                if (sem[0]=='.near'):
+		    pdb.set_trace()
+		    sem_list=list(sem)
+		    sem_list[0]=('.near_')
+		    sem=tuple(sem_list)
+		op = self.ops[sem[0]]
 		args = [recurse(arg) for arg in sem[1:]]
 		return op(*args) if args else op
             else:
