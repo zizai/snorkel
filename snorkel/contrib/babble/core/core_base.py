@@ -106,6 +106,7 @@ ops = {
     '.bool': lambda x: lambda c: x,
     '.string': lambda x: lambda c: x,
     '.int': lambda x: lambda c: x,
+    '.float': lambda x: lambda c: x,
     # lists
     '.tuple': lambda x: lambda c: tuple(x(c)),
     '.list': lambda *x: lambda c: [z(c) for z in x],
@@ -113,7 +114,7 @@ ops = {
         # apply a function x to elements in list y
     '.map': lambda func_, list_: lambda cxy: [func_(cxy)(lambda c: yi)(cxy) for yi in list_(cxy)],
         # call a 'hungry' evaluated function on one or more arguments
-    '.call': lambda *x: lambda c: x[0](c)(x[1])(c), #TODO: extend to more than one argument?
+    '.call': lambda *x: lambda c: x[0](c)(*x[1:])(c),
         # apply an element to a list of functions (then call 'any' or 'all' to convert to boolean)
     '.composite_and': lambda x, y: lambda cxy: lambda z: lambda cz: all([x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)]),
     '.composite_or':  lambda x, y: lambda cxy: lambda z: lambda cz: any([x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)]),

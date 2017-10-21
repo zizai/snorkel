@@ -136,8 +136,23 @@ ops = {
     '.within': lambda g2: lambda c2: lambda g1: lambda c1: c1['helpers']['is_within'](g1(c1), g2(c2)),
 
     #########
-    '.near_': lambda g2: lambda c2: lambda g1: lambda c1: lambda k: lambda c0: c1['helpers']['is_near'](g1(c1), g2(c2), k(c0)),
+    '.near_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_near'](g1(c1), g2(c2), k(c1)),
+    '.far_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_far'](g1(c1), g2(c2), k(c1)),
 
+    '.smaller_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_smaller'](g1(c1), g2(c2), k(c1)),
+    '.larger_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_larger'](g1(c1), g2(c2), k(c1)),
+    '.samearea_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_same_area'](g1(c1), g2(c2), k(c1)),
+    
+    '.wider_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_wider'](g1(c1), g2(c2), k(c1)),
+    '.taller_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_taller'](g1(c1), g2(c2), k(c1)),
+    '.samewidth_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_same_width'](g1(c1), g2(c2), k(c1)),
+    
+    '.skinnier_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_skinnier'](g1(c1), g2(c2), k(c1)),
+    '.shorter_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_shorter'](g1(c1), g2(c2), k(c1)),
+    '.sameheight_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_same_height'](g1(c1), g2(c2), k(c1)),
+    
+    '.overlaps_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_overlaps'](g1(c1), g2(c2), k(c1)),
+    '.aligned_': lambda g2: lambda c2: lambda g1, k: lambda c1: c1['helpers']['is_aligned'](g1(c1), g2(c2), k(c1)),
 }
 
 
