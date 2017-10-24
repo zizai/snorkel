@@ -24,8 +24,8 @@ class Embeddings(object):
         self.verbose = verbose
         # infer dimension
         if not self.dim and self.fmt != "gensim":
-            vec = open(self.fpath, "rU").readline().strip().split(' ')[1:]
-            self.dim = len(vec)
+            header = open(self.fpath, "rU").readline().strip().split(' ')
+            self.dim = len(header) - 1 if len(header) != 2 else int(header[-1])
             if self.verbose:
                 print "Detected {}d embeddings".format(self.dim)
 
