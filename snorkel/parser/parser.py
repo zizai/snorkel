@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import sys
 import requests
 
@@ -12,15 +13,32 @@ class Parser(object):
         self.name = name
         self.encoding = encoding
 
+    @staticmethod
+    def strip_null_bytes(text):
+        """
+        Remove NUL (\x00) characters from string. We do this to prevent postgreSQL errors
+        
+        :param text:
+        :return:
+        """
+        return re.sub("[\x00]+", "", text)
+
     def to_unicode(self, text):
         '''
         Convert char encoding to unicode
+
+        #  'utf8' codec can't decode byte 0xf3 in position 1048: invalid continuation byte
+
         :param text:
         :return:
         '''
-        text = text.encode('utf-8', 'error')
-        text = text.decode('string_escape', errors='ignore')
-        text = text.decode('utf-8')
+        try:
+            text = text.encode('utf-8', 'error')
+            text = text.decode('string_escape', errors='ignore')
+            text = text.decode('utf-8')
+        except Exception as e:
+            sys.stderr.write("ERROR unicode decoding {}".format(e))
+            text = u"<~~UNICODE PARSING ERROR~~>"
         return text
 
     def connect(self):
@@ -105,8 +123,3 @@ class URLParserConnection(ParserConnection):
         :return:
         '''
         return self.parser.parse(document, text, self)
-
-
-
-
-
