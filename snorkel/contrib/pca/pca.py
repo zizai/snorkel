@@ -419,7 +419,12 @@ class PCA(TFNoiseAwareModel):
             if self.bidirectional:
                 return torch.cat((ret1.view(1, -1), ret2.view(1, -1), ret1_b.view(1, -1), ret2_b.view(1, -1)), 1)
             else:
-                return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
+                if self.only_chars:
+                    # todo: only returning character-level features
+                    # will have to adjust this for if i want to do bidirectional stuff
+                    return ret2.view(1, -1)
+                else:
+                    return torch.cat((ret1.view(1, -1), ret2.view(1, -1)), 1)
         else:
             if self.bidirectional:
                 return torch.cat((ret1.view(1, -1), ret1_b.view(1, -1)), 1)
@@ -565,6 +570,9 @@ class PCA(TFNoiseAwareModel):
     def _init_kwargs(self, **kwargs):
 
         self.model_kwargs = kwargs
+
+        # todo: tentative; for character-only feature set
+        self.only_chars = kwargs.get('only_chars', False)
 
         # weights for boosting
         self.weights = kwargs.get('weights',None)
