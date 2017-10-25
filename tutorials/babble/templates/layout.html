@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Babble Labble Demo</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen">
+		<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
+	<style>
+		div#loading {
+	    width: 100px;
+	    height: 100px;
+	    display: none;
+	    margin: 0 auto;
+	    background: url("{{ url_for('static', filename='loading-gif.gif') }}") no-repeat;
+	    background-size: 50px Auto;
+	    background-position: center;
+	    cursor: wait;
+	    }
+	</style>
+	</head>
+  	<body>
+  		<div id="left"> <h1 style="color: #ffffff; text-align: center"> Babble Labble </h1>
+  		</div>
+  		<div id="right">
+			{% block content %}{% endblock %}
+		</div>
+	</body>
+</html>

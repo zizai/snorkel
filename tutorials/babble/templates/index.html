@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% block content %}
+<p> Person X and Person Y are/will be married</p>
+<p>{{candidate|safe}}</p>
+
+{% from "_formhelpers.html" import render_field %}
+<script type="text/javascript">// <![CDATA[
+        function loading(){
+            $("#loading").show();
+            $("#content").hide();       
+        }
+// ]]></script>
+<div id="loading"></div>
+<div id="content">
+	<form method=post style="text-align: center; margin-top: 5%">
+	  <dl>
+	  	{{ form.csrf_token }}
+	  	{% for subfield in form.label %}
+	  	<tr>
+	  		<td>{{ subfield }}</td>
+	  		<td>{{ subfield.label }}</td>
+	  	</tr>
+	  	{% endfor %}
+	  	<br/>
+	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
+	    	{{ form.explanation(cols="50", rows="2", placeholder="Tell us why you chose this label", class="form-control") }}
+         <p class="col-sm-5 help-block">
+            {{ form.explanation.errors[0] }}
+		</div>
+	  </dl>
+     <br/>
+	  <p><input class="btn btn-success" type=submit value=Go onclick="loading();">
+      {{ form.skip }}
+	</form>
+{% if conf_matrix is defined %}
+<div class="container">
+{% for matrix in conf_matrix %}
+	<table class="table table-fixed">
+      <thead>
+		 <th> True Positives {{matrix.tp|length}} </th>
+      </thead>
+      <tbody>
+		{% for spouse in matrix.tp %}
+		   <tr>
+		        <td> {{ spouse[0].sentence.text }} </td>
+		   </tr>
+		{% endfor %}
+      </tbody>
+	</table>
+   {% for spouse in matrix.tn %}
+   <table class = "table table-fixed">
+      <thead>
+      	<th> True Negatives {{ matrix.tn|length}} </th>
+      </thead>
+      <tbody>
+      	{% for spouse in matrix.tn %}
+      	<tr>
+      		<td> {{ spouse[0].sentence.text }}</td>
+      	</tr>
+      	{% endfor %}
+      </tbody>
+   </table>
+   {% endfor %}
+   {% for spouse in matrix.fp %}
+   <table>
+   	<th> False Positives {{ matrix.fp|length}} </th>
+   	{% for spouse in matrix.fp %}
+   	<tr>
+   		<td> {{ spouse[0].sentence.text }}</td>
+   	</tr>
+   	{% endfor %}
+   </table>
+   {% endfor %}
+      {% for spouse in matrix.fn %}
+   <table>
+   	<th> False Negatives {{ matrix.fn|length}} </th>
+   	{% for spouse in matrix.fn %}
+   	<tr>
+   		<td> {{ spouse[0].sentence.text }}</td>
+   	</tr>
+   	{% endfor %}
+   </table>
+   {% endfor %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if no_parses_msg is defined %}
+	Explanantion generated no new parses.
+{% endif %}
+{% endblock %}
+</div>
