@@ -342,8 +342,8 @@ class SemanticParser(object):
     def swapSubjectives(self, parse):
 	def recurse(sem):
 	    if isinstance(sem,tuple):
-		#if (sem[0]=='.near'):
-		#    print("'.near' found")
+		if (sem[0]=='.near'):
+		    print("'.near' found")
 		#    sem_list=list(sem)
                 #    sem_list[0]=('.near_')
                 #    sem_list.append(('.float', 45.0))
