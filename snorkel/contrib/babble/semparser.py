@@ -83,7 +83,7 @@ class SemanticParser(object):
             """
             num_parses_by_exp.append(len(exp_parses))
             for j, parse in enumerate(exp_parses):
-		self.evaluateSubjectives(parse)
+		newSem=self.swapSubjectives(parse)
 		lf = self.grammar.evaluate(parse)
 		if return_parses:
                     parse.function = lf
@@ -339,18 +339,25 @@ class SemanticParser(object):
         validate_semantics(sem)
         return self.grammar.translate(sem)
 
-    def evaluateSubjectives(self, parse):
+    def swapSubjectives(self, parse):
 	def recurse(sem):
 	    if isinstance(sem,tuple):
-                if (sem[0]=='.near'):
-                    print("'.near' found")
-		    sem_list=list(sem)
-                    sem_list[0]=('.near_')
-                    ###sem_list.append(45.0)
-                    sem=tuple(sem_list)
-                op = self.grammar.ops[sem[0]]
-                args = [recurse(arg) for arg in sem[1:]]
-                return op(*args) if args else op
-            else:
-                return sem
-	LF = recurse(parse.semantics) 
+		#if (sem[0]=='.near'):
+		#    print("'.near' found")
+		#    sem_list=list(sem)
+                #    sem_list[0]=('.near_')
+                #    sem_list.append(('.float', 45.0))
+                #    sem=tuple(sem_list)
+		#    print(sem)
+		#op = sem[0]
+		args = [recurse(arg) for arg in sem[1:]]
+                #print (op,*args)
+		#return (op,args) if args else op
+		print(sem)
+		return sem
+	    else:
+	        return sem
+	newSem = recurse(parse.semantics)
+	print(newSem)
+	return newSem
+	
