@@ -83,12 +83,15 @@ class SemanticParser(object):
             """
             num_parses_by_exp.append(len(exp_parses))
             for j, parse in enumerate(exp_parses):
+		### Produce multiple parses around here
 		newSem=self.swapSubjectives(parse)
+		print(newSem)
 		lf = self.grammar.evaluate(parse)
 		if return_parses:
                     parse.function = lf
                     parses.append(parse)
-                lf.__name__ = "{}_{}".format(exp.name, j)
+                ### Change naming scheme
+		lf.__name__ = "{}_{}".format(exp.name, j)
                 LFs.append(lf)
             self.explanation_counter += 1
         ###
@@ -343,21 +346,21 @@ class SemanticParser(object):
 	def recurse(sem):
 	    if isinstance(sem,tuple):
 		if (sem[0]=='.near'):
-		    print("'.near' found")
-		#    sem_list=list(sem)
-                #    sem_list[0]=('.near_')
-                #    sem_list.append(('.float', 45.0))
-                #    sem=tuple(sem_list)
-		#    print(sem)
-		#op = sem[0]
+		    #print("'.near' found")
+		    sem_list=list(sem)
+                    sem_list[0]=('.near_')
+                    sem_list.append(('.float', 45.0))
+                    sem=tuple(sem_list)
+		newSem=[]
+		newSem.append(sem[0])
+		#print (newSem)
 		args = [recurse(arg) for arg in sem[1:]]
-                #print (op,*args)
-		#return (op,args) if args else op
-		print(sem)
-		return sem
+		newSem.extend(args)
+		newSem=tuple(newSem)
+		#print (newSem)
+		return newSem
 	    else:
 	        return sem
 	newSem = recurse(parse.semantics)
-	print(newSem)
 	return newSem
 	
