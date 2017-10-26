@@ -1,4 +1,5 @@
 import os
+import collections
 import numpy as np
 
 import warnings
@@ -48,7 +49,7 @@ class PCA(TFNoiseAwareModel):
                 ret.append(1.)
         return np.array(ret)
 
-    def _get_context_seqs(self, candidates):
+    def _get_context_seqs(self, candidates, max_window_len=5):
         """
         Given a set of candidates, generate word contexts. This is task-dependant.
         Each context c_i maps to an embedding matrix W_i in \R^{n \times d} where
@@ -65,6 +66,8 @@ class PCA(TFNoiseAwareModel):
         :param candidates:
         :return:
         """
+        dist = collections.defaultdict(list)
+
         context_seqs = []
         for c in candidates:
             words    = candidate_to_tokens(c)
@@ -92,6 +95,15 @@ class PCA(TFNoiseAwareModel):
             left_seq  = np.array(words[0: m1_start])
             right_seq = np.array(words[m1_end:])
 
+            # enforce window constraints
+            left_seq  = left_seq[-max_window_len:]
+            right_seq = right_seq[:max_window_len]
+
+            dist["S"].append(sent_seq.shape[0])
+            dist["L"].append(left_seq.shape[0])
+            dist["R"].append(right_seq.shape[0])
+            dist["M"].append(m1_seq.shape[0])
+
             # use kerney decay?
             if self.kernel is None:
                 context_seqs.append((sent_seq, m1_seq, left_seq, right_seq, True))
@@ -103,8 +115,16 @@ class PCA(TFNoiseAwareModel):
                 dleft_seq  = dist_sent[0: m1_start]
                 dright_seq = dist_sent[m1_end:]
 
+                # enforce window constraints
+                dleft_seq = dleft_seq[-max_window_len:]
+                dright_seq = dright_seq[:max_window_len]
+
                 context_seqs.append((sent_seq, m1_seq, left_seq, right_seq,
                                      True, dist_sent, dm1, dleft_seq, dright_seq))
+
+        print "context lengths:"
+        for i in dist:
+            print i, np.mean(dist[i]), np.max(dist[i])
 
         return context_seqs
 
@@ -119,7 +139,7 @@ class PCA(TFNoiseAwareModel):
 
         # HACK for NER/1-arity
         if len(candidates[0]) == 1:
-            return self._get_context_seqs(candidates)
+            return self._get_context_seqs(candidates, self.max_context_window_length)
 
         data = []
         for candidate in candidates:
@@ -593,6 +613,9 @@ class PCA(TFNoiseAwareModel):
 
         # Set max sentence length
         self.max_sentence_length = kwargs.get('max_sentence_length', 100)
+
+        # Set max context window length (Left/Right window around mention)
+        self.max_context_window_length = kwargs.get('max_context_window_length', 5 )
 
         # Set kernel
         self.kernel = kwargs.get('kernel', None)
