@@ -263,7 +263,7 @@ class Grammar(object):
     def evaluate(self, parse):
         def recurse(sem):
             if isinstance(sem, tuple):
-                op = self.ops[sem[0]]
+		op = self.ops[sem[0]]
                 args = [recurse(arg) for arg in sem[1:]]
                 return op(*args) if args else op
             else:
@@ -272,9 +272,11 @@ class Grammar(object):
         return lambda candidate: LF({'helpers': self.helpers, 'user_lists': self.user_lists, 'candidate': candidate})
 
     def translate(self, sem):
-        def recurse(sem):
+        changed=0
+	def recurse(sem):
             if isinstance(sem, tuple):
                 if sem[0] in self.translate_ops:
+		    changed=1
                     op = self.translate_ops[sem[0]]
                     args_ = [recurse(arg) for arg in sem[1:]]
                     return op(*args_) if args_ else op
@@ -282,7 +284,7 @@ class Grammar(object):
                     return str(sem)
             else:
                 return str(sem)
-        return recurse(sem)
+        if changed: return recurse(sem)
 
     def print_grammar(self):
         def all_rules(rule_index):
