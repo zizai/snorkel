@@ -86,14 +86,15 @@ class SemanticParser(object):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
 		if (parseString.find('near')>=0):
-		    print(parseString.find('near'))
-		    newSem_0=self.swapSubjectives(parse, 45.0)
-		    newSem_1=self.swapSubjectives(parse, 50.0)
-		    newSem_2=self.swapSubjectives(parse, 55.0)
+		    #print(parseString.find('near'))
+		    print(parse.semantics)
+		    newSem_0=self.swapSubjectives(parse,'.near', 45.0)
+		    newSem_1=self.swapSubjectives(parse,'.near', 50.0)
+		    newSem_2=self.swapSubjectives(parse,'.near', 55.0)
 		    print(newSem_0)
-		    print(newSem_1)
-		    print(newSem_2) 
-		    #parse.semantics = newSem
+		    #print(newSem_1)
+		    #print(newSem_2) 
+		    parse.semantics = newSem_0
 		lf = self.grammar.evaluate(parse)
 		if return_parses:
                     parse.function = lf
@@ -350,10 +351,10 @@ class SemanticParser(object):
         validate_semantics(sem)
         return self.grammar.translate(sem)
 
-    def swapSubjectives(self, parse, value):
+    def swapSubjectives(self, parse, key, value):
 	def recurse(sem):
 	    if isinstance(sem,tuple):
-		if (sem[0]=='.near'):
+		if (sem[0]==key):
 		    #print("'.near' found")
 		    sem_list=list(sem)
                     sem_list[0]=('.near_')
