@@ -88,7 +88,7 @@ class SemanticParser(object):
 		    newSem_0=self.swapSubjectives(parse,'.near', 45.0)
 		    newSem_1=self.swapSubjectives(parse,'.near', 50.0)
 		    newSem_2=self.swapSubjectives(parse,'.near', 55.0)
-		    parse.semantics = newSem_0
+		    #parse.semantics = newSem_1
 		lf = self.grammar.evaluate(parse)
 		if return_parses:
                     parse.function = lf
