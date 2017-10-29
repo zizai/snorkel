@@ -60,7 +60,6 @@ class SemanticParser(object):
 
         :param explanations: An instance or list of Explanation objects
         """
-        key='.smaller'
 	"""Need to check if something is in keys. Write helper script to test this."""
 
 	LFs = []
@@ -86,15 +85,10 @@ class SemanticParser(object):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
 		if (parseString.find('.near')>=0):
-		    #print(parseString.find('.near'))
-		    print(parse.semantics)
 		    newSem_0=self.swapSubjectives(parse,'.near', 45.0)
 		    newSem_1=self.swapSubjectives(parse,'.near', 50.0)
 		    newSem_2=self.swapSubjectives(parse,'.near', 55.0)
-		    print(newSem_0)
-		    #print(newSem_1)
-		    #print(newSem_2) 
-		    #parse.semantics = newSem_0
+		    parse.semantics = newSem_0
 		lf = self.grammar.evaluate(parse)
 		if return_parses:
                     parse.function = lf
@@ -352,21 +346,22 @@ class SemanticParser(object):
         return self.grammar.translate(sem)
 
     def swapSubjectives(self, parse, key, value):
+	newKey = str(key) + "_"
 	def recurse(sem):
 	    if isinstance(sem,tuple):
+		sem_list=list(sem)
 		if (sem[0]==key):
-		    newKey = str(key) + "_"
-		    sem_list=list(sem)
-                    sem_list[0]=(newKey)
-                    sem_list.append(('.float', value))
+                    sem_list[0]=newKey
                     sem=tuple(sem_list)
+		if isinstance(sem[1], tuple):
+		    if (sem[1][0]==key):
+			sem_list.append(('.float', value))
+                        sem=tuple(sem_list)
 		newSem=[]
 		newSem.append(sem[0])
-		#print (newSem)
 		args = [recurse(arg) for arg in sem[1:]]
 		newSem.extend(args)
 		newSem=tuple(newSem)
-		#print (newSem)
 		return newSem
 	    else:
 	        return sem
