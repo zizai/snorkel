@@ -15,6 +15,7 @@ from wtforms import StringField, validators, TextAreaField
 from wtforms.fields import RadioField, SubmitField
 from snorkel.contrib.babble import BabbleStream
 from snorkel.lf_helpers import *
+from tutorials.babble.spouse.spouse_examples import get_explanations, get_user_lists
 
 # dependencies:
 # flask
@@ -33,14 +34,14 @@ class ExplanationForm(FlaskForm):
 def candidate_html(c):
 	chunks = get_text_splits(c)
 	div_tmpl = u'''<div style="border: 1px #858585; box-shadow:0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-    background-color:#FDFDFD; padding:5pt 10pt 5pt 10pt; width: 80%; margin: auto; margin-top: 5%">{}</div>'''
-	arg_tmpl = u'<b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">{0}<small style="color:#4B86A8; font-size:10pt;">{1}</small></b>'
+    background-color:#FDFDFD; padding:5pt 10pt 5pt 10pt; width: 80%; margin: auto; margin-top: 2%">{}</div>'''
+	arg_tmpl = u'<b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">{}</b>'
 	sent_tmpl = u'<p style="font-size:12pt;">{}</p>'
 	text = u""
 	for s in chunks[0:]:
 	    if s in [u"{{A}}", u"{{B}}"]:
-	        span = (c[0].get_span(), " arg1 ") if s == u"{{A}}" else (c[1].get_span(), " arg2 ")
-	        text += arg_tmpl.format(span[0], span[1])
+	        span = c[0].get_span() if s == u"{{A}}" else c[1].get_span()
+	        text += arg_tmpl.format(span)
 	    else:
 	        text += s.replace(u"\n", u"<BR/>")
 	html = div_tmpl.format(sent_tmpl.format(text.strip()))
@@ -146,10 +147,13 @@ def index():
 	# pipe.extract()
 	# pipe.load_gold()
 	
-	candidates = session.query(candidate_class).filter(
-    candidate_class.split == config['babbler_candidate_split']).all()
-	
-	bs = BabbleStream(session, candidates[:10], strategy='linear', preload=False)
+	candidates = session.query(Spouse).filter(Spouse.split == 0).all()
+	spouse_explanations = get_explanations(candidates)
+	spouse_user_lists = get_user_lists()
+
+	bs = BabbleStream(session, strategy='linear', candidate_class=Spouse)
+	# bs.preload(explanations=spouse_explanations, user_lists=spouse_user_lists)
+	# bs.get_label_matrix()
 
 	c = bs.next()
 	# print c

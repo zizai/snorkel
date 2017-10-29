@@ -15,16 +15,25 @@ when explanation is received:
 when done, pull out L_train and proceed to generative model
 """
 from collections import defaultdict, namedtuple
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
+from pandas import DataFrame, Series
 import scipy.sparse as sparse
-import random
 
 from snorkel.annotations import LabelAnnotator, load_gold_labels, csr_AnnotationMatrix
 from snorkel.learning.utils import MentionScorer
 from snorkel.lf_helpers import test_LF
-from snorkel.utils import matrix_tp, matrix_fp, matrix_tn, matrix_fn, matrix_coverage
+from snorkel.utils import (
+    matrix_conflicts,
+    matrix_coverage,
+    matrix_overlaps,
+    matrix_tp,
+    matrix_fp,
+    matrix_fn,
+    matrix_tn
+)
 
 from snorkel.contrib.babble.filter_bank import FilterBank
 from snorkel.contrib.babble.grammar import Parse
@@ -32,25 +41,60 @@ from snorkel.contrib.babble.semparser import Explanation, SemanticParser
 
 # from tutorials.babble.spouse.spouse_examples import get_user_lists, get_explanations
 
-ConfusionMatrix = namedtuple('ConfusionMatrix', ['tp', 'fp', 'tn', 'fn'])
-Statistics = namedtuple('Statistics', ['accuracy', 'class_coverage'])
+ConfusionMatrix = namedtuple('ConfusionMatrix', ['correct', 'incorrect', 'abstained'])
+Metrics = namedtuple('Metrics', ['accuracy', 'coverage', 'class_coverage'])
+
+class Statistic(object):
+    def __init__(self, numer, denom):
+        self.numer = int(numer)
+        self.denom = int(denom)
+        self.percent = float(numer)/denom * 100 if denom else 0
+    
+    def __repr__(self):
+        return "{}: {:.2f}% ({}/{})".format(
+            type(self).__name__, self.percent, self.numer, self.denom)
+
+class Accuracy(Statistic):
+    """The accuracy of a single labeling function."""
+    pass
+
+class Coverage(Statistic):
+    """The coverage (# labeled/# total) of a single labeling function."""
+    pass
+
+class ClassCoverage(Statistic):
+    """The coverage (# labeled/# total _in class_) of a single labeling function."""
+    pass
+
+class GlobalCoverage(Statistic):
+    """The coverage (# labeled with 1+ label/# total) of all labeling functions."""
+    pass
+
 
 class CandidateGenerator(object):
     """
     A generator for returning a list of candidates in a certain order.
     """
-    def __init__(self, candidates, strategy='linear'):
-        if strategy == 'linear':
-            self.candidate_generator = self.linear_generator(candidates)
-        elif strategy == 'random':
-            self.candidate_generator = self.random_generator(candidates)
-        elif strategy == 'balanced':
-            raise NotImplementedError
-        elif strategy == 'active':
+    def __init__(self, babble_stream, seed=None, 
+                 balanced=False, active=False, shuffled=False):
+        """
+        If active = True, return only candidates that have no labels so far
+        If balanced = True, alternate between candidates with True/False gold labels
+        If random = True, return the candidates (passing the above conditions,
+            if applicable) in random order.
+        """
+        candidates = babble_stream.dev_candidates
+        labels = babble_stream.dev_labels
+        
+        if active:
             raise NotImplementedError
         else:
-            raise Exception("kwarg 'strategy' must be in "
-                "{'linear', 'random', 'balanced', 'active'}")
+            if balanced:
+                self.candidate_generator = self.balanced_generator(
+                    candidates, labels, seed, shuffled=shuffled)
+            else:
+                self.candidate_generator = self.linear_generator(
+                    candidates, seed, shuffled=shuffled)
 
     def __iter__(self):
         return self
@@ -58,29 +102,52 @@ class CandidateGenerator(object):
     def next(self):
         return self.candidate_generator.next()
 
-    def linear_generator(self, candidates):
+    @staticmethod
+    def linear_generator(candidates, seed, shuffled=False):
+        if shuffled:
+            if seed is not None:
+                random.seed(seed)
+            random.shuffle(candidates)
         for c in candidates:
             yield c
 
-    def random_generator(self, candidates):
-        random.shuffle(candidates)
-        for c in candidates:
+    @staticmethod
+    def balanced_generator(candidates, labels, seed, shuffled=False):
+        candidates_labels = zip(candidates, labels)
+        if shuffled:
+            if seed is not None:
+                random.seed(seed)
+            random.shuffle(candidates_labels)
+        positives = [c for (c, l) in candidates_labels if l == 1]
+        negatives = [c for (c, l) in candidates_labels if l == -1]
+        candidate_queue = []
+        for i in range(max(len(positives), len(negatives))):
+            if i < len(positives):
+                candidate_queue.append(positives[i])
+            if i < len(negatives):
+                candidate_queue.append(negatives[i])
+        for c in candidate_queue:
             yield c
+
+
 
 
 class BabbleStream(object):
     """
     An object for iteratively viewing candidates and parsing corresponding explanations.
     """
-    def __init__(self, session, mode='text', candidate_class=None, 
-                strategy='linear', verbose=True):
+    def __init__(self, session, mode='text', candidate_class=None, seed=None, 
+                verbose=True, **kwargs):
         self.session = session
         self.mode = mode
         self.candidate_class = candidate_class
+        self.seed = seed
         self.verbose = verbose
 
         self.dev_candidates = session.query(self.candidate_class).filter(self.candidate_class.split == 1).all()
-        self.candidate_generator = CandidateGenerator(self.dev_candidates, strategy)
+        self.dev_labels = np.ravel((load_gold_labels(session, annotator_name='gold', split=1)).todense())
+    
+        self.candidate_generator_kwargs = kwargs
         self.user_lists = {}
         self.semparser = None
         self.filter_bank = FilterBank(session, candidate_class)
@@ -95,17 +162,20 @@ class BabbleStream(object):
         self.temp_label_matrix = None
 
         # Evaluation tools
-        dev_labels          = load_gold_labels(session, annotator_name='gold', split=1)
         self.num_dev_total  = len(self.dev_candidates)
-        self.num_dev_pos    = dev_labels.nnz
-        self.num_dev_neg    = self.num_dev_total - self.num_dev_pos
-        self.scorer         = MentionScorer(self.dev_candidates, dev_labels)
+        self.num_dev_pos    = sum(self.dev_labels == 1)
+        self.num_dev_neg    = sum(self.dev_labels == -1)
+        assert(self.num_dev_total == self.num_dev_pos + self.num_dev_neg)
+        self.scorer         = MentionScorer(self.dev_candidates, self.dev_labels)
 
 
     def __iter__(self):
         return self
 
     def next(self):
+        if not hasattr(self, 'candidate_generator'):
+            self.candidate_generator = CandidateGenerator(self,
+                seed=self.seed, **(self.candidate_generator_kwargs))
         c = self.candidate_generator.next()
         self.temp_candidate = c
         return c
@@ -196,18 +266,25 @@ class BabbleStream(object):
             tp, fp, tn, fn = self.scorer.score(dev_marginals, 
                 set_unlabeled_as_neg=False, set_at_thresh_as_neg=False, display=False)
 
-            conf_matrix_list.append(ConfusionMatrix(tp, fp, tn, fn))
-            TP, FP, TN, FN = map(lambda x: float(len(x)), [tp, fp, tn, fn])
+            TP, FP, TN, FN = map(lambda x: len(x), [tp, fp, tn, fn])
             if TP or FP:
-                accuracy = TP/float(TP + FP)
-                class_coverage = float(TP + FP)/self.num_dev_pos
+                conf_matrix = (ConfusionMatrix(tp, fp, set(self.dev_candidates) - tp - fp))
+                accuracy = Accuracy(TP, TP + FP)
+                coverage = Coverage(TP + FP, self.num_dev_total)
+                class_coverage = ClassCoverage(TP + FP, self.num_dev_pos)
             elif TN or FN:
-                accuracy = TN/float(TN + FN)
-                class_coverage = float(TN + FN)/self.num_dev_pos
+                conf_matrix = (ConfusionMatrix(tn, fn, set(self.dev_candidates) - tn - fn))
+                accuracy = Accuracy(TN, TN + FN)
+                coverage = Coverage(TN + FN, self.num_dev_total)
+                class_coverage = ClassCoverage(TN + FN, self.num_dev_neg)
             else:
-                accuracy = None
-                class_coverage = None
-            stats_list.append(Statistics(accuracy, class_coverage))
+                conf_matrix = ConfusionMatrix(set(), set(), set(self.dev_candidates))
+                accuracy = Accuracy(0, self.num_dev_total)
+                coverage = Coverage(0, self.num_dev_total)
+                class_coverage = ClassCoverage(0, self.num_dev_total)
+
+            conf_matrix_list.append(conf_matrix)
+            stats_list.append(Metrics(accuracy, coverage, class_coverage))
 
         return conf_matrix_list, stats_list
 
@@ -250,13 +327,73 @@ class BabbleStream(object):
                     len(parses_to_add), len(self.parses)))
                 print("Added {} explanation(s) to set. (Total # explanations = {})".format(
                     len(explanations_to_add), len(self.parses)))
-        
+
         # Permanently store the semantics and signatures in duplicate filters
         self.filter_bank.commit(idxs)
 
         self.temp_parses = None
         self.temp_explanations = None
         self.temp_label_matrix = None
+
+    def get_global_coverage(self):
+        """Calculate stats for the dataset as a whole.
+
+        Note: this only consideres committed LFs
+        TODO: use sparse_abs from snorkel.utils here and elsewhere.
+        """
+        num_labeled = sum(np.asarray(abs(np.sum(self.label_matrix, 1))).ravel() != 0)
+
+        return GlobalCoverage(num_labeled, self.num_dev_total)
+
+    # def _sparse_to_csr_annotation_matrix(self, label_matrix)
+    #     """Convert a sparse label_matrix into a csr_AnnotationMatrix.
+        
+    #     Note: assumes it will only be applied to dev_candidates.
+    #     """
+    #     candidate_index = {c.id: i for i, c in enumerate(self.dev_candidates)}
+    #     row_index = {v: k for k, v in candidate_index.iteritems()}
+    #     key_index = 
+
+    def get_parses(self, idx=None):
+        if idx is None:
+            parses = self.parses
+        elif isinstance(idx, int):
+            parses = [self.parses[idx]]
+        elif isinstance(idx, list):
+            parses = [parse for i, parse in enumerate(self.parses) if i in idx]
+        return [self.semparser.grammar.translate(parse.semantics) for parse in parses]
+
+    def get_lf_stats(self):
+        """Returns a pandas DataFrame with the LFs and various per-LF statistics.
+        
+        NOTE: assumes you're asking about the dev set.
+        """
+        label_matrix = sparse.csr_matrix(self.label_matrix)
+        labels = self.dev_labels
+        lf_names = [parse.function.__name__ for parse in self.parses]
+
+        # Default LF stats
+        col_names = ['j', 'Coverage', 'Overlaps', 'Conflicts']
+        d = {
+            'j'         : range(label_matrix.shape[1]),
+            'Coverage'  : Series(data=matrix_coverage(label_matrix), index=lf_names),
+            'Overlaps'  : Series(data=matrix_overlaps(label_matrix), index=lf_names),
+            'Conflicts' : Series(data=matrix_conflicts(label_matrix), index=lf_names)
+        }
+        col_names.extend(['TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
+        tp = matrix_tp(label_matrix, labels)
+        fp = matrix_fp(label_matrix, labels)
+        fn = matrix_fn(label_matrix, labels)
+        tn = matrix_tn(label_matrix, labels)
+        ac = (tp+tn).astype(float) / (tp+tn+fp+fn)
+        d['Empirical Acc.'] = Series(data=ac, index=lf_names)
+        d['TP']             = Series(data=tp, index=lf_names)
+        d['FP']             = Series(data=fp, index=lf_names)
+        d['FN']             = Series(data=fn, index=lf_names)
+        d['TN']             = Series(data=tn, index=lf_names)
+
+        return DataFrame(data=d, index=lf_names)[col_names]
+        
 
     def get_label_matrix(self):
         if self.temp_parses is not None:
@@ -278,6 +415,7 @@ class Babbler(object):
     # TODO: convert to UDFRunner 
     def __init__(self, mode, candidate_class=None, explanations=[], exp_names=[], 
                  user_lists={}, string_format='implicit', beam_width=10, top_k=-1,
+                 do_filter=True,
                  do_filter_duplicate_semantics=True, 
                  do_filter_consistency=True, 
                  do_filter_duplicate_signatures=True, 
@@ -295,9 +433,15 @@ class Babbler(object):
         self.explanations = explanations
         self.explanations_by_name = {}
         self.update_explanation_map(explanations)
+        if do_filter == False:
+            do_filter_duplicate_semantics = False
+            do_filter_consistency = False
+            do_filter_duplicate_signatures = False
+            do_filter_uniform_signatures = False
+            do_filter_low_accuracy = False
         self.do_filter_duplicate_semantics = do_filter_duplicate_semantics
         self.do_filter_consistency = do_filter_consistency
-        self.do_filter_duplicate_signatures = do_filter_duplicate_signatures,
+        self.do_filter_duplicate_signatures = do_filter_duplicate_signatures
         self.do_filter_uniform_signatures = do_filter_uniform_signatures
         self.do_filter_low_accuracy = do_filter_low_accuracy
         self.gold_labels = gold_labels
