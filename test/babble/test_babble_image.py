@@ -13,6 +13,7 @@ class TestBabbleImage(TestBabbleBase):
     @classmethod
     def setUpClass(cls):
         cls.sp = SemanticParser(mode='image')
+        # cls.subjectives = True # Move me to TestBabbleImageSubjectives
 
     def test_edges(self):
         self.check_explanations(image_explanations.edges)

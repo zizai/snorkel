@@ -12,13 +12,14 @@ class TestBabbleBase(unittest.TestCase):
         pass
 
     def check_explanations(self, explanations):
+        # subjectives = getattr(self, 'subjectives', False)
         num_explanations = len(explanations)
         num_parses = 0
         self.assertTrue(len(explanations))
         for exp in explanations:
             if exp.candidate and not isinstance(exp.candidate, tuple):
                 exp.candidate = self.candidate_map[exp.candidate]
-            LF_dict = self.sp.parse_and_evaluate(exp, show_erroring=True)
+            LF_dict = self.sp.parse_and_evaluate(exp, show_erroring=True) # add kwarg: subjectives=subjectives
             # TEMP: Use for getting semantics to put in Explanation.semantics
             # parses = self.sp.parse(exp, return_parses=True)
             # print(parses[0].semantics)
