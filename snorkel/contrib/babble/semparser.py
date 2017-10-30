@@ -140,7 +140,8 @@ class SemanticParser(object):
                            pseudo_python=False,
                            remove_paren=False,
                            paraphrases=False,
-                           only=[]):
+                           only=[],
+			   subjectives=False):
         """
         Calls SemanticParser.parse and evaluates the accuracy of resulting LFs.
         
