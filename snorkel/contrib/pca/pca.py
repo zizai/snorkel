@@ -39,6 +39,8 @@ def weighted_MLSMLoss(inp, t, weight, size_average=False):
     """
     # todo: account for when weight=None as default
     o = torch.sigmoid(inp)
+    # test: bound values of sigmoid to avoid numerical instability
+    o = torch.clamp(torch.clamp(o, min=1e-7), max=1-1e-7)
     out = (t.unsqueeze(1) * torch.log(o)) + ((1-t).unsqueeze(1) * (torch.log(1 - o)))
     out = torch.neg(out * weight.unsqueeze(1))
     loss = out.sum()
