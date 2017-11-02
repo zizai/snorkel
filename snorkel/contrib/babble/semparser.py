@@ -84,15 +84,14 @@ class SemanticParser(object):
             for j, parse in enumerate(exp_parses):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
-		#for key in ['.near']:
-		if 1==0: 
+		for key in ['.near', '.far', '.smaller', '.larger', '.samearea', '.wider', '.skinnier', '.samewidth', '.taller', '.shorter', '.sameheight', '.aligned']:
 		    if (parseString.find(key)>=0):
-		        print("Key found")
+		        print("Key found:"+str(key))
 		        count = 0
 		        for val in [SUBJECTIVE_DEFAULTS[key]*0.9,
 					SUBJECTIVE_DEFAULTS[key],
 					SUBJECTIVE_DEFAULTS[key]*1.1]:	
-		            newSem=self.swapSubjectives(parse,key, val)
+			    newSem=self.swapSubjectives(parse,key, val)
 		            parse.semantics = newSem
 		            lf = self.grammar.evaluate(parse)
 		            if return_parses:
