@@ -85,21 +85,32 @@ class SemanticParser(object):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
 		if (parseString.find('.near')>=0):
-		    newSem_0=self.swapSubjectives(parse,'.near', 45.0)
-		    newSem_1=self.swapSubjectives(parse,'.near', 50.0)
-		    newSem_2=self.swapSubjectives(parse,'.near', 55.0)
-		    parse.semantics = newSem_1
-		lf = self.grammar.evaluate(parse)
-		if return_parses:
-                    parse.function = lf
-                    parses.append(parse)
+		    ### FIX THIS SO THAT IT HAS INDEX TOO
+		    count = 0
+		    for val in [45.0,50.0,55.0]:	
+		        newSem=self.swapSubjectives(parse,'.near', val)
+		        parse.semantics = newSem
+		        lf = self.grammar.evaluate(parse)
+		        if return_parses:
+                            parse.function = lf
+                            parses.append(parse)
+		        lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
+			LFs.append(lf)
+			count+=1
+		else:
+		    lf = self.grammar.evaluate(parse)
+		    if return_parses:
+                        parse.function = lf
+                        parses.append(parse)
                 ### Change naming scheme
-		lf.__name__ = "{}_{}".format(exp.name, j)
-                LFs.append(lf)
+		    lf.__name__ = "{}_{}".format(exp.name, j)
+                    LFs.append(lf)
             self.explanation_counter += 1
-        ###
+	for label in LFs:
+	    print label
+	###
         """
-        For all LFs that came from subjective expansion:
+	For all LFs that came from subjective expansion:
             Check accuracy on the dev set
             Keep only best
         """
@@ -206,8 +217,8 @@ class SemanticParser(object):
                         explanation.name,
                         return_parses=True)
             for parse in parses:
-		print("Parse semantics" + str(parse.semantics))
-                print("Explanation semantics:"+ str(explanation.semantics))
+		#print("Parse semantics" + str(parse.semantics))
+                #print("Explanation semantics:"+ str(explanation.semantics))
                 if show_parse:
                     print("PARSE: {}\n".format(parse))
                 semantics_ = self.translate(parse.semantics) if pseudo_python else parse.semantics
@@ -231,7 +242,7 @@ class SemanticParser(object):
                     LFs['erroring'].append(parse.function)
                     continue
                 # CORRECT             
-                if subjectives or (explanation.semantics and parse.semantics == explanation.semantics):
+                if (condition_passes and subjectives) or (explanation.semantics and parse.semantics == explanation.semantics):
 		    if show_correct: print("C: {}\n".format(semantics_))
                     nCorrect[i] += 1
                     LF = parse.function
