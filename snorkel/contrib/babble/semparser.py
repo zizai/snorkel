@@ -84,19 +84,23 @@ class SemanticParser(object):
             for j, parse in enumerate(exp_parses):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
-		if (parseString.find('.near')>=0):
-		    ### FIX THIS SO THAT IT HAS INDEX TOO
-		    count = 0
-		    for val in [45.0,50.0,55.0]:	
-		        newSem=self.swapSubjectives(parse,'.near', val)
-		        parse.semantics = newSem
-		        lf = self.grammar.evaluate(parse)
-		        if return_parses:
-                            parse.function = lf
-                            parses.append(parse)
-		        lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
-			LFs.append(lf)
-			count+=1
+		#for key in ['.near']:
+		if 1==0: 
+		    if (parseString.find(key)>=0):
+		        print("Key found")
+		        count = 0
+		        for val in [SUBJECTIVE_DEFAULTS[key]*0.9,
+					SUBJECTIVE_DEFAULTS[key],
+					SUBJECTIVE_DEFAULTS[key]*1.1]:	
+		            newSem=self.swapSubjectives(parse,key, val)
+		            parse.semantics = newSem
+		            lf = self.grammar.evaluate(parse)
+		            if return_parses:
+                                parse.function = lf
+                                parses.append(parse)
+		            lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
+			    LFs.append(lf)
+			    count+=1
 		else:
 		    lf = self.grammar.evaluate(parse)
 		    if return_parses:
