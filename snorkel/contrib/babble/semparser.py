@@ -85,7 +85,7 @@ class SemanticParser(object):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
 		subjectivePhrase = 0
-		for key in ['.near', '.far', '.smaller', '.larger', '.samearea', '.wider', '.skinnier', '.samewidth', '.taller', '.shorter', '.sameheight', '.aligned']:
+		for key in SUBJECTIVE_DEFAULTS: 
 		    if (parseString.find(key)>=0):
 		        subjectivePhrase = 1
 			print("Key found:"+str(key))
@@ -102,19 +102,6 @@ class SemanticParser(object):
 		            lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
 			    LFs.append(lf)
 			    count+=1
-		
-		if (parseString.find('.overlaps')>=0):
-		    pdb.set_trace()
-		    subjectivePhrase = 1
-		    newSem=self.swapSubjectives(parse,'.overlaps',25.0)
-		    print(newSem)
-		    parse.semantics=newSem
-		    lf = self.grammar.evaluate(parse)
-		    if return_parses:
-                        parse.function = lf
-                        parses.append(parse)
-		    lf.__name__ = "{}_{}_{}".format(exp.name, j, 0)
-		    LFs.append(lf)
 		if not subjectivePhrase:
 		    print("Not subjective phrase")
 		    lf = self.grammar.evaluate(parse)
