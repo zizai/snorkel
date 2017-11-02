@@ -102,6 +102,19 @@ class SemanticParser(object):
 		            lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
 			    LFs.append(lf)
 			    count+=1
+		
+		if (parseString.find('.overlaps')>=0):
+		    pdb.set_trace()
+		    subjectivePhrase = 1
+		    newSem=self.swapSubjectives(parse,'.overlaps',25.0)
+		    print(newSem)
+		    parse.semantics=newSem
+		    lf = self.grammar.evaluate(parse)
+		    if return_parses:
+                        parse.function = lf
+                        parses.append(parse)
+		    lf.__name__ = "{}_{}_{}".format(exp.name, j, 0)
+		    LFs.append(lf)
 		if not subjectivePhrase:
 		    print("Not subjective phrase")
 		    lf = self.grammar.evaluate(parse)
