@@ -107,7 +107,7 @@ class SemanticParser(object):
                     LFs.append(lf)
             self.explanation_counter += 1
 	for label in LFs:
-	    print label
+	    print label.__name__
 	###
         """
 	For all LFs that came from subjective expansion:
