@@ -84,9 +84,11 @@ class SemanticParser(object):
             for j, parse in enumerate(exp_parses):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
+		subjectivePhrase = 0
 		for key in ['.near', '.far', '.smaller', '.larger', '.samearea', '.wider', '.skinnier', '.samewidth', '.taller', '.shorter', '.sameheight', '.aligned']:
 		    if (parseString.find(key)>=0):
-		        print("Key found:"+str(key))
+		        subjectivePhrase = 1
+			print("Key found:"+str(key))
 		        count = 0
 		        for val in [SUBJECTIVE_DEFAULTS[key]*0.9,
 					SUBJECTIVE_DEFAULTS[key],
@@ -100,7 +102,8 @@ class SemanticParser(object):
 		            lf.__name__ = "{}_{}_{}".format(exp.name, j, count)
 			    LFs.append(lf)
 			    count+=1
-		else:
+		if not subjectivePhrase:
+		    print("Not subjective phrase")
 		    lf = self.grammar.evaluate(parse)
 		    if return_parses:
                         parse.function = lf
