@@ -11,63 +11,10 @@ import torch.optim as optim
 import sys
 import time
 import numpy as np
+from .utils import *
+import logging
 
-
-def timeit(method):
-
-    def timed(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-
-        print '%r %2.2f sec' % (method.__name__, te-ts)
-        return result
-
-    return timed
-
-
-def get_singular_vectors(x, r, l=0, align_method=None):
-    """
-    :param x: embedding matrix
-    :param r: keep top r components
-    :param l: remove top l components
-    :param align_method:
-    :return:
-    """
-    u, s, v = torch.svd(x)
-    k = r if v.size(1) > l + r else v.size(1) - l
-    z = torch.zeros(l + r, v.size(0)).double()
-    z[0:l + k, ] = v.transpose(0, 1)[:l + k, ]
-
-    if align_method in ['magic1', 'magicg']:
-        theta = np.random.normal(0, 1.0, (l + r) * x.shape[1])
-        theta = torch.from_numpy(theta[:z.size(0) * z.size(1)]).view(z.size(0), z.size(1)).double()
-        z = torch.mul(z, torch.sign(torch.mul(z, theta)))
-
-    # TODO: Add this back in
-    # if align_method == 'procrustes':
-    #     r = \
-    #     scipy.linalg.orthogonal_procrustes(z.numpy().T, self.F[:z.size(0) * z.size(1)].reshape(z.size(0), z.size(1)).T)[
-    #         0]
-    #     z = torch.mm(torch.from_numpy(r), z)
-
-    return z[l:, ]
-
-
-def get_principal_components(X, k=1, method=None):
-    """
-    Compute k principal components of X
-    :param X:
-    :param k:
-    :param method:
-    :return:
-    """
-    W = torch.from_numpy(X).float()
-    W = W / torch.norm(W)
-    mu = torch.mean(W, 1, keepdim=True)
-    pc = get_singular_vectors(W - mu, k, method=method).view(1, -1)
-    pc = pc / torch.norm(pc)
-    return pc.numpy()
+logger = logging.getLogger(__name__)
 
 
 def to_scalar(var):
@@ -122,7 +69,7 @@ class EmbeddingCRF(nn.Module):
     GPU  = "gpu"
 
     def __init__(self, tag_set, word_to_idx, embeddings, window=0, k=0, decay=1.0,
-                 fine_tune_embs=False, host_device="CPU", seed=123):
+                 fix_embeddings=True, host_device="CPU", seed=123):
         """
 
         NOTE: We assume the embedding matrix and word index dicts are setup outside the model
@@ -159,12 +106,14 @@ class EmbeddingCRF(nn.Module):
         self.word_to_idx = word_to_idx
         self.emb_dim     = embeddings.shape[1]
         self.embs        = nn.Embedding(len(self.word_to_idx), self.emb_dim)
-        self.embs.weight.requires_grad = fine_tune_embs
+        self.embs.weight.requires_grad = fix_embeddings == False
 
         # maps the output of the CRF into tag space.
         # representation dimension is emb + mean(left) + mean(right)
         self.repr_dim = self.emb_dim + (self.emb_dim * (k + 1) * (2 if self.window else 0))
-        self.linear2tag = nn.Linear(self.repr_dim, self.tagset_size)
+        self.linear2tag = nn.Linear(self.repr_dim, self.tagset_size, bias=False)
+
+        nn.init.xavier_normal(self.linear2tag.weight.data)
 
         # Matrix of transition parameters.  Entry i,j is the score of transitioning *to* i *from* j.
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size))
@@ -184,7 +133,6 @@ class EmbeddingCRF(nn.Module):
         self.transitions.data[self.tag_to_idx[self.START_TAG], :] = -10000
         self.transitions.data[:, self.tag_to_idx[self.STOP_TAG]]  = -10000
 
-
     def _set_manual_seed(self):
         """
         Set numpy and torch manual seeds
@@ -198,13 +146,11 @@ class EmbeddingCRF(nn.Module):
 
         np.random.seed(seed=int(self.seed))
 
-
     def _forward_alg(self, feats):
 
         init_alphas = torch.Tensor(1, self.tagset_size).fill_(-10000.)
         if self.host_device == self.GPU:
             init_alphas = init_alphas.cuda()
-            #forward_var.cuda()
 
         forward_var = autograd.Variable(init_alphas)
         init_alphas[0][self.tag_to_idx[self.START_TAG]] = 0.
@@ -268,20 +214,6 @@ class EmbeddingCRF(nn.Module):
         feats  = self.linear2tag(out)
         return feats
 
-
-    def _get_context_features(self, sentence, window=0, decay=1.0, k=0):
-        """
-
-        :param sentence:
-        :param window:
-        :param decay:
-        :param k:
-        :return:
-        """
-        embeds = self.embs(sentence).view(len(sentence), 1, -1)
-        # dist_exp_decay
-
-
     def _score_sentence(self, feats, tags):
         """
         Gives the score of a provided tag sequence
@@ -302,7 +234,6 @@ class EmbeddingCRF(nn.Module):
         score = score + self.transitions[self.tag_to_idx[self.STOP_TAG], tags[-1]]
         return score
 
-
     def _viterbi_decode(self, feats):
         """
 
@@ -320,8 +251,6 @@ class EmbeddingCRF(nn.Module):
 
         # forward_var at step i holds the viterbi variables for step i-1
         forward_var = autograd.Variable(init_vvars)
-        #if self.host_device == self.GPU:
-        #    forward_var.cuda()
 
         for feat in feats:
             bptrs_t = []  # holds the backpointers for this step
@@ -358,7 +287,6 @@ class EmbeddingCRF(nn.Module):
         best_path.reverse()
         return path_score, best_path
 
-
     def neg_log_likelihood(self, sentence, tags):
         """
         Criterion function
@@ -372,7 +300,6 @@ class EmbeddingCRF(nn.Module):
         gold_score    = self._score_sentence(feats, tags)
         return forward_score - gold_score
 
-
     def forward(self, sentence):
         """
         TOOD: Minibatching here?
@@ -383,7 +310,8 @@ class EmbeddingCRF(nn.Module):
         score, tag_seq = self._viterbi_decode(feats)
         return score, tag_seq
 
-
+    def predict(self):
+        pass
 
 class PytorchModelWrapper(object):
     """

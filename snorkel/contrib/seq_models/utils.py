@@ -1,7 +1,81 @@
+import torch
+import scipy
 import re
 import sys
 import collections
 from snorkel.models import Document, SequenceTag
+import numpy as np
+
+
+#
+# Alignment Methods
+#
+def init_f(l, r, dim):
+    while True:
+        F = np.random.normal(0, 1.0, (l + r) * dim)
+        f1 = F[:(l + r) * dim].reshape(((l + r), dim))
+        product1 = np.dot(f1, f1.T)
+        product1 = product1 - np.identity(product1.shape[0])
+        if product1.any() == 0:
+            continue
+        return F
+
+def magic_theta(z, theta):
+    theta = torch.from_numpy(theta[:z.size(0) * z.size(1)]).view(z.size(0), z.size(1)).double()
+    return torch.mul(z, torch.sign(torch.mul(z, theta)))
+
+def procrustes(z, F):
+    r = scipy.linalg.orthogonal_procrustes(z.numpy().T, F[:z.size(0) * z.size(1)].reshape(z.size(0), z.size(1)).T)[0]
+    return torch.mm(torch.from_numpy(r), z)
+
+#
+# PCA
+#
+def get_singular_vectors(x, r=1, l=0, align_func=None):
+    u, s, v = torch.svd(x)
+    k = r if v.size(1) > l + r else v.size(1) - l
+    z = torch.zeros(l + r, v.size(0)).double()
+    z[0:l + k, ] = v.transpose(0, 1)[:l + k, ]
+    # correct for alignment (e.g., procrustes, magic theta)
+    z = align_func(z) if align_func else z
+    return z[l:, ]
+
+def get_principal_components(x, y=None, r=1, l=0, align_func=None):
+    x = torch.from_numpy(x).float()
+    mu = torch.mean(x, 0, keepdim=True)
+    return get_singular_vectors(x - mu.repeat(x.shape[0], 1), r=r, align_func=align_func).numpy()
+
+def init_f(l, r, dim):
+    while True:
+        F = np.random.normal(0, 1.0, (l + r) * dim)
+        f1 = F[:(l + r) * dim].reshape(((l + r), dim))
+        product1 = np.dot(f1, f1.T)
+        product1 = product1 - np.identity(product1.shape[0])
+        if product1.any() == 0:
+            continue
+        return F
+
+
+def dist_exp_decay(length, decay, start, end):
+    """
+    Distance weight decay around span (start:end)
+
+    :param length:
+    :param decay:
+    :param start:
+    :param end:
+    :return:
+    """
+    ret = []
+    for i in range(length):
+        if i < start:
+            ret.append(decay ** (start - i))
+        elif i >= end:
+            ret.append(decay ** (i - end + 1))
+        else:
+            ret.append(1.)
+    return np.array(ret)
+
 
 def map_tag_seqs(tags, doc):
     """
@@ -146,3 +220,16 @@ def get_tagged_sentences(session, doc_ids, concept_types, tag_fmt="IOB", verbose
             tagged.append((s.words, tags))
 
     return tagged
+
+
+def timeit(method):
+
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+
+        print '%r %2.2f sec' % (method.__name__, te-ts)
+        return result
+
+    return timed

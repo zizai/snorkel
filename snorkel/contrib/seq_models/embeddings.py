@@ -49,7 +49,7 @@ class Embeddings(object):
                 i = model.wv.vocab[word].index
                 yield (word, model.wv.syn0norm[i])
 
-        elif self.fmt in ["text","fasttext"]:
+        elif self.fmt in ["text", "fasttext"]:
             start = 0 if self.fmt == "text" else 1
             for i, line in enumerate(open(self.fpath, "rU")):
                 if i < start:
