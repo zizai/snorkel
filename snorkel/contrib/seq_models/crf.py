@@ -43,27 +43,6 @@ def log_sum_exp(vec):
     return max_score + torch.log(torch.sum(torch.exp(vec - max_score_broadcast)))
 
 
-def dist_exp_decay(length, decay, start, end):
-    """
-    Distance weight decay around span (start:end)
-
-    :param length:
-    :param decay:
-    :param start:
-    :param end:
-    :return:
-    """
-    ret = []
-    for i in range(length):
-        if i < start:
-            ret.append(decay ** (start - i))
-        elif i >= end:
-            ret.append(decay ** (i - end + 1))
-        else:
-            ret.append(1.)
-    return np.array(ret)
-
-
 class EmbeddingCRF(nn.Module):
 
     GPU  = "gpu"
@@ -86,7 +65,7 @@ class EmbeddingCRF(nn.Module):
         self.seed        = seed
         self.host_device = host_device.lower()
         if not torch.cuda.is_available() and self.host_device == self.GPU:
-            sys.stderr.write("Warning! CUDA not available, defaulting to CPU\n")
+            logger.error("Warning! CUDA not available, defaulting to CPU")
             self.host_device = "cpu"
         self._set_manual_seed()
 
@@ -113,12 +92,12 @@ class EmbeddingCRF(nn.Module):
         self.repr_dim = self.emb_dim + (self.emb_dim * (k + 1) * (2 if self.window else 0))
         self.linear2tag = nn.Linear(self.repr_dim, self.tagset_size, bias=False)
 
-        nn.init.xavier_normal(self.linear2tag.weight.data)
+        #nn.init.xavier_normal(self.linear2tag.weight.data)
 
         # Matrix of transition parameters.  Entry i,j is the score of transitioning *to* i *from* j.
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size))
 
-        print "Using host_device: {}".format(self.host_device)
+        logger.info("Using host_device: {}".format(self.host_device))
         if self.host_device == self.GPU:
             self.cuda()
             self.transitions.cuda()
@@ -166,7 +145,6 @@ class EmbeddingCRF(nn.Module):
         alpha = log_sum_exp(terminal_var)
         return alpha
 
-
     def _forward_alg_tutorial(self, feats):
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.Tensor(1, self.tagset_size).fill_(-10000.)
@@ -202,10 +180,10 @@ class EmbeddingCRF(nn.Module):
         alpha = log_sum_exp(terminal_var)
         return alpha
 
-
     def _get_features(self, sentence):
         """
         Word-only embedding features
+        TODO: Bring in the PCA/representation code from representation.py
         :param sentence:
         :return:
         """
