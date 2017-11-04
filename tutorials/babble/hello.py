@@ -1,4 +1,4 @@
-from flask import Flask, flash, redirect, render_template, request, session, abort
+from flask import Blueprint, Flask, flash, redirect, render_template, request, session, abort, current_app
 import os
 import sys
 sys.path.append('/Users/Stephaniewang/Documents/snorkel')
@@ -10,45 +10,28 @@ from tutorials.babble.spouse import SpousePipeline
 from snorkel.viewer import SentenceNgramViewer
 from snorkel.contrib.babble import Explanation
 from snorkel.contrib.babble import Babbler
-from flask_wtf import FlaskForm
-from wtforms import StringField, validators, TextAreaField
-from wtforms.fields import RadioField, SubmitField
+
+from flask_bootstrap import Bootstrap
 from snorkel.contrib.babble import BabbleStream
 from snorkel.lf_helpers import *
 from tutorials.babble.spouse.spouse_examples import get_explanations, get_user_lists
-
+from main_page import main_page
 # dependencies:
 # flask
 # Flask-WTF
 # wtforms
+# flask_bootstrap
+ 
+def create_app(bs, session):
+	app = Flask(__name__)
+	app.secret_key = 'myverylongsecretkey'
+	bootstrap = Bootstrap(app)
+	app.config['babble_stream_object'] = bs
+	app.config['session'] = session
+	app.register_blueprint(main_page)
+	return app
 
-app = Flask(__name__)
-
-app.secret_key = 'myverylongsecretkey'
-
-class ExplanationForm(FlaskForm):
-	label = RadioField('Label', choices=[('True', 'True, they are spouses.'),('False', 'False, are not spouses.')])
-	explanation = TextAreaField('Explanation', [validators.InputRequired()])
-	skip = SubmitField(label="Skip")
-
-def candidate_html(c):
-	chunks = get_text_splits(c)
-	div_tmpl = u'''<div style="border: 1px #858585; box-shadow:0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-    background-color:#FDFDFD; padding:5pt 10pt 5pt 10pt; width: 80%; margin: auto; margin-top: 2%">{}</div>'''
-	arg_tmpl = u'<b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">{}</b>'
-	sent_tmpl = u'<p style="font-size:12pt;">{}</p>'
-	text = u""
-	for s in chunks[0:]:
-	    if s in [u"{{A}}", u"{{B}}"]:
-	        span = c[0].get_span() if s == u"{{A}}" else c[1].get_span()
-	        text += arg_tmpl.format(span)
-	    else:
-	        text += s.replace(u"\n", u"<BR/>")
-	html = div_tmpl.format(sent_tmpl.format(text.strip()))
-	return html
-
-@app.route("/", methods=['GET', 'POST'])
-def index():
+if __name__ == "__main__":
 	config = {
 	'b': 0.5,
 	'babbler_candidate_split': 0,
@@ -146,57 +129,8 @@ def index():
 	# pipe.parse()
 	# pipe.extract()
 	# pipe.load_gold()
-	
-	candidates = session.query(Spouse).filter(Spouse.split == 0).all()
-	spouse_explanations = get_explanations(candidates)
-	spouse_user_lists = get_user_lists()
 
-	bs = BabbleStream(session, strategy='linear', candidate_class=Spouse)
+	bs = BabbleStream(session, candidate_class=Spouse, balanced=True, seed=123)
 	# bs.preload(explanations=spouse_explanations, user_lists=spouse_user_lists)
-	# bs.get_label_matrix()
-
-	c = bs.next()
-	# print c
-	# sv = SentenceNgramViewer([c], session, n_per_page=1, height=150)
-	# candidate = sv.get_selected()[0].sentence.text
-
-	candidate = candidate_html(c)
-
-	form = ExplanationForm(request.form)
-	if form.validate and form.skip.data:
-		c = bs.next()
-		candidate = candidate_html(c)
-		return render_template('index.html', candidate=candidate, form=form)
-
-	elif request.method == 'POST' and form.validate():
-		label = form.label.data
-		if label == 'True':
-			label = True
-		elif label == 'False':
-			label = False
-		condition = form.explanation.data 
-		print label
-		print condition
-		explanation = Explanation(condition, label, candidate=c, name='')
-		print explanation
-		parse_results = bs.apply(explanation)
-		print len(parse_results)
-		if len(parse_results) == 2:
-			conf_matrix_list, stats_list = parse_results
-			print conf_matrix_list
-			print stats_list
-			return render_template('index.html', candidate=candidate, form=form, conf_matrix=conf_matrix_list)
-		else:
-			# generated no new parses
-			return render_template('index.html', candidate=candidate, form=form, no_parses_msg = "True")
-		return redirect('/error') # shouldn't here
-
-	return render_template(
-		'index.html', candidate=candidate, form=form)
-
-@app.route("/success", methods=['GET', 'POST'])
-def success():
-	return render_template('success.html')
- 
-if __name__ == "__main__":
-    app.run()
+	app = create_app(bs, session)
+	app.run()

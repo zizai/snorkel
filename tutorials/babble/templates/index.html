@@ -1,7 +1,8 @@
 {% extends "layout.html" %}
 {% block content %}
+{% import "bootstrap/wtf.html" as wtf %}
 
-<p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 10pt; margin: autp;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> are/will be married</p>
+<p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 10pt; margin: auto;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> were/are/will be married</p>
 <p>{{candidate|safe}}</p>
 
 {% from "_formhelpers.html" import render_field %}
@@ -13,7 +14,7 @@
 // ]]></script>
 <div id="loading"></div>
 <div id="content">
-	<form method=post style="text-align: center; margin-top: 5%">
+<!-- 	<form method=post style="text-align: center; margin-top: 5%">
 	  <dl>
 	  	{{ form.csrf_token }}
 	  	{% for subfield in form.label %}
@@ -32,59 +33,43 @@
      <br/>
 	  <p><input class="btn btn-success" type=submit value=Go onclick="loading();">
       {{ form.skip }}
-	</form>
-{% if conf_matrix is defined %}
-<div class="container">
-{% for matrix in conf_matrix %}
-	<table class="table table-fixed">
-      <thead>
-		 <th> True Positives {{matrix.tp|length}} </th>
-      </thead>
-      <tbody>
-		{% for spouse in matrix.tp %}
-		   <tr>
-		        <td> {{ spouse[0].sentence.text }} </td>
-		   </tr>
-		{% endfor %}
-      </tbody>
-	</table>
-   {% for spouse in matrix.tn %}
-   <table class = "table table-fixed">
-      <thead>
-      	<th> True Negatives {{ matrix.tn|length}} </th>
-      </thead>
-      <tbody>
-      	{% for spouse in matrix.tn %}
-      	<tr>
-      		<td> {{ spouse[0].sentence.text }}</td>
-      	</tr>
-      	{% endfor %}
-      </tbody>
-   </table>
+	</form> -->
+   {{ form.csrf_token }}
+   {{ wtf.quick_form(form) }}
+
+<!-- iterate over the parse_list indices, then display the parse, the confusion matrix and the statistics -->
+<!-- {% if parse_list is defined %}
+   {% for i in range(parse_list| length)%}
+   <p>{{ parse_list[i] }}</p>
+      <div class="container">
+         <table class="table table-fixed">
+            <thead>
+             <th> Correct {{conf_matrix[i].correct|length}} </th>
+            </thead>
+            <tbody>
+            {% for spouse in conf_matrix[i].correct %}
+               <tr>
+                    <td> {{ spouse[0].sentence.text }} </td>
+               </tr>
+            {% endfor %}
+            </tbody>
+         </table>
+
+         <table class="table table-fixed">
+            <thead>
+             <th> Incorrect {{conf_matrix[i].incorrect|length}} </th>
+            </thead>
+            <tbody>
+            {% for spouse in conf_matrix[i].incorrect %}
+               <tr>
+                    <td> {{ spouse[0].sentence.text }} </td>
+               </tr>
+            {% endfor %}
+            </tbody>
+         </table>
+      </div>
    {% endfor %}
-   {% for spouse in matrix.fp %}
-   <table>
-   	<th> False Positives {{ matrix.fp|length}} </th>
-   	{% for spouse in matrix.fp %}
-   	<tr>
-   		<td> {{ spouse[0].sentence.text }}</td>
-   	</tr>
-   	{% endfor %}
-   </table>
-   {% endfor %}
-      {% for spouse in matrix.fn %}
-   <table>
-   	<th> False Negatives {{ matrix.fn|length}} </th>
-   	{% for spouse in matrix.fn %}
-   	<tr>
-   		<td> {{ spouse[0].sentence.text }}</td>
-   	</tr>
-   	{% endfor %}
-   </table>
-   {% endfor %}
-</div>
-{% endfor %}
-{% endif %}
+{% endif %} -->
 
 {% if no_parses_msg is defined %}
 	Explanantion generated no new parses.
