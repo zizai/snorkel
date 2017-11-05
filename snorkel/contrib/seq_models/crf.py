@@ -280,7 +280,7 @@ class EmbeddingCRF(nn.Module):
 
     def forward(self, sentence):
         """
-        TOOD: Minibatching here?
+        TOOD: Minibatching
         :param sentence:
         :return:
         """
