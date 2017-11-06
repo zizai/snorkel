@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 from pandas import DataFrame, Series
 
 from snorkel.models import Sentence
+from snorkel.lf_helpers import test_LF
+from snorkel import SnorkelSession
+from snorkel.models import Span, Label, Candidate
 
 from core import core_grammar
 from text import text_grammar
@@ -61,7 +64,7 @@ class SemanticParser(object):
         :param explanations: An instance or list of Explanation objects
         """
 	"""Need to check if something is in keys. Write helper script to test this."""
-
+        ##session = SnorkelSession()
 	LFs = []
         parses = []
         num_parses_by_exp = []
@@ -85,7 +88,7 @@ class SemanticParser(object):
 		### Produce multiple parses around here
 		parseString = str(parse.semantics)
 		subjectivePhrase = 0
-		for key in SUBJECTIVE_DEFAULTS: 
+		for key in ['.near','.far','.smaller','.larger','.samearea','.wider','.skinnier','.samewidth','.taller','.shorter','.sameheight','.aligned']: 
 		    if (parseString.find(key)>=0):
 		        subjectivePhrase = 1
 			print("Key found:"+str(key))
@@ -103,7 +106,7 @@ class SemanticParser(object):
 			    LFs.append(lf)
 			    count+=1
 		if not subjectivePhrase:
-		    print("Not subjective phrase")
+		    #print("Not subjective phrase")
 		    lf = self.grammar.evaluate(parse)
 		    if return_parses:
                         parse.function = lf
@@ -112,8 +115,7 @@ class SemanticParser(object):
 		    lf.__name__ = "{}_{}".format(exp.name, j)
                     LFs.append(lf)
             self.explanation_counter += 1
-	for label in LFs:
-	    print label.__name__
+	chooseSubjectives(LFs)
 	###
         """
 	For all LFs that came from subjective expansion:
@@ -387,4 +389,13 @@ class SemanticParser(object):
 	        return sem
 	newSem = recurse(parse.semantics)
 	return newSem
-	
+
+    def chooseSubjectives(self, LFs):
+	for label in LFs:
+	    if label.__name__.find("0_0_")>=0:
+	        ##print(session.query(Candidate))
+		session = SnorkelSession()
+    		pdb.set_trace()
+		tp, fp, tn, fn = test_LF(session, label, split=1, annotator_name='gold')
+		#test_LF(session,label,split=1,annotator_name="gold") 
+
