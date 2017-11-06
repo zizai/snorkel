@@ -1,9 +1,12 @@
 import os
 import sys
+import logging
 import numpy as np
 from gensim.models.word2vec import Word2Vec
 
-class Embeddings(object):
+logger = logging.getLogger(__name__)
+
+class EmbeddingLoader(object):
     """
     Simple wrapper class for loading various embedding file formats
     - FastText
@@ -28,7 +31,7 @@ class Embeddings(object):
             header = open(self.fpath, "rU").readline().strip().split(' ')
             self.dim = len(header) - 1 if len(header) != 2 else int(header[-1])
             if self.verbose:
-                print "Detected {}d embeddings".format(self.dim)
+                logger.info("Detected {}d embeddings".format(self.dim))
 
     def _read(self):
         """
@@ -43,7 +46,7 @@ class Embeddings(object):
             model.init_sims()
             self.dim = model.wv.syn0norm.shape[1]
             if self.verbose:
-                print "Detected {}d embeddings".format(self.dim)
+                logger.info("Detected {}d embeddings".format(self.dim))
 
             for word in model.wv.vocab:
                 i = model.wv.vocab[word].index
@@ -62,7 +65,7 @@ class Embeddings(object):
                 yield (line[0], vec)
 
         if errors and self.verbose:
-            sys.stderr.write("{} lines skipped\n".format(errors))
+            logger.error("{} lines skipped\n".format(errors))
 
     def __iter__(self):
         return self._read()
