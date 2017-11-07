@@ -10,6 +10,8 @@ from utils import candidate_to_tokens, SymbolTable
 from six.moves.cPickle import dump, load
 from time import time
 import scipy
+import pickle
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -17,6 +19,9 @@ from torch.autograd import Variable
 import torch.utils.data as data_utils
 
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
+from itertools import groupby
+from collections import Counter
+
 
 def train_preds(input_model, X_train):
     """Return predicted y-values"""
@@ -364,6 +369,17 @@ class PCA(TFNoiseAwareModel):
 
         return z[self.l:, ]
 
+    def majority_vote(self, y_labels):
+        """
+        feed in y values corresponding to paragraphs and grab majority label here
+        :param y_labels:
+        :return:
+        """
+        c = Counter(y_labels)
+        value, count = c.most_common()[0]
+        return value
+
+
     def get_principal_components(self, x, y=None):
         # word level features
         ret1 = torch.zeros(self.r + 1, self.word_emb_dim).double()
@@ -572,6 +588,8 @@ class PCA(TFNoiseAwareModel):
     def _init_kwargs(self, **kwargs):
 
         self.model_kwargs = kwargs
+
+        self.paragraph = kwargs.get('paragraph', None)
 
         # todo: tentative; for character-only feature set
         self.only_chars = kwargs.get('only_chars', False)
@@ -790,12 +808,28 @@ class PCA(TFNoiseAwareModel):
             X_dev = self._preprocess_data_combination(X_dev)
         Y_train = torch.from_numpy(Y_train).float()
 
+        # todo: self.paragraph will contain two things for now:
+        # 1. pickled dictionary mapping X_train indices to paragraph vector indices
+        # 2. csv file with pretrained paragraph embeddings
+        if self.paragraph is not None:
+            idx_file, df_file = self.paragraph.split(':')
+            with open(idx_file, 'rb') as f:
+                train_to_docid_dict = pickle.load(f)
+            parvec = pd.read_csv(df_file, header=None)
+
         new_X_train = None
         for i in range(len(X_train)):
             feature = self.gen_feature(X_train[i])
             if new_X_train is None:
                 new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1)), dtype=np.float)).float()
-            new_X_train[i] = feature
+            if self.paragraph is not None and not self.only_chars:
+                # this is the dictionary that contains training data idx --> doc_id
+                df_loc = train_to_docid_dict[i]
+                paragraph_vector = parvec.loc[df_loc]
+                torch_pvec = torch.from_numpy(paragraph_vector).float()
+                new_X_train[i] = torch.cat((feature, torch_pvec.view(1, -1)), 1)
+            else:
+                new_X_train[i] = feature
         data_set = data_utils.TensorDataset(new_X_train, Y_train)
         train_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
