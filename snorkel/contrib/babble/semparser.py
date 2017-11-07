@@ -115,7 +115,7 @@ class SemanticParser(object):
 		    lf.__name__ = "{}_{}".format(exp.name, j)
                     LFs.append(lf)
             self.explanation_counter += 1
-	chooseSubjectives(LFs)
+	#chooseSubjectives(LFs)
 	###
         """
 	For all LFs that came from subjective expansion:
@@ -390,12 +390,12 @@ class SemanticParser(object):
 	newSem = recurse(parse.semantics)
 	return newSem
 
-    def chooseSubjectives(self, LFs):
-	for label in LFs:
-	    if label.__name__.find("0_0_")>=0:
-	        ##print(session.query(Candidate))
-		session = SnorkelSession()
-    		pdb.set_trace()
-		tp, fp, tn, fn = test_LF(session, label, split=1, annotator_name='gold')
+    #def chooseSubjectives(self, LFs):
+#	for label in LFs:
+#	    if label.__name__.find("0_0_")>=0:
+#	        ##print(session.query(Candidate))
+#		session = SnorkelSession()
+#   		pdb.set_trace()
+#		tp, fp, tn, fn = test_LF(session, label, split=1, annotator_name='gold')
 		#test_LF(session,label,split=1,annotator_name="gold") 
 
