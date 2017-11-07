@@ -115,6 +115,12 @@ class SemanticParser(object):
 		    lf.__name__ = "{}_{}".format(exp.name, j)
                     LFs.append(lf)
             self.explanation_counter += 1
+	for label in LFs:
+	    if label.__name__.find("0_0_")>=0:
+	        ##print(session.query(Candidate))
+		session = SnorkelSession()
+		#tp, fp, tn, fn = test_LF(session, label, split=1, annotator_name='gold')
+		test_LF(session,label,split=1,annotator_name="gold") 
 	#chooseSubjectives(LFs)
 	###
         """
