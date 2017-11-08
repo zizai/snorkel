@@ -10,5 +10,5 @@ class KeywordBaselinesList:
     def makeBaselineList(self):
 	baselineList = list(self.explanationList) 
 	for index, explanation in enumerate(baselineList):
-	    baselineList[index]=KeywordBaselines(baselineList[index], self.conjunction).modify()
+	    baselineList[index]=KeywordBaselines(baselineList[index], self.conjunction).makeBaseline()
 	return baselineList

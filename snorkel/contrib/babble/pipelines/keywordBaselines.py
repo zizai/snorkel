@@ -30,9 +30,9 @@ class KeywordBaselines:
 	else:
 	    self.condition=helper + " are in the sentence"
     
-    def modify(self):
+    def makeBaseline(self):
 	self.setKeywords()
 	if(self.keywords):
 	    self.makeCondition()
-	newExp = Explanation(name = self.name, condition = self.condition, candidate = self.candidate, label = self.label, semantics = self.semantics)
-	return newExp
+	baselineExplanation = Explanation(name = self.name, condition = self.condition, candidate = self.candidate, label = self.label, semantics = self.semantics)
+	return baselineExplanation
