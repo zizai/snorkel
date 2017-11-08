@@ -1,4 +1,4 @@
-from keywordBaselines import KeywordBaselines
+from keyword_baselines import KeywordBaselines
 from snorkel.contrib.babble import Explanation, link_explanation_candidates
 
 class KeywordBaselinesList:
