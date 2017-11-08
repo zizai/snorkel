@@ -7,7 +7,7 @@ import collections
 import numpy as np
 import scipy.linalg
 from .embeddings import Embeddings
-
+from .utils import *
 
 def match_term(t, embs):
     """
@@ -27,50 +27,6 @@ def match_term(t, embs):
     if nt in embs:
         return embs[nt]
     return None
-
-
-def get_singular_vectors(x, r, l=0, method=None):
-    """
-    :param x: embedding matrix
-    :param r: keep top r components
-    :param l: remove top l components
-    :param method:
-    :return:
-    """
-    u, s, v = torch.svd(x)
-    k = r if v.size(1) > l + r else v.size(1) - l
-    z = torch.zeros(l + r, v.size(0)).double()
-    z[0:l + k, ] = v.transpose(0, 1)[:l + k, ]
-
-    if method in ['magic1', 'magicg']:
-        theta = np.random.normal(0, 1.0, (l + r) * x.shape[1])
-        theta = torch.from_numpy(theta[:z.size(0) * z.size(1)]).view(z.size(0), z.size(1)).double()
-        z = torch.mul(z, torch.sign(torch.mul(z, theta)))
-
-    # TODO: Add this back in
-    # if method == 'procrustes':
-    #     r = \
-    #     scipy.linalg.orthogonal_procrustes(z.numpy().T, self.F[:z.size(0) * z.size(1)].reshape(z.size(0), z.size(1)).T)[
-    #         0]
-    #     z = torch.mm(torch.from_numpy(r), z)
-
-    return z[l:, ]
-
-
-def get_principal_components(X, k=1, method=None):
-    """
-    Compute k principal components of X
-    :param X:
-    :param k:
-    :param method:
-    :return:
-    """
-    W = torch.from_numpy(X).float()
-    W = W / torch.norm(W)
-    mu = torch.mean(W, 1, keepdim=True)
-    pc = get_singular_vectors(W - mu, k, method=method).view(1, -1)
-    pc = pc / torch.norm(pc)
-    return pc.numpy()
 
 
 def all_but_the_top(W):

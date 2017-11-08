@@ -92,8 +92,6 @@ class EmbeddingCRF(nn.Module):
         self.repr_dim = self.emb_dim + (self.emb_dim * (k + 1) * (2 if self.window else 0))
         self.linear2tag = nn.Linear(self.repr_dim, self.tagset_size, bias=False)
 
-        #nn.init.xavier_normal(self.linear2tag.weight.data)
-
         # Matrix of transition parameters.  Entry i,j is the score of transitioning *to* i *from* j.
         self.transitions = nn.Parameter(torch.randn(self.tagset_size, self.tagset_size))
 
@@ -277,6 +275,12 @@ class EmbeddingCRF(nn.Module):
         forward_score = self._forward_alg(feats)
         gold_score    = self._score_sentence(feats, tags)
         return forward_score - gold_score
+
+        #forward_score = self._forward_alg(feats)
+        #gold_score = self._score_sentence(feats, tags)
+        #return forward_score - gold_score
+
+
 
     def forward(self, sentence):
         """
