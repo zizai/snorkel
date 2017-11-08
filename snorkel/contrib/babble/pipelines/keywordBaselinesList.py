@@ -7,8 +7,8 @@ class KeywordBaselinesList:
 	self.explanationList = explanationList
 	self.conjunction=conjunction
 
-    def modifyList(self):
-	modifiedList = list(self.explanationList) 
-	for index, explanation in enumerate(modifiedList):
-	    modifiedList[index]=KeywordBaselines(modifiedList[index], self.conjunction).modify()
-	return modifiedList
+    def makeBaselineList(self):
+	baselineList = list(self.explanationList) 
+	for index, explanation in enumerate(baselineList):
+	    baselineList[index]=KeywordBaselines(baselineList[index], self.conjunction).modify()
+	return baselineList
