@@ -1,18 +1,16 @@
 from keywordBaselines import KeywordBaselines
 from snorkel.contrib.babble import Explanation, link_explanation_candidates
-import re
 
-class KeywordBaselineLists(KeywordBaselines):
+class KeywordBaselinesList:
 
-    def __init__(self, explanationList):
+    def __init__(self, explanationList, conjunction='and'):
 	self.explanationList = explanationList
+	self.conjunction=conjunction
 
     def modifyList(self):
 	modifiedList = list(self.explanationList) 
-	for explanation in modifiedList:
-	    print(explanation)
-	    keyword=KeywordBaselines(explanation).findKeywords()
-	    print("Keyword: " + str(keyword))
+	for index, explanation in enumerate(modifiedList):
+	    modifiedList[index]=KeywordBaselines(modifiedList[index], self.conjunction).modify()
 	return modifiedList
 
 basic = [
@@ -52,8 +50,15 @@ basic = [
         candidate='3375a3c2-9b8a-423a-8334-32fe860be60e::span:3939:3948~~3375a3c2-9b8a-423a-8334-32fe860be60e::span:3967:3981',
         label=False,
         semantics=None),
+    Explanation(
+        name='LF_spouse_to_left',
+        condition="the words 'wife' and 'husband' are within two words to the left of arg 1 or arg 2",
+        candidate='03a1e1a0-93c3-41a8-a905-a535ce8f2b09::span:6822:6837~~03a1e1a0-93c3-41a8-a905-a535ce8f2b09::span:6855:6858',
+        label=True,
+        semantics=None)
 ]
 
-testing=KeywordBaselineLists(basic)
-testing.modifyList()
-#print(testing.modifyList())
+testing=KeywordBaselinesList(basic)
+print(basic)
+newExps = testing.modifyList()
+print(newExps)

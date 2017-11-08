@@ -16,35 +16,23 @@ class KeywordBaselines:
 	self.label=explanation.label
 	self.semantics=explanation.semantics
  	self.conjunction=conjunction
+	self.keywords=[]
 
-    def findKeywords(self):
-	keywords=re.findall(r'\'(.+?)\'',self.condition)
-	return keywords
+    def setKeywords(self):
+	self.keywords=re.findall(r'\'(.+?)\'',self.condition)
     
     def makeCondition(self):
-	keywords=self.findKeywords()
-	if len(keywords)==1:
-	    self.condition="the word '" + keywords[0] + "' is in the sentence"
+	helper="'" + self.keywords[0] + "'"
+	for i in range(1,len(self.keywords)):
+	    helper=helper + " " + self.conjunction + " " + "'" + self.keywords[i] + "'"
+	if len(self.keywords)==1 or self.conjunction=='or':
+	    self.condition=helper + " is in the sentence"
 	else:
-	    helper="'" + keywords[0] + "'"
-	    for i in range(1,len(keywords)):
-		helper=helper + " " + self.conjunction + " " + "'" + keywords[i] + "'"
-	    self.condition="the words " + helper + " are in the sentence"
+	    self.condition=helper + " are in the sentence"
     
     def modify(self):
-	self.makeCondition()
+	self.setKeywords()
+	if(self.keywords):
+	    self.makeCondition()
 	newExp = Explanation(name = self.name, condition = self.condition, candidate = self.candidate, label = self.label, semantics = self.semantics)
 	return newExp
-
-testExp = Explanation(
-        name='LF_spouse_to_left',
-        condition="the words 'wife' and 'husband' are within two words to the left of arg 1 or arg 2",
-        candidate='03a1e1a0-93c3-41a8-a905-a535ce8f2b09::span:6822:6837~~03a1e1a0-93c3-41a8-a905-a535ce8f2b09::span:6855:6858',
-        label=True,
-        semantics=None)
-
-testing = KeywordBaselines(testExp, conjunction='or')
-#print(testing.explanation)
-#keyword=testing.findKeywords()
-#print(keyword[0])
-print(testing.modify())
