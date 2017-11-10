@@ -18,27 +18,34 @@ from snorkel.contrib.babble import BabbleStream
 from snorkel.lf_helpers import *
 from tutorials.babble.spouse.spouse_examples import get_explanations, get_user_lists
 
+#----------# NOTES #----------#
+# call bs.next() only when button "skip" or "commit" is pressed
 
 class ExplanationForm(FlaskForm):
 	label = RadioField('Label', choices=[('True', 'True, they are spouses.'),('False', 'False, are not spouses.')])
 	explanation = TextAreaField('Explanation', [validators.InputRequired()])
-	skip = SubmitField(label="Skip")
-	submit_explaination = SubmitField('Submit')
-	commit_lfs = SubmitField('Commit')
+	# skip = SubmitField(label="Skip")
+	# submit_explanation = SubmitField('Parse Explanation')
 
+class LabelingFunctionForm(FlaskForm):
+	pass
+	# commit_lfs = SubmitField('Commit Labeling Functions')
 
 # https://stackoverflow.com/questions/46653424/flask-wtforms-fieldlist-with-booleanfield
-def parse_list_form_builder(parses):
-	class ParseListForm(ExplanationForm):
+def parse_list_form_builder(parses, translator):
+	class ParseListForm(FlaskForm):
 		pass
-	for (i, parseName) in enumerate(parses):
-		setattr(ParseListForm, 'parse', BooleanField(label=parseName))
+	for (idx, parse) in enumerate(parses):
+		label = "Parse {}:\n{}\n".format(idx, translator(parse.semantics))
+		setattr(ParseListForm, 'parse', BooleanField(label=label))
 	return ParseListForm()
 
 def candidate_html(c):
 	chunks = get_text_splits(c)
 	div_tmpl = u'''<div style="border: 1px #858585; box-shadow:0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-    background-color:#FDFDFD; padding:5pt 10pt 5pt 10pt; width: 80%; margin: auto; margin-top: 2%">{}</div>'''
+    background-color:#FDFDFD; padding:5pt 10pt 5pt 10pt; width: 80%; margin: auto; margin-top: 2%">
+    <p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 0pt; margin: auto;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> were/are/will be married</p>	
+    {}</div>'''
 	arg_tmpl = u'<b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">{}</b>'
 	sent_tmpl = u'<p style="font-size:12pt;">{}</p>'
 	text = u""
@@ -51,46 +58,75 @@ def candidate_html(c):
 	html = div_tmpl.format(sent_tmpl.format(text.strip()))
 	return html
 
+def sentence_html(c):
+	chunks = get_text_splits(c)
+	arg_tmpl = u'<b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">{}</b>'
+	sent_tmpl = u'<p style="font-size:10pt;">{}</p>'
+	text = u""
+	for s in chunks[0:]:
+	    if s in [u"{{A}}", u"{{B}}"]:
+	        span = c[0].get_span() if s == u"{{A}}" else c[1].get_span()
+	        text += arg_tmpl.format(span)
+	    else:
+	        text += s.replace(u"\n", u"<BR/>")
+	html = sent_tmpl.format(text.strip())
+	return html
+
 main_page = Blueprint('main_page', __name__, template_folder='templates')
 
 @main_page.route("/", methods=['GET', 'POST'])
 def index():
 	bs = current_app.config['babble_stream_object']
-	c = bs.next()
-
-	candidate = candidate_html(c)
-
-	form = ExplanationForm(request.form)
-
+	form1 = ExplanationForm(request.form)
+	form2 = LabelingFunctionForm(request.form)
 	# CASE 1: SKIP THE CURRENT SAMPLE
-	if form.skip.data:
-		c = bs.next()
-		print bs
-		candidate = candidate_html(c)
-		return render_template('index.html', candidate=candidate, form=form)
+	if request.method == 'POST' and "skip" in request.form:
+		current_app.config['candidate'] = bs.next() # GET THE NEXT CANDIDATE
+		candidate = candidate_html(current_app.config['candidate'])
+		return render_template('index.html', candidate=candidate, form=form1)
 
-	elif request.method == 'POST' and form.commit_lfs.data:
-		print bs
-		bs.commit([0])
+	# CASE 2: SUBMIT AN EXPLANATION
+	if request.method == 'POST' and "pos" in request.form or "neg" in request.form:
+		candidate = candidate_html(current_app.config['candidate'])
+		if "pos" in request.form: label = True
+		elif "neg" in request.form: label = False
+		condition = form1.explanation.data 
+		explanation = Explanation(condition, label, candidate=current_app.config['candidate'])
 
-	# CASE 2: SUBMIT AN EXPLAINATION
-	elif request.method == 'POST' and form.validate():
-		label = form.label.data
-		if label == 'True': label = True
-		elif label == 'False': label = False
-		condition = form.explanation.data 
-		explanation = Explanation(condition, label, candidate=c)
+		# for debugging purposes
+		print current_app.config['candidate']
 		print label
 		print condition
 		print explanation
+
 		parse_results = bs.apply(explanation)
-		if len(parse_results) == 3:
-			parse_list, conf_matrix_list, stats_list = parse_results
-			form = parse_list_form_builder(parse_list)
-			return render_template('index.html', candidate=candidate, form=form, conf_matrix=conf_matrix_list)
+		if len(parse_results) == 4:
+			parse_list, filtered_parses, conf_matrix_list, stats_list = parse_results
+			print conf_matrix_list
+			print stats_list
+			# form2 = parse_list_form_builder(parse_list, bs.semparser.grammar.translate)
+			parse_list = [bs.semparser.grammar.translate(parse.semantics) for parse in parse_list]
+			correct_incorrect_sentences = []
+			for idx in range(len(conf_matrix_list)):
+				tf_sentence_dict = {}
+				tf_sentence_dict["correct"] = [sentence_html(sentence) for sentence in conf_matrix_list[idx].correct]
+				tf_sentence_dict["incorrect"] = [sentence_html(sentence) for sentence in conf_matrix_list[idx].incorrect]
+				tf_sentence_dict["abstain"] = [sentence_html(sentence) for sentence in conf_matrix_list[idx].abstained]
+				correct_incorrect_sentences.append(tf_sentence_dict)
+
+			displayed_stats = zip(parse_list, correct_incorrect_sentences, stats_list)
+			return render_template('index.html', candidate=candidate, form=form1, stats = displayed_stats, form2=form2)
 		else:
 			# generated no new parses
-			return render_template('index.html', candidate=candidate, form=form, no_parses_msg = "True")
+			return render_template('index.html', candidate=candidate, form=form1, no_parses_msg = "True")
 		return redirect('/error') # shouldn't be here
 
-	return render_template('index.html', candidate=candidate, form=form)
+	# CASE 3: COMMIT THE LFS 
+	elif request.method == 'POST' and "commit" in request.form:
+		bs.commit()
+		# get the next candidate
+		current_app.config['candidate'] = bs.next()
+		
+	candidate = candidate_html(current_app.config['candidate'])
+	return render_template('index.html', candidate=candidate, form=form1)
+

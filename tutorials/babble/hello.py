@@ -22,11 +22,12 @@ from main_page import main_page
 # wtforms
 # flask_bootstrap
  
-def create_app(bs, session):
+def create_app(bs, c, session):
 	app = Flask(__name__)
 	app.secret_key = 'myverylongsecretkey'
 	bootstrap = Bootstrap(app)
 	app.config['babble_stream_object'] = bs
+	app.config['candidate'] = c
 	app.config['session'] = session
 	app.register_blueprint(main_page)
 	return app
@@ -131,6 +132,7 @@ if __name__ == "__main__":
 	# pipe.load_gold()
 
 	bs = BabbleStream(session, candidate_class=Spouse, balanced=True, seed=123)
+	c = bs.next()
 	# bs.preload(explanations=spouse_explanations, user_lists=spouse_user_lists)
-	app = create_app(bs, session)
+	app = create_app(bs, c, session)
 	app.run()

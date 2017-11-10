@@ -2,7 +2,7 @@
 {% block content %}
 {% import "bootstrap/wtf.html" as wtf %}
 
-<p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 10pt; margin: auto;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> were/are/will be married</p>
+<!-- <p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 10pt; margin: auto;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> were/are/will be married</p> -->
 <p>{{candidate|safe}}</p>
 
 {% from "_formhelpers.html" import render_field %}
@@ -14,65 +14,69 @@
 // ]]></script>
 <div id="loading"></div>
 <div id="content">
-<!-- 	<form method=post style="text-align: center; margin-top: 5%">
+	<form method=post style="text-align: center; margin-top: 5%">
 	  <dl>
 	  	{{ form.csrf_token }}
-	  	{% for subfield in form.label %}
-	  	<tr>
-	  		<td>{{ subfield }}</td>
-	  		<td>{{ subfield.label }}</td>
-	  	</tr>
-	  	{% endfor %}
-	  	<br/>
 	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
-	    	{{ form.explanation(cols="50", rows="2", placeholder="Tell us why you chose this label", class="form-control") }}
+	    	{{ form.explanation(cols="10", rows="2", placeholder="Explain yourself, then submit by clicking the label you think is correct.", class="form-control") }}
          <p class="col-sm-5 help-block">
             {{ form.explanation.errors[0] }}
 		</div>
 	  </dl>
      <br/>
-	  <p><input class="btn btn-success" type=submit value=Go onclick="loading();">
-      {{ form.skip }}
-	</form> -->
-   {{ form.csrf_token }}
-   {{ wtf.quick_form(form) }}
+        <input class="button button-action button-square button-giant" type=submit name=pos onclick="loading();" value="&#xE145;"></input>
+        <input class="button button-caution button-square button-giant" type=submit name=neg onclick="loading();" value="&#xE15B;"></input>
+        <input class="button button-square button-giant" type=submit name=skip onclick="loading();" value="&#xE14B;"></input>
+        <br/>
+	</form>
 
-<!-- iterate over the parse_list indices, then display the parse, the confusion matrix and the statistics -->
-<!-- {% if parse_list is defined %}
-   {% for i in range(parse_list| length)%}
-   <p>{{ parse_list[i] }}</p>
-      <div class="container">
-         <table class="table table-fixed">
-            <thead>
-             <th> Correct {{conf_matrix[i].correct|length}} </th>
-            </thead>
-            <tbody>
-            {% for spouse in conf_matrix[i].correct %}
-               <tr>
-                    <td> {{ spouse[0].sentence.text }} </td>
-               </tr>
-            {% endfor %}
-            </tbody>
-         </table>
+  {% if stats is defined %}
+  <div id="stats-tabs">
+  <ul class="nav nav-tabs">
+    {% for tup in stats %}
+      <li class="{% if loop.index == 1 %}active{% endif %}"><a data-toggle="tab" href="#parse_{{loop.index}}">Parse {{loop.index}}</a></li>
+    {% endfor %}
+    <li><a data-toggle="tab" href="#dummy">dummy tab</a></li>
+  </ul>
 
-         <table class="table table-fixed">
-            <thead>
-             <th> Incorrect {{conf_matrix[i].incorrect|length}} </th>
-            </thead>
-            <tbody>
-            {% for spouse in conf_matrix[i].incorrect %}
-               <tr>
-                    <td> {{ spouse[0].sentence.text }} </td>
-               </tr>
-            {% endfor %}
-            </tbody>
-         </table>
-      </div>
-   {% endfor %}
-{% endif %} -->
+  <div class="tab-content">
+    {% for tup in stats %}
+    <div id="parse_{{loop.index}}" class="tab-pane fade in {% if loop.index == 1 %}in active{% endif %}">
+          <h4>Labeling Function</h4>
+    <div class="panel panel-default">
+      <div class="panel-body">
+      <p>{{tup[0]}}</p>
+    </div>
+  </div>
 
-{% if no_parses_msg is defined %}
-	Explanantion generated no new parses.
-{% endif %}
-{% endblock %}
+      <ul class="list-group">
+      <h4>Metrics</h4>
+      <li class="list-group-item">{{tup[2].accuracy}}</li>
+      <li class="list-group-item">{{tup[2].class_coverage}}</li>
+      <li class="list-group-item">{{tup[2].coverage}}</li>
+    </ul>
+        <ul class="list-group">
+          <h4>Correctly Labeled</h4>
+        {% for sample in tup[1].correct[:5]%}
+        <li class="list-group-item">{{ sample|safe }}</li>
+        {% endfor %}
+      </ul>
+
+      <ul class="list-group">
+        <h4>Incorrectly Labeled</h4>
+      {% for sample in tup[1].incorrect[:5]%}
+      <li class="list-group-item">{{ sample|safe }}</li>
+      {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    <div id="dummy" class="tab-pane fade">
+    <h3>Dummy</h3>
+    <p>dummy tab data</p>
+    </div>
+  </div>
 </div>
+  <input class="button button-action button-rounded" type=submit name=commit value="Commit"></input>
+  {% endif %}
+  </div>
+  {% endblock %}
