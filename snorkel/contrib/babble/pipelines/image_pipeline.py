@@ -32,8 +32,7 @@ class ImagePipeline(BabblePipeline):
             num_candidates = self.session.query(self.candidate_class).filter(
                 self.candidate_class.split == split).count()
             print("Candidates [Split {}]: {}".format(split, num_candidates))
-
-
+    
     def classify(self, config=None, slim_ws_path=None):
         if config:
             self.config = config
@@ -77,10 +76,15 @@ class ImagePipeline(BabblePipeline):
                 mscoco_id = mscoco[image_id]
 
                 coco_ids[image_id] = int(mscoco_id)
+                
+                #HACK: sometimes marginals[idx] is a float, sometimes a matrix...
                 try:
                     labels[image_id] = max(labels[image_id], max(marginals[idx], 0))
                 except:
-                    import pdb; pdb.set_trace()
+                    try:
+                        labels[image_id] = max(labels[image_id], max(marginals[idx].todense(), 0))
+                    except:
+                        import pdb; pdb.set_trace()
 
             return coco_ids, labels
 
@@ -138,8 +142,8 @@ class ImagePipeline(BabblePipeline):
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...grabbing candidate and gold label subsets.")  
             candidates_train = self.get_candidates(TRAIN)
-            L_gold_train = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
-            X_train, Y_train = self.traditional_supervision(candidates_train, L_gold_train)
+            Y_train = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
+            #Deleted call to traditional_supervision, which was pruning by number of non-zeros
             if self.config['display_marginals'] and not self.config['no_plots']:
                 plt.hist(Y_train, bins=20)
                 plt.show()
@@ -157,9 +161,7 @@ class ImagePipeline(BabblePipeline):
         # Convert to TFRecords Format
         if self.config.get('download_data', False):
             print ('Downloading and converting images...')
-            os.system('python ' + os.path.join(slim_ws_path, 'download_and_convert_data.py') + \
-                      ' --dataset_name mscoco ' + \
-                      ' --dataset_dir ' + dataset_dir)
+            os.system('python ' + os.path.join(slim_ws_path, 'download_and_convert_data.py') + ' --dataset_name mscoco ' + ' --dataset_dir ' + dataset_dir)
         else:
             print("Assuming MSCOCO data is already downloaded and converted (download_data = False).")
         
@@ -169,8 +171,8 @@ class ImagePipeline(BabblePipeline):
 
         # Run homemade hacky random search
         # First, make random assignments in space of possible configurations
-        param_names = self.config['disc_params_search'].keys()
-        param_assignments = list(product(*[self.config['disc_params_search'][pn] for pn in param_names]))
+        param_names = self.config['disc_params_range'].keys()
+        param_assignments = list(product(*[self.config['disc_params_range'][pn] for pn in param_names]))
         disc_params_list = [{k: v for k, v in zip(param_names, param_assignments[i])} for i in range(len(param_assignments))]
         # Randomnly select a small number of these to try
         random.shuffle(disc_params_list)
@@ -274,6 +276,7 @@ class ImagePipeline(BabblePipeline):
                  ' --dataset_split_name=test ' + \
                  ' --model_name=' + str(self.config['disc_model_class']) + \
                  ' | tee -a ' + test_file)
+                
         
         accuracy, precision, recall = scrape_output(test_file)
         p, r = precision, recall
