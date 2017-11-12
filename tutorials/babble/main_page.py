@@ -19,17 +19,12 @@ from snorkel.lf_helpers import *
 from tutorials.babble.spouse.spouse_examples import get_explanations, get_user_lists
 
 #----------# NOTES #----------#
-# call bs.next() only when button "skip" or "commit" is pressed
 
 class ExplanationForm(FlaskForm):
-	label = RadioField('Label', choices=[('True', 'True, they are spouses.'),('False', 'False, are not spouses.')])
-	explanation = TextAreaField('Explanation', [validators.InputRequired()])
-	# skip = SubmitField(label="Skip")
-	# submit_explanation = SubmitField('Parse Explanation')
+	explanation = TextAreaField('Explanation', [validators.DataRequired()])
 
 class LabelingFunctionForm(FlaskForm):
 	pass
-	# commit_lfs = SubmitField('Commit Labeling Functions')
 
 # https://stackoverflow.com/questions/46653424/flask-wtforms-fieldlist-with-booleanfield
 def parse_list_form_builder(parses, translator):
@@ -86,7 +81,7 @@ def index():
 		return render_template('index.html', candidate=candidate, form=form1)
 
 	# CASE 2: SUBMIT AN EXPLANATION
-	if request.method == 'POST' and "pos" in request.form or "neg" in request.form:
+	if request.method == 'POST' and form1.validate_on_submit() and ("pos" in request.form or "neg" in request.form):
 		candidate = candidate_html(current_app.config['candidate'])
 		if "pos" in request.form: label = True
 		elif "neg" in request.form: label = False
@@ -100,11 +95,11 @@ def index():
 		print explanation
 
 		parse_results = bs.apply(explanation)
-		if len(parse_results) == 4:
+		print len(parse_results)
+		if len(parse_results[0]) > 0:
 			parse_list, filtered_parses, conf_matrix_list, stats_list = parse_results
 			print conf_matrix_list
 			print stats_list
-			# form2 = parse_list_form_builder(parse_list, bs.semparser.grammar.translate)
 			parse_list = [bs.semparser.grammar.translate(parse.semantics) for parse in parse_list]
 			correct_incorrect_sentences = []
 			for idx in range(len(conf_matrix_list)):
@@ -118,7 +113,7 @@ def index():
 			return render_template('index.html', candidate=candidate, form=form1, stats = displayed_stats, form2=form2)
 		else:
 			# generated no new parses
-			return render_template('index.html', candidate=candidate, form=form1, no_parses_msg = "True")
+			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True")
 		return redirect('/error') # shouldn't be here
 
 	# CASE 3: COMMIT THE LFS 
@@ -126,6 +121,8 @@ def index():
 		bs.commit()
 		# get the next candidate
 		current_app.config['candidate'] = bs.next()
+		candidate = candidate_html(current_app.config['candidate'])
+		return render_template('index.html', candidate=candidate, form=form1)
 		
 	candidate = candidate_html(current_app.config['candidate'])
 	return render_template('index.html', candidate=candidate, form=form1)

@@ -1,8 +1,142 @@
 {% extends "layout.html" %}
 {% block content %}
-{% import "bootstrap/wtf.html" as wtf %}
 
-<!-- <p style="font-size:12pt; margin-top: 5%; padding:5pt 10pt 5pt 10pt; margin: auto;"> <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person X</b>and <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Person Y</b> were/are/will be married</p> -->
+          <!-- Modal -->
+      <div id="labelModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+
+          <!-- Modal content-->
+          <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal">&times;</button>
+              <h4 class="modal-title">Welcome to Babble Labble</h4>
+            </div>
+            <div class="modal-body">
+              <p>Give a label that corresponds to the statement:</p>
+
+          </div>
+          <div class="modal-footer">
+            <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+
+          <!-- Modal -->
+      <div id="myModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+
+          <!-- Modal content-->
+          <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal">&times;</button>
+              <h4 class="modal-title">Welcome to Babble Labble</h4>
+            </div>
+            <div class="modal-body">
+              <p>Give a label that corresponds to the statement:</p>
+
+           <p class="lead">The given text indicates that the <mark>highlighted people</mark> are married (to each other), were married in the past, or are getting married.</p>
+
+          <p> <em>Only use information from the text itself.</em> We are more interested in whether or not the given text indicates that the people are married than we are in whether or not they are actually married. </p>
+
+          <p>Complete the sentence "I chose this label because..." with a reason supporting your choice of label.</p>
+          <p>Your explanation must:</p>
+          <ul>
+          <li>Refer to the first highlighted person in the sentence as <strong>person1</strong> and the second as <strong>person2</strong> (instead of quoting their names)
+          <li>Result in a <strong>complete sentence</strong> (e.g., "I chose this label because...the word 'wife' is within two words of person2", not "I chose this label because...'wife'")
+          <li>Place in <strong>double quotes</strong> any word from the sentence that you are quoting (other than person1 or person2).
+          <li>Be <strong>unique</strong> for each text.
+          </ul>
+          <a href="#hint" data-toggle="collapse">Hint</a>
+          <div id="hint" class="collapse">
+            A common successful formula is to find a word or words that informed your decision, and then state whether they occurred before/after/between person1 and/or person2, or more specifically, within a certain number of words or characters in a certain direction to <mark>person1</mark> or <mark>person2</mark>. Your explanation may also use compound statements, refer to word attributes (spelling, capitalization, starts with, ends with, word count) or specific word distances (within three words of, more than ten words away from, etc.). It's okay if your explanation won't always be true for other sentences; just tell us about the words that informed your decision for this sentence.
+          </div>
+
+          <br/>
+          <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="headingOne">
+        <h4 class="panel-title">
+          <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+            Example #1
+          </a>
+        </h4>
+      </div>
+      <div id="collapseOne" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="headingOne">
+        <div class="panel-body">
+          <strong>Text:</strong> "Meanwhile, Kate and Michael celebrated their second wedding anniversary last month."<br/>
+          <strong>Label:</strong> True<br/>
+          <strong>Explanation:</strong> I chose this label because...<br/>
+          <em class="text-success">good:</em> "and" is between person1 and person2 and the words "wedding anniversary" occur after person2.<br/>
+          <em class="text-success">good:</em> the words "their" and "wedding" occur after person2.<br/>
+          <em class="text-success">good:</em> person1 and person2 are within two words of each other and "celebrated" is after person2.<br/>
+          <em class="text-danger">bad (real world knowledge):</em> it says person1 and person2 have been married for two years.<br/>
+          <em class="text-danger">bad (misuses quoted word):</em> person1 and person2 had a "wedding".(does not refer to position of "wedding" in the sentence)
+        </div>
+      </div>
+    </div>
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="headingTwo">
+        <h4 class="panel-title">
+          <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+            Example #2
+          </a>
+        </h4>
+      </div>
+      <div id="collapseTwo" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingTwo">
+        <div class="panel-body">
+          <strong>Text:</strong> "Education Minister Christopher Pyne is tipped to take over Defense, while current Social Services Minister Scott Morrison is predicted to move to Treasury, amid widespread expectations Joe Hockey will depart as treasurer."<br/>
+          <strong>Label:</strong> False<br/>
+          ​<strong>Explanation:</strong> I chose this label because...<br/>
+          <em class="text-success">good:</em> person1 and person2 are both immediately preceded by the word "Minister"<br/>
+          <em class="text-success">good:</em> the last word of person1 is not the same as the last word of person2.<br/>
+          <em class="text-danger">bad (not grounded in specific words):</em> the sentence does not say anything about them being married.<br/>
+          <em class="text-danger">bad (real world knowledge):</em> person1 and person2 are both men.
+        </div>
+      </div>
+    </div>
+    <div class="panel panel-default">
+      <div class="panel-heading" role="tab" id="headingThree">
+        <h4 class="panel-title">
+          <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+            Example #3
+          </a>
+        </h4>
+      </div>
+      <div id="collapseThree" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingThree">
+        <div class="panel-body">
+          <strong>Text:</strong> "Pictured: Jane with husband Howard and eldest daughter Sophie
+          <strong>Label:</strong> False
+          ​<strong>Explanation:</strong> I chose this label because...<br/> 
+          <em class="text-success">good:</em> "daughter" occurs within three words to the left of person2.<br/>
+          <em class="text-success">good:</em> "daughter" is between person1 and person2.<br/>
+          <em class="text-danger">bad ("daughter" not quoted):</em> person2 is person1's daughter.<br/>
+          <em class="text-danger">bad (misuses quoted word):</em> person2 is person1's "daughter". (does not refer to position of "daughter")
+        </div>
+      </div>
+    </div>
+  </div>
+          </div>
+          <div class="modal-footer">
+            <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
+          </div>
+        </div>
+
+      </div>
+    </div>
+      <div id="left"> <h1 style="color: #ffffff; text-align: center"> Babble Labble </h1>
+        <!-- Trigger the modal with a button -->
+      <div class="information">
+        <button class="button button-plain button-borderless" data-toggle="modal" data-target="#myModal"><i class="material-icons">info_outline</i></button>
+        <a class="button button-plain button-borderless" href="https://hazyresearch.github.io/snorkel/blog/babble_labble.html"><i class="material-icons">description</i></a>
+      </div>
+      <button class="button button-large button-plain button-borderless" data-toggle="modal" data-target="#labelModal">HISTORY</button>
+      </div>
+
+<div id="right">
 <p>{{candidate|safe}}</p>
 
 {% from "_formhelpers.html" import render_field %}
@@ -14,12 +148,12 @@
 // ]]></script>
 <div id="loading"></div>
 <div id="content">
-	<form method=post style="text-align: center; margin-top: 5%">
+	<form method=post style="text-align: center; width: 70%; margin: auto; padding-top: 4%">
 	  <dl>
 	  	{{ form.csrf_token }}
 	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
 	    	{{ form.explanation(cols="10", rows="2", placeholder="Explain yourself, then submit by clicking the label you think is correct.", class="form-control") }}
-         <p class="col-sm-5 help-block">
+         <p class="col-sm-12 help-block">
             {{ form.explanation.errors[0] }}
 		</div>
 	  </dl>
@@ -36,7 +170,6 @@
     {% for tup in stats %}
       <li class="{% if loop.index == 1 %}active{% endif %}"><a data-toggle="tab" href="#parse_{{loop.index}}">Parse {{loop.index}}</a></li>
     {% endfor %}
-    <li><a data-toggle="tab" href="#dummy">dummy tab</a></li>
   </ul>
 
   <div class="tab-content">
@@ -70,13 +203,16 @@
       </ul>
     </div>
     {% endfor %}
-    <div id="dummy" class="tab-pane fade">
-    <h3>Dummy</h3>
-    <p>dummy tab data</p>
-    </div>
   </div>
 </div>
+<form method=post style="text-align: center; margin-top: 5%">
   <input class="button button-action button-rounded" type=submit name=commit value="Commit"></input>
+</form>
+  {% endif %}
+
+  {% if no_parse_error is defined %}
+  <p>Your explanation generated no valid parses -- check your explanation or skip this example.</p>
   {% endif %}
   </div>
+</div>
   {% endblock %}

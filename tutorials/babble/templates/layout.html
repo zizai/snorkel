@@ -3,12 +3,14 @@
 	<head>
 		<title>Babble Labble Demo</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen">
+<!-- 		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen"> -->
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/button.css') }}">
 		<link href="https://fonts.googleapis.com/icon?family=Material+Icons"
       rel="stylesheet">
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.0/jquery.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 	<style>
 		div#loading {
 	    width: 100px;
@@ -20,17 +22,6 @@
 	    background-position: center;
 	    cursor: wait;
 	    }
-	    #progressbar {
-		  background-color: #565e69;
-		  /*border-radius: 13px; /* (height of inner div) / 2 + padding */
-		  padding: 2px;
-		}
-		#progressbar > div {
-		   background-color: #70848e;
-		   width: 40%; /* Adjust with JavaScript */
-		   height: 10px;
-/*		   border-radius: px;*/
-		}
 		input[name="pos"] {
 			font-family: 'Material Icons';
 		}
@@ -43,17 +34,14 @@
 		div#stats-tabs {
 			padding: 20px 15px 15px 20px;
 		}
+		.information {
+			text-align: center;
+		}
 	</style>
 	</head>
   	<body>
-  		<div id="left"> <h1 style="color: #ffffff; text-align: center"> Babble Labble </h1>
-<!--   			<div id="progressbar">
-			  <div></div>
-			</div> -->
-  		</div>
-  		<div id="right">
-  			{% extends "bootstrap/base.html" %}
-			{% block content %}{% endblock %}
-		</div>
+<!-- 	{% extends "bootstrap/base.html" %} -->
+	{% block content %}{% endblock %}
+		
 	</body>
 </html>
