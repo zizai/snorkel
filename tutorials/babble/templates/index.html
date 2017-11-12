@@ -9,11 +9,10 @@
           <div class="modal-content">
             <div class="modal-header">
               <button type="button" class="close" data-dismiss="modal">&times;</button>
-              <h4 class="modal-title">Welcome to Babble Labble</h4>
+              <h4 class="modal-title">Evalution Metrics</h4>
             </div>
             <div class="modal-body">
-              <p>Give a label that corresponds to the statement:</p>
-
+              {{ lf_stats| safe }}
           </div>
           <div class="modal-footer">
             <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
@@ -132,8 +131,15 @@
       <div class="information">
         <button class="button button-plain button-borderless" data-toggle="modal" data-target="#myModal"><i class="material-icons">info_outline</i></button>
         <a class="button button-plain button-borderless" href="https://hazyresearch.github.io/snorkel/blog/babble_labble.html"><i class="material-icons">description</i></a>
+        <h4>Coverage</h4>
+        <div class="progress" style="height: 5px;">
+          <div class="progress-bar" role="progressbar" style="width: {{'%0.2f' % coverage|float}}%;" aria-valuenow={{coverage}} aria-valuemin="0" aria-valuemax="100">{{'%0.2f' % coverage|float}}%</div>
+        </div>
       </div>
       <button class="button button-large button-plain button-borderless" data-toggle="modal" data-target="#labelModal">HISTORY</button>
+      <form method=post style="text-align: center; margin-top: 5%">
+        <input class="button button-action button-rounded" type=submit name=finish value="Finish Pipeline"></input>
+      </form>
       </div>
 
 <div id="right">

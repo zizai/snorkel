@@ -74,11 +74,13 @@ def index():
 	bs = current_app.config['babble_stream_object']
 	form1 = ExplanationForm(request.form)
 	form2 = LabelingFunctionForm(request.form)
+	lf_stats = bs.get_lf_stats().to_html(columns=['Coverage', 'Overlaps', 'TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
+	coverage = bs.get_global_coverage().numer/float(bs.get_global_coverage().denom) * 100
 	# CASE 1: SKIP THE CURRENT SAMPLE
 	if request.method == 'POST' and "skip" in request.form:
 		current_app.config['candidate'] = bs.next() # GET THE NEXT CANDIDATE
 		candidate = candidate_html(current_app.config['candidate'])
-		return render_template('index.html', candidate=candidate, form=form1)
+		return render_template('index.html', candidate=candidate, form=form1, lf_stats=lf_stats, coverage=coverage)
 
 	# CASE 2: SUBMIT AN EXPLANATION
 	if request.method == 'POST' and form1.validate_on_submit() and ("pos" in request.form or "neg" in request.form):
@@ -110,10 +112,10 @@ def index():
 				correct_incorrect_sentences.append(tf_sentence_dict)
 
 			displayed_stats = zip(parse_list, correct_incorrect_sentences, stats_list)
-			return render_template('index.html', candidate=candidate, form=form1, stats = displayed_stats, form2=form2)
+			return render_template('index.html', candidate=candidate, form=form1, stats = displayed_stats, form2=form2, lf_stats=lf_stats, coverage=coverage)
 		else:
 			# generated no new parses
-			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True")
+			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True", lf_stats=lf_stats, coverage=coverage)
 		return redirect('/error') # shouldn't be here
 
 	# CASE 3: COMMIT THE LFS 
@@ -122,8 +124,17 @@ def index():
 		# get the next candidate
 		current_app.config['candidate'] = bs.next()
 		candidate = candidate_html(current_app.config['candidate'])
-		return render_template('index.html', candidate=candidate, form=form1)
+		return render_template('index.html', candidate=candidate, form=form1, lf_stats=lf_stats, coverage=coverage)
+
+	# CASE 4: FINISH THE PIPELINE -- LABEL DATASET AND TRAIN MODEL
+	elif request.method == 'POST' and "finish" in request.form:
+		pipe = current_app.config['pipe']
+		pipe.lfs = bs.get_lfs()
+		pipe.label()
+		pipe.supervise()
+		pipe.featurize()
+		pipe.classify()
 		
 	candidate = candidate_html(current_app.config['candidate'])
-	return render_template('index.html', candidate=candidate, form=form1)
+	return render_template('index.html', candidate=candidate, form=form1, lf_stats=lf_stats, coverage=coverage)
 
