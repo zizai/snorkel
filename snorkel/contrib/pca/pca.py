@@ -810,22 +810,22 @@ class PCA(TFNoiseAwareModel):
 
         # todo: self.paragraph will contain two things for now:
         # 1. pickled dictionary mapping X_train indices to paragraph vector indices
-        # 2. csv file with pretrained paragraph embeddings
+        # 2. txt file with pretained prargraph embeddings
         if self.paragraph is not None:
-            idx_file, df_file = self.paragraph.split(':')
+            idx_file, parvec_file = self.paragraph.split(':')
             with open(idx_file, 'rb') as f:
                 train_to_docid_dict = pickle.load(f)
-            parvec = pd.read_csv(df_file, header=None)
+            parvec = np.genfromtxt(parvec_file)
 
         new_X_train = None
         for i in range(len(X_train)):
             feature = self.gen_feature(X_train[i])
             if new_X_train is None:
                 new_X_train = torch.from_numpy(np.zeros((len(X_train), feature.size(1)), dtype=np.float)).float()
-            if self.paragraph is not None and not self.only_chars:
+            if (self.paragraph is not None) and (not self.only_chars):
                 # this is the dictionary that contains training data idx --> doc_id
-                df_loc = train_to_docid_dict[i]
-                paragraph_vector = parvec.loc[df_loc]
+                par_idx = train_to_docid_dict[i]
+                paragraph_vector = parvec[par_idx]
                 torch_pvec = torch.from_numpy(paragraph_vector).float()
                 new_X_train[i] = torch.cat((feature, torch_pvec.view(1, -1)), 1)
             else:
