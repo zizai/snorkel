@@ -9,10 +9,10 @@
           <div class="modal-content">
             <div class="modal-header">
               <button type="button" class="close" data-dismiss="modal">&times;</button>
-              <h4 class="modal-title">Evalution Metrics</h4>
+              <h4 class="modal-title">Evaluation Metrics</h4>
             </div>
             <div class="modal-body">
-              {{ lf_stats| safe }}
+              {{ metrics.lf_stats| safe }}
           </div>
           <div class="modal-footer">
             <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
@@ -21,9 +21,6 @@
 
       </div>
     </div>
-
-
-
           <!-- Modal -->
       <div id="myModal" class="modal fade" role="dialog">
         <div class="modal-dialog">
@@ -128,21 +125,26 @@
     </div>
       <div id="left"> <h1 style="color: #ffffff; text-align: center"> Babble Labble </h1>
         <!-- Trigger the modal with a button -->
-      <div class="information">
+      <div class="information" id="left-metrics">
         <button class="button button-plain button-borderless" data-toggle="modal" data-target="#myModal"><i class="material-icons">info_outline</i></button>
         <a class="button button-plain button-borderless" href="https://hazyresearch.github.io/snorkel/blog/babble_labble.html"><i class="material-icons">description</i></a>
-        <h4>Coverage</h4>
-        <div class="progress" style="height: 5px;">
-          <div class="progress-bar" role="progressbar" style="width: {{'%0.2f' % coverage|float}}%;" aria-valuenow={{coverage}} aria-valuemin="0" aria-valuemax="100">{{'%0.2f' % coverage|float}}%</div>
-        </div>
+        <h4>Coverage {{'%0.2f' % metrics.coverage|float}}%</h4>
+<!--         <div class="progress" style="height: 7px;">
+          <div class="progress-bar" role="progressbar" style="width: {{'%0.2f' % metrics.coverage|float}}%;" aria-valuenow={{metrics.coverage}} aria-valuemin="0" aria-valuemax="100"></div>
+        </div> -->
+        <h4>Labels {{metrics.num_labels}}</h4>
+        <h4>Examples Seen {{metrics.num_examples}}</h4>
+        <button style="text-align: center;" class="button button-rounded" data-toggle="modal" data-target="#labelModal"> View History</button>
       </div>
-      <button class="button button-large button-plain button-borderless" data-toggle="modal" data-target="#labelModal">HISTORY</button>
       <form method=post style="text-align: center; margin-top: 5%">
         <input class="button button-action button-rounded" type=submit name=finish value="Finish Pipeline"></input>
       </form>
       </div>
 
 <div id="right">
+  <p style="font-size:14pt; margin-top: 2%; padding:5pt 10pt 5pt 0pt; text-align:center;"> Label whether
+    <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">X</b>and 
+    <b style="background-color:#ffd77c;padding:1pt 5pt 1pt 5pt;">Y</b> were/are/will be married</p>
 <p>{{candidate|safe}}</p>
 
 {% from "_formhelpers.html" import render_field %}
@@ -171,6 +173,15 @@
 	</form>
 
   {% if stats is defined %}
+    {% if filtered_analysis is not none %}
+    <div id="filtered-tab">
+      Not all parses made it. <a href="#filtered" data-toggle="collapse">See why some were filtered.</a>
+      <div id="filtered" class="collapse">
+        {{filtered_analysis|safe}}
+      </div>
+    </div>
+    {% endif %}
+
   <div id="stats-tabs">
   <ul class="nav nav-tabs">
     {% for tup in stats %}
@@ -181,30 +192,33 @@
   <div class="tab-content">
     {% for tup in stats %}
     <div id="parse_{{loop.index}}" class="tab-pane fade in {% if loop.index == 1 %}in active{% endif %}">
-          <h4>Labeling Function</h4>
-    <div class="panel panel-default">
-      <div class="panel-body">
-      <p>{{tup[0]}}</p>
-    </div>
-  </div>
 
       <ul class="list-group">
       <h4>Metrics</h4>
       <li class="list-group-item">{{tup[2].accuracy}}</li>
       <li class="list-group-item">{{tup[2].class_coverage}}</li>
       <li class="list-group-item">{{tup[2].coverage}}</li>
+      <li class="list-group-item">Number of correct labels: {{tup[1].correct| length}}</li>
+      <li class="list-group-item">Number of incorrect labels: {{tup[1].incorrect | length}}</li>
     </ul>
+
+    <h4>Labeling Function</h4>
+    <div class="panel panel-default">
+      <div class="panel-body">
+      <p>{{tup[0]}}</p>
+    </div>
+  </div>
         <ul class="list-group">
           <h4>Correctly Labeled</h4>
         {% for sample in tup[1].correct[:5]%}
-        <li class="list-group-item">{{ sample|safe }}</li>
+        <li class="list-group-item list-group-item-success">{{ sample|safe }}</li>
         {% endfor %}
       </ul>
 
       <ul class="list-group">
         <h4>Incorrectly Labeled</h4>
       {% for sample in tup[1].incorrect[:5]%}
-      <li class="list-group-item">{{ sample|safe }}</li>
+      <li class="list-group-item list-group-item-danger">{{ sample|safe }}</li>
       {% endfor %}
       </ul>
     </div>
@@ -217,7 +231,7 @@
   {% endif %}
 
   {% if no_parse_error is defined %}
-  <p>Your explanation generated no valid parses -- check your explanation or skip this example.</p>
+  <p style="text-align: center; margin-top: 5%">Your explanation generated no valid parses -- check your explanation, revisit the <a data-toggle="modal" data-target="#myModal">instructions</a>, or skip this example.</p>
   {% endif %}
   </div>
 </div>

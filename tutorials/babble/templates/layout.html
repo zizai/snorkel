@@ -2,6 +2,27 @@
 <html>
 	<head>
 		<title>Babble Labble Demo</title>
+<!-- 		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		    <ul class=flashes>
+		    {% for message in messages %}
+		      <li>{{ message }}</li>
+		    {% endfor %}
+		    </ul>
+		  {% endif %}
+		{% endwith %} -->
+
+		{% with messages = get_flashed_messages(with_categories=true) %}
+		  <!-- Categories: success (green), info (blue), warning (yellow), danger (red) -->
+		  {% if messages %}
+		    {% for category, message in messages %}
+		      <div class="alert alert-{{ category }} alert-dismissible" style="margin-bottom: 0px" role="alert">
+		      <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+		      {{ message }}
+		      </div>
+		    {% endfor %}
+		  {% endif %}
+		{% endwith %}
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen"> -->
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
@@ -32,6 +53,9 @@
 			font-family: 'Material Icons';
 		}
 		div#stats-tabs {
+			padding: 20px 15px 15px 20px;
+		}
+		div#filtered-tab {
 			padding: 20px 15px 15px 20px;
 		}
 		.information {

@@ -13,3 +13,8 @@
 #content {
 	margin: auto;
 }
+#left-metrics {
+  font-family: "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+  color: white;
+  font-size: 26px;
+}
