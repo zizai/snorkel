@@ -12,7 +12,6 @@ inequalities = {
     '.gt': lambda x, y: x > y,
 }
 
-# VERSION 4
 
 class Phrase(object):
     fields = ['text', 'words', 'char_offsets', 'pos_tags', 'ner_tags', 'entity_types']
@@ -20,6 +19,14 @@ class Phrase(object):
     def __init__(self, sentence=None):
         for field in self.fields:
             setattr(self, field, getattr(sentence, field) if sentence else None)
+            # NOTE: I believe all candidate-related fields are already unicode.
+            # value = getattr(sentence, field) if sentence else None
+            # # Convert all str inputs into unicode
+            # if isinstance(value, str):
+            #     value = value.decode('utf-8')
+            # elif isinstance(value, list) and len(value) and isinstance(value[0], str):
+            #     value = [w.decode('utf-8') for w in value]
+            # setattr(self, field, value)
 
     def __getitem__(self, key):
         if isinstance(key, slice):
@@ -45,6 +52,26 @@ class Phrase(object):
 
     def __repr__(self):
         return 'Phrase("{}" : {} tokens)'.format(self.text.strip(), len(self.words))
+
+
+def index_word(string, index):
+    words = string.split()
+    return _index_wordlist(words, index)
+
+
+def index_phrase(phrase, index):
+    words = phrase.words
+    return _index_wordlist(words, index)
+
+
+def _index_wordlist(wordlist, index):
+    if len(wordlist) == 0:
+        return ''
+    if index > 0:
+        index = index - 1
+    elif index < 0:
+        index = len(wordlist) + index
+    return wordlist[max(0, min(index, len(wordlist) - 1))]
 
 
 def phrase_filter(phr, field, val):
@@ -138,6 +165,8 @@ def get_sentence_phrase(span):
 
 
 helpers = {
+    'index_word': index_word,
+    'index_phrase': index_phrase,
     'phrase_filter': phrase_filter,
     'get_left_phrase': get_left_phrase,
     'get_right_phrase': get_right_phrase,

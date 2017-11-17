@@ -4,12 +4,15 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from pandas import DataFrame, Series
+from scipy.sparse import csr_matrix, coo_matrix
 import scipy.sparse as sparse
 
 from snorkel.annotations import LabelAnnotator, load_gold_labels, csr_AnnotationMatrix
 from snorkel.learning.utils import MentionScorer
 from snorkel.lf_helpers import test_LF
 from snorkel.utils import (
+    PrintTimer,
+    ProgressBar,
     matrix_conflicts,
     matrix_coverage,
     matrix_overlaps,
@@ -26,6 +29,8 @@ from snorkel.contrib.babble.semparser import Explanation, SemanticParser
 
 ConfusionMatrix = namedtuple('ConfusionMatrix', ['correct', 'incorrect', 'abstained'])
 Metrics = namedtuple('Metrics', ['accuracy', 'coverage', 'class_coverage'])
+# Use 'parse' as field instead of 'explanation' to match with FilteredParse object.
+FilteredExplanation = namedtuple('FilteredExplanation', ['parse', 'reason'])
 
 class Statistic(object):
     def __init__(self, numer, denom):
@@ -118,12 +123,13 @@ class BabbleStream(object):
     An object for iteratively viewing candidates and parsing corresponding explanations.
     """
     def __init__(self, session, mode='text', candidate_class=None, seed=None, 
-                 user_lists={}, verbose=True, **kwargs):
+                 user_lists={}, apply_filters=True, verbose=True, **kwargs):
         self.session = session
         self.mode = mode
         self.candidate_class = candidate_class
         self.seed = seed
         self.verbose = verbose
+        self.apply_filters = apply_filters
 
         self.dev_candidates = session.query(self.candidate_class).filter(self.candidate_class.split == 1).all()
         self.dev_labels = np.ravel((load_gold_labels(session, annotator_name='gold', split=1)).todense())
@@ -135,17 +141,23 @@ class BabbleStream(object):
         
         self.parses = []
         self.label_matrix = None
+        # rows, cols, data, shape:(_, _)
+        self.label_triples = [[[],[],[],0,0], None, [[],[],[],0,0]]
 
         # Temporary storage
-        # self.temp_explanations = None
         self.temp_parses = None
         self.temp_label_matrix = None
+        self.last_parses = []
 
         # Evaluation tools
         self.num_dev_total  = len(self.dev_candidates)
         self.num_dev_pos    = sum(self.dev_labels == 1)
         self.num_dev_neg    = sum(self.dev_labels == -1)
-        assert(self.num_dev_total == self.num_dev_pos + self.num_dev_neg)
+        if self.num_dev_pos + self.num_dev_neg != self.num_dev_total:
+            print("WARNING: Number of candidates ({}) does not equal the number "
+                "of pos ({}) + neg ({}) = {} labels.".format(
+                    self.num_dev_total, self.num_dev_pos, self.num_dev_neg,
+                    self.num_dev_pos + self.num_dev_neg))
         self.scorer         = MentionScorer(self.dev_candidates, self.dev_labels)
 
 
@@ -163,7 +175,7 @@ class BabbleStream(object):
     def _build_semparser(self):
         self.semparser = SemanticParser(
             mode=self.mode, candidate_class=self.candidate_class, 
-            user_lists=self.user_lists) #top_k=-4, beam_width=30)
+            user_lists=self.user_lists, beam_width=10) #top_k=-4, beam_width=30)
 
     def add_user_lists(self, new_user_lists):
         """
@@ -186,6 +198,9 @@ class BabbleStream(object):
             parses, _, _, _ = self.apply(explanations)
             if parses:
                 self.commit()
+            # Also label train and test
+            self.label_split(0)
+            self.label_split(2)
 
     def apply(self, explanations, split=1, parallelism=1):
         """
@@ -193,8 +208,8 @@ class BabbleStream(object):
         :param parallelism: number of threads to use; CURRENTLY UNUSED
         :param split: the split to use for the filter bank; CURRENTLY UNUSED
         """
+        # Flush all uncommmitted results from previous runs
         self.commit([])
-        print("All previously uncommitted parses have been flushed.")
 
         if parallelism != 1:
             raise NotImplementedError("BabbleStream does not yet support parallelism > 1")
@@ -202,16 +217,26 @@ class BabbleStream(object):
         if split != 1:
             raise NotImplementedError("BabbleStream does not yet support splits != 1")
 
-        parses = self._parse(explanations)
-        parses, filtered_parses, label_matrix = self._filter(parses, explanations)
+        explanations = explanations if isinstance(explanations, list) else [explanations]
+        parses, unparseable_explanations = self._parse(explanations)
+        if self.apply_filters:
+            parses, filtered_parses, label_matrix = self._filter(parses, explanations)
+        else:
+            print("Because apply_filters=False, no parses are being filtered.")
+            filtered_parses = {}
+            label_matrix = self.filter_bank.label(parses)
         conf_matrix_list, stats_list = self.analyze(parses)
+
+        filtered_objects = filtered_parses
+        filtered_objects['UnparseableExplanations'] = unparseable_explanations
         
         # Hold results in temporary space until commit
         # self.temp_explanations = explanations if isinstance(explanations, list) else [explanations]
         self.temp_parses = parses if isinstance(parses, list) else [parses]
         self.temp_label_matrix = label_matrix
-        
-        return parses, filtered_parses, conf_matrix_list, stats_list
+        self.temp_filtered_objects = filtered_objects
+
+        return parses, filtered_objects, conf_matrix_list, stats_list
 
     def _parse(self, explanations):
         """
@@ -223,8 +248,11 @@ class BabbleStream(object):
 
         parses = self.semparser.parse(explanations, 
             return_parses=True, verbose=self.verbose)
+        used_explanations = set([p.explanation for p in parses])
+        unparseable_explanations = [FilteredExplanation(exp, 'Unparseable') 
+            for exp in explanations if exp not in used_explanations]
 
-        return parses
+        return parses, unparseable_explanations
     
     def _filter(self, parses, explanations):
         """
@@ -272,36 +300,82 @@ class BabbleStream(object):
 
         return conf_matrix_list, stats_list
 
-    def filtered_analysis(self, filtered_parses):
-        if not any(filtered_parses.values()):
+    def filtered_analysis(self, filtered_parses=None):
+        if filtered_parses is None:
+            # Use the last set of filtered parses to be produced.
+            filtered_parses = self.temp_filtered_objects
+
+        if filtered_parses is None or not any(filtered_parses.values()):
             print("No filtered parses to analyze.")
             return
-        for filter_name, parses in filtered_parses.items():
-            if parses:
-                print("Filter {} removed {} parse(s):".format(filter_name, len(parses)))
-            for i, filtered_parse in enumerate(parses):
-                print("\n#{} Filtered parse:".format(i))
-                print("Explanation (source):\n{}".format(
-                    filtered_parse.parse.explanation))
-                print("\nParse (pseudocode):\n{}".format(
-                    self.semparser.grammar.translate(filtered_parse.parse.semantics)))
 
-                if filter_name == 'DuplicateSemanticsFilter':
-                    print("\nReason:\nCollision with parse from this explanation:\n{}".format(
-                        filtered_parse.reason.explanation))
+        filter_names = [
+            'UnparseableExplanations',
+            'DuplicateSemanticsFilter',
+            'ConsistencyFilter',
+            'UniformSignatureFilter',
+            'DuplicateSignatureFilter',
+        ]
+
+        num_filtered = 0
+        print("SUMMARY")
+        print("{} TOTAL:".format(
+            sum([len(p) for p in filtered_parses.values()])))
+        print("{} Unparseable Explanation".format(
+            len(filtered_parses.get('UnparseableExplanations', []))))
+        print("{} Duplicate Semantics".format(
+            len(filtered_parses.get('DuplicateSemanticsFilter', []))))
+        print("{} Inconsistency with Example".format(
+            len(filtered_parses.get('ConsistencyFilter', []))))
+        print("{} Uniform Signature".format(
+            len(filtered_parses.get('UniformSignatureFilter', []))))
+        print("{} Duplicate Signature".format(
+            len(filtered_parses.get('DuplicateSignatureFilter', []))))
+
+        for filter_name in filter_names:
+            parses = filtered_parses.get(filter_name, [])
+
+            for filtered_parse in parses:
+                num_filtered += 1
+
+                if filtered_parse.reason == 'Unparseable':
+                    parse_str = filtered_parse.parse.condition
+                else:
+                    parse_str = self.semparser.grammar.translate(filtered_parse.parse.semantics)
+
+                if filter_name == 'UnparseableExplanations':
+                    filter_str = "Unparseable Explanation"
+                    reason_str = "This explanation couldn't be parsed."
+
+                elif filter_name == 'DuplicateSemanticsFilter':
+                    filter_str = "Duplicate Semantics"
+                    reason_str = 'This parse is identical to one produced by the following explanation:\n\t"{}"'.format(
+                        filtered_parse.reason.explanation.condition)
                     
                 elif filter_name == 'ConsistencyFilter':
                     candidate = filtered_parse.reason
-                    print('\nReason:\nInconsistent with candidate ({}, {}) from:\n"{}"'.format(
-                        candidate[0].get_span(), candidate[1].get_span(), 
-                        filtered_parse.reason.get_parent().text))
+                    filter_str = "Inconsistency with Example"
+                    reason_str = "This parse did not agree with the candidate ({}, {})".format(
+                        candidate[0].get_span(), candidate[1].get_span())
+                        # filtered_parse.reason.get_parent().text.encode('utf-8')))
                     
                 elif filter_name == 'UniformSignatureFilter':
-                    print("\nReason:\n{}".format(filtered_parse.reason))
+                    filter_str = "Uniform Signature"
+                    reason_str = "This parse labeled {} of the {} development examples".format(
+                        filtered_parse.reason, self.num_dev_total)
                     
                 elif filter_name == 'DuplicateSignatureFilter':
-                    print("\nReason:\nCollision with parse from this explanation:\n{}".format(
-                        filtered_parse.reason.explanation))
+                    filter_str = "Duplicate Signature"
+                    reason_str = "This parse labeled identically to the following existing parse:\n\t{}".format(
+                        self.semparser.grammar.translate(filtered_parse.reason.explanation))
+
+                print("\n[#{}]: {}".format(num_filtered, filter_str))
+                # print("\nFilter: {}".format(filter_str))
+                if filtered_parse.reason == 'Unparseable':
+                    print("\nExplanation: {}".format(parse_str))
+                else:
+                    print("\nParse: {}".format(parse_str))
+                print("\nReason: {}\n".format(reason_str))
 
 
     def commit(self, idxs='all'):
@@ -336,15 +410,50 @@ class BabbleStream(object):
             else:
                 self.label_matrix = sparse.hstack((self.label_matrix, self.temp_label_matrix))
 
+            self.last_parses = parses_to_add
             if self.verbose:
                 print("Added {} parse(s) from {} explanations to set. (Total # parses = {})".format(
                     len(parses_to_add), len(explanations_to_add), len(self.parses)))
 
         # Permanently store the semantics and signatures in duplicate filters
-        self.filter_bank.commit(idxs)
+        self.filter_bank.commit(idxs)                
 
         self.temp_parses = None
         self.temp_label_matrix = None
+
+    def label_split(self, split):
+        """Label a single split"""
+        if split == 1:
+            raise Exception("The dev set is labeled during Babbler.apply() by the FilterBank.")
+
+        with PrintTimer("Applying labeling functions to split {}".format(split)):
+            lfs = [parse.function for parse in self.last_parses]
+            candidates = self.session.query(self.candidate_class).filter(
+                self.candidate_class.split == split).all()
+            num_existing_lfs = self.label_triples[split][4]
+
+            rows = []
+            cols = []
+            data = []
+            pb = ProgressBar(len(candidates) * len(lfs))
+            for j, lf in enumerate(lfs):
+                for i, c in enumerate(candidates):
+                    pb.bar(i)
+                    label = lf(c)
+                    if label:
+                        rows.append(i)
+                        cols.append(j + num_existing_lfs)
+                        data.append(label)
+            pb.close()
+            # NOTE: There is potential for things to go wrong if the user calls
+            # this function twice and the label matrix ends up wonky.
+            self.label_triples[split][0].extend(rows)
+            self.label_triples[split][1].extend(cols)
+            self.label_triples[split][2].extend(data)
+            self.label_triples[split][3] = len(candidates)
+            self.label_triples[split][4] += len(lfs)
+            print("Stored {} triples for split {}. Now shape is ({}, {}).".format(
+                len(data), split, self.label_triples[split][3], self.label_triples[split][4]))
 
     def get_global_coverage(self):
         """Calculate stats for the dataset as a whole.
@@ -421,21 +530,24 @@ class BabbleStream(object):
         d['TN']             = Series(data=tn, index=lf_names)
 
         return DataFrame(data=d, index=lf_names)[col_names]
-        
 
-    def get_label_matrix(self):
-        if self.temp_parses is not None:
-            print("You must commit before retrieving the label matrix.")
-            return None
-        # TODO: For now, return a csr_matrix. Later, confirm we don't need to convert.
-        # label_matrix = csr_LabelMatrix(
-        #     self.label_matrix, 
-        #     candidate_index=
-        #     row_index=
-        #     annotation_key_cls=
-        #     key_index=
-        #     col_index=)
-        return self.label_matrix
+    def get_label_matrix(self, split=1):
+        if split == 1:
+            if self.temp_parses is not None:
+                print("You must commit before retrieving the label matrix.")
+                return None
+            label_matrix = self.label_matrix
+        else:
+            rows, cols, data, shape_row, shape_col = self.label_triples[split]
+            label_matrix = coo_matrix((data, (rows, cols)), shape=(shape_row, shape_col)).tocsr()
+        
+        candidates = self.session.query(self.candidate_class).filter(
+            self.candidate_class.split == split).all()
+        candidate_index = {c.id: i for i, c in enumerate(candidates)}
+        row_index = {v: k for k, v in candidate_index.items()}
+        return csr_AnnotationMatrix(label_matrix, 
+                                    candidate_index=candidate_index,
+                                    row_index=row_index)
 
 
 class Babbler(BabbleStream):

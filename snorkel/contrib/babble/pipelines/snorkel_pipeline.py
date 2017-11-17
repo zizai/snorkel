@@ -20,9 +20,10 @@ from snorkel.annotations import (FeatureAnnotator, LabelAnnotator, save_marginal
 from snorkel.learning import GenerativeModel, MajorityVoter
 from snorkel.learning.structure import DependencySelector
 from snorkel.learning import reRNN, SparseLogisticRegression
+from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
-from utils import STAGES, PrintTimer, train_model, score_marginals, final_report
+from utils import STAGES, train_model, score_marginals, final_report
 
 TRAIN = 0
 DEV = 1
@@ -46,6 +47,9 @@ class SnorkelPipeline(object):
         self.gen_model = None
         self.disc_model = None
 
+        self.L_train = None
+        self.L_dev = None
+        self.L_test = None
 
     def run(self):
         def is_valid_stage(stage_id):
@@ -71,6 +75,19 @@ class SnorkelPipeline(object):
                     result = getattr(self, stage)()
 
         return result
+
+    def db_status(self):
+        num_docs = self.session.query(Document).count()
+        print("Documents: {}".format(num_docs))
+
+        num_candidates = [0] * 3
+        for split in [0,1,2]:
+            num_candidates[split] = self.session.query(self.candidate_class).filter(
+                self.candidate_class.split == split).count()
+        print("Candidates: {}".format(num_candidates))
+
+        # TODO:
+        # How to probe the number of features and gold labels without loading?
 
 
     def parse(self, doc_preprocessor, parser=Spacy(), fn=None, clear=True):
@@ -99,6 +116,7 @@ class SnorkelPipeline(object):
         
         if self.config['disc_model_class'] == 'lstm':
             print("Using disc_model_class='lstm'...skipping 'featurize' stage.")
+            return
 
         featurizer = FeatureAnnotator()
         for split in self.config['splits']:
@@ -108,7 +126,8 @@ class SnorkelPipeline(object):
                 F = featurizer.apply_existing(split=split, parallelism=self.config['parallelism'])
             num_candidates, num_features = F.shape
             if self.config['verbose']:
-                print("\nFeaturized split {}: ({},{}) sparse (nnz = {})".format(split, num_candidates, num_features, F.nnz))
+                print("Featurized split {}: ({},{}) sparse (nnz = {})".format(split, num_candidates, num_features, F.nnz))
+
 
     def collect(self):
         raise NotImplementedError
@@ -137,10 +156,12 @@ class SnorkelPipeline(object):
             print("In 'traditional' supervision mode...skipping 'supervise' stage.")
             return                
 
-        if getattr(self, 'L_train', None) is None:
-            self.L_train = load_label_matrix(self.session, split=TRAIN)
-        L_train = self.L_train
+        if self.L_train is None:
+            L_train = load_label_matrix(self.session, split=TRAIN)
+        else:
+            L_train = self.L_train
         assert L_train.nnz > 0
+
         L_gold_train = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
         if self.config['verbose']:
             print("Using L_train: {0}".format(L_train.__repr__()))
@@ -151,8 +172,12 @@ class SnorkelPipeline(object):
 
         # Load DEV and TEST labels and gold labels
         if DEV in self.config['splits']:
-            L_dev = load_label_matrix(self.session, split=DEV)
+            if self.L_dev is None:
+                L_dev = load_label_matrix(self.session, split=DEV)
+            else:
+                L_dev = self.L_dev            
             assert L_dev.nnz > 0
+
             L_gold_dev = load_gold_labels(self.session, annotator_name='gold', split=DEV)
             if self.config['verbose']:
                 print("Using L_dev: {0}".format(L_dev.__repr__()))
@@ -161,9 +186,14 @@ class SnorkelPipeline(object):
                 positive = float(sum(L_gold_dev.todense() == 1))
                 print("Positive Fraction: {:.1f}%\n".format(positive/total * 100))
             assert L_gold_dev.nonzero()[0].shape[0] > 0
+
         if TEST in self.config['splits']:
-            L_test = load_label_matrix(self.session, split=TEST)
-            assert L_test.nnz > 0
+            if self.L_test is None:
+                L_test = load_label_matrix(self.session, split=TEST)
+            else:
+                L_test = self.L_test            
+            assert L_test.nnz > 0            
+
             L_gold_test = load_gold_labels(self.session, annotator_name='gold', split=TEST)
             if self.config['verbose']:
                 print("Using L_test: {0}".format(L_test.__repr__()))
@@ -173,7 +203,7 @@ class SnorkelPipeline(object):
                 print("Positive Fraction: {:.1f}%\n".format(positive/total * 100))
             assert L_gold_test.nonzero()[0].shape[0] > 0
 
-        if self.config['supervision'] == 'majority_vote':
+        if self.config['supervision'] == 'majority':
             gen_model = MajorityVoter()
             train_marginals = gen_model.marginals(L_train)
 
@@ -181,10 +211,44 @@ class SnorkelPipeline(object):
 
             # Learn dependencies
             if self.config['learn_deps']:
-                ds = DependencySelector()
-                deps = ds.select(L_train, threshold=self.config['threshold'])
-                if self.config['verbose']:
-                    self.display_dependencies(deps)
+                if self.config['deps_thresh']:
+                    ds = DependencySelector()
+                    np.random.seed(self.config['seed'])
+                    deps = ds.select(L_train, threshold=config['deps_thresh'])
+                    if args.verbose > 0:
+                        print("Selected {0} dependencies.".format(len(deps)))
+
+                else:
+                    all_deps = []
+                    all_t = [0.02 + 0.02 * dep_t for dep_t in range(0, 25, 1)]
+
+                    # Iterates over selection thresholds
+                    with PrintTimer("Calculating optimal dependency threshold..."):
+                        pb = ProgressBar(len(all_t))
+                        for i, dep_t in enumerate(all_t):
+                            pb.bar(i)
+                            ds = DependencySelector()
+                            deps = ds.select(L_train, propensity=True, threshold=dep_t)
+                            all_deps.append(deps)
+
+                            if len(deps) == 0:
+                                break
+                        pb.close()
+
+                    # Selects point of approximate maximum curvature
+                    max_curvature = float('-Inf')
+                    i_max = None
+                    for i in range(1, len(all_deps) - 1):
+                        curvature = len(all_deps[i+1]) + len(all_deps[i-1]) \
+                                    - 2 * len(all_deps[i])
+                        if curvature > max_curvature:
+                            max_curvature = curvature
+                            i_max = i
+
+                    deps = all_deps[i_max]
+                    print("Selected threshold {0} for {1} dependencies."
+                            .format(all_t[i_max], len(deps)))
+
             else:
                 deps = ()
 
@@ -208,7 +272,7 @@ class SnorkelPipeline(object):
                 model_name='generative_{}'.format(self.config['domain']),
                 save_dir='checkpoints',
                 beta=self.config['gen_f_beta'],
-                tune_b=self.config['tune_b']
+                tune_b=self.config['tune_b'],
             )
             train_marginals = gen_model.marginals(L_train)
 
@@ -227,8 +291,8 @@ class SnorkelPipeline(object):
                     # Display marginals
                     plt.hist(train_marginals, bins=20)
                     plt.show()
-                if self.config['display_learned_accuracies']:
-                    raise NotImplementedError
+                # if self.config['display_learned_accuracies']:
+                    # raise NotImplementedError
                     # NOTE: Unfortunately, learned accuracies are not available after grid search
                     # lf_stats = L_dev.lf_stats(self.session, L_gold_dev, 
                     #     gen_model.learned_lf_stats()['Accuracy'])
@@ -284,16 +348,22 @@ class SnorkelPipeline(object):
         elif self.config['disc_model_class'] == 'logreg':
             disc_model_class = SparseLogisticRegression
 
-            X_train = load_feature_matrix(self.session, split=TRAIN)
             if self.config['supervision'] == 'traditional':
-                L_train_gold = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
-                Y_train = np.array(L_train_gold.todense()).reshape((L_train_gold.shape[0],))
+                print("In 'traditional' supervision mode...grabbing candidate and gold label subsets.")  
+                if self.config['traditional_split'] != TRAIN:
+                    print("NOTE: using split {} for traditional supervision. "
+                        "Be aware of unfair evaluation.".format(self.config['traditional_split']))
+                X_train = load_feature_matrix(self.session, 
+                                              split=self.config['traditional_split'])
+                L_gold = load_gold_labels(self.session, annotator_name='gold', 
+                                          split=self.config['traditional_split'])
+                Y_train = np.array(L_gold.todense()).reshape((L_gold.shape[0],))
                 Y_train[Y_train == -1] = 0
                 X_train, Y_train = self.traditional_supervision(X_train, Y_train)
             else:
+                X_train = load_feature_matrix(self.session, split=TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
                     else load_marginals(self.session, split=0))
-
 
             X_dev = load_feature_matrix(self.session, split=DEV)
             X_test = load_feature_matrix(self.session, split=TEST)
@@ -322,7 +392,8 @@ class SnorkelPipeline(object):
                 model_init_params=self.config['disc_init_params'],
                 model_name='discriminative_{}'.format(self.config['domain']),
                 save_dir='checkpoints',
-                eval_batch_size=self.config['disc_eval_batch_size']
+                eval_batch_size=self.config['disc_eval_batch_size'],
+                tune_b=self.config['tune_b'],
             )
         self.disc_model = disc_model
 
@@ -330,9 +401,15 @@ class SnorkelPipeline(object):
         with PrintTimer("[7.2] Evaluate generative model (opt_b={})".format(opt_b)):
             if self.gen_model is not None:
                 # Score generative model on test set
-                L_test = load_label_matrix(self.session, split=TEST)
+                if self.L_test is None:
+                    L_test = load_label_matrix(self.session, split=TEST)
+                else:
+                    L_test = self.L_test            
+                assert L_test.nnz > 0         
+
                 np.random.seed(self.config['seed'])
-                self.scores['Gen'] = score_marginals(self.gen_model.marginals(L_test), Y_test, b=opt_b)
+                self.scores['Gen'] = score_marginals(
+                    self.gen_model.marginals(L_test), Y_test, b=opt_b)
             else:
                 print("gen_model is undefined. Skipping.")
 

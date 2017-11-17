@@ -71,13 +71,16 @@ class Grammar(object):
         """
         # Tokenize input string
         # string = string.lower()
+        assert(isinstance(string, unicode))
         if string.endswith('.'):
             string = string[:-1]
         string = re.sub(r'\s+', ' ', string)
         output = self.parser.parse(None, string).next()
+        # convert back to unicode after spacy converts to str
+        output['words'] = [w.decode(errors='ignore') for w in output['words']]
         tokens = map(lambda x: dict(zip(['word', 'pos', 'ner'], x)), 
                      zip(output['words'], output['pos_tags'], output['ner_tags']))
-        
+
         # Lowercase all non-quoted words; doesn't handle nested quotes
         quoting = False
         for token in tokens:
@@ -92,13 +95,6 @@ class Grammar(object):
         tokens = [start] + tokens + [stop]
         words = [t['word'] for t in tokens]
         self.words = words # (for print_chart)
-        
-        # ABANDONED:
-        # Add temporary string rules
-        # if self.string_format == 'implicit':
-        #     for word in words:
-        #         if word not in stopwords:
-        #             self.add_rule(Rule('$String', word, ('.string', word))))
 
         chart = defaultdict(list)
         for j in range(1, len(tokens) + 1):
@@ -285,20 +281,32 @@ class Grammar(object):
         def recurse(sem):
             if isinstance(sem, tuple):
                 if sem[0] in self.translate_ops:
-                    op = self.translate_ops[sem[0]]
-                    args_ = [recurse(arg) for arg in sem[1:]]
+                    op = self.translate_ops[sem[0]] # op is a lambda function
+                    # For these types, leave func as the name of the function
+                    if sem[0] in ['.composite_or', '.composite_and']:
+                        args_ = [sem[1][0]]
+                        args_.extend([recurse(arg) for arg in sem[2:]])
+                    elif sem[0] in ['.map']:
+                        func = sem[1]
+                        if len(func) == 1:
+                            args_ = ['{}'.format(func[0])]
+                        else:
+                            args_ = [recurse(func)]
+                        args_.extend([recurse(arg) for arg in sem[2:]])
+                    else:
+                        args_ = [recurse(arg) for arg in sem[1:]]
                     return op(*args_) if args_ else op
                 else:
-                    return str(sem)
+                    return unicode(sem)
             else:
-                return str(sem)
+                return unicode(sem)
         return recurse(sem)
 
     def print_grammar(self):
         def all_rules(rule_index):
             return [rule for rules in list(rule_index.values()) for rule in rules]
         def print_rules_sorted(rules):
-            for s in sorted([str(rule) for rule in rules]):
+            for s in sorted([unicode(rule) for rule in rules]):
                 print('  ' + s)
         print('Lexical rules:')
         print_rules_sorted(all_rules(self.lexical_rules))

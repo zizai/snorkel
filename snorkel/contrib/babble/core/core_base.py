@@ -15,17 +15,18 @@ lexical_rules = (
     [Rule('$And', w, '.and') for w in ['and']] +
     [Rule('$Or', w, '.or') for w in ['or', 'nor']] +
     [Rule('$Not', w, '.not') for w in ['not', "n't"]] +
-    [Rule('$All', w, '.all') for w in ['all']] +
-    [Rule('$Any', w, '.any') for w in ['any', 'a']] +
+    [Rule('$All', w, '.all') for w in ['all', 'both']] +
+    [Rule('$Any', w, '.any') for w in ['any', 'a', 'one of']] +
     [Rule('$None', w, '.none') for w in ['none', 'not any', 'neither', 'no']] +
     [Rule('$Is', w) for w in ['is', 'are', 'be', 'comes', 'appears', 'occurs']] +
     [Rule('$Exists', w) for w in ['exist', 'exists']] +
     [Rule('$Int', w, ('.int', 0)) for w in ['no']] +
     [Rule('$Int', w,  ('.int', 1)) for w in ['immediately', 'right']] +
+    [Rule('$Int', w,  ('.int', -1)) for w in ['last', 'final', 'ending']] +
     [Rule('$AtLeastOne', w, ('.geq', ('.int', 1))) for w in ['a', 'another']] +
     [Rule('$Because', w) for w in ['because', 'since', 'if']] +
     [Rule('$Equals', w, '.eq') for w in ['equal', 'equals', '=', '==', 'same', 'identical', 'exactly']] + 
-    [Rule('$NotEquals', w, '.neq') for w in ['different']] + 
+    [Rule('$NotEquals', w, '.neq') for w in ['different ?than']] + 
     [Rule('$LessThan', w, '.lt') for w in ['less than', 'smaller than', '<']] +
     [Rule('$AtMost', w, '.leq') for w in ['at most', 'no larger than', 'less than or equal', 'within', 'no more than', '<=']] +
     [Rule('$AtLeast', w, '.geq') for w in ['at least', 'no less than', 'no smaller than', 'greater than or equal', '>=']] +
@@ -40,7 +41,8 @@ lexical_rules = (
     [Rule('$CID', w, '.cid') for w in ['cid', 'cids', 'canonical id', 'canonical ids']] +
     [Rule('$ArgNum', w, ('.int', 1)) for w in ['one', '1']] +
     [Rule('$ArgNum', w, ('.int', 2)) for w in ['two', '2']] +
-    [Rule('$ArgXListAnd', w, ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))) for w in ['them']]
+    [Rule('$ArgXListAnd', w, ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))) for w in ['them', 'entities']] +
+    [Rule('$EachOther', w) for w in ['eachother', 'each other']]
 )
 
 unary_rules = [
@@ -54,6 +56,7 @@ unary_rules = [
     Rule('$Exists', '$Is'),
     Rule('$Equals', '$Is ?$Equals', '.eq'),
     Rule('$NotEquals', '$Equals $Not', '.neq'),
+    Rule('$NotEquals', '$Is $NotEquals', '.neq'),
     Rule('$Compare', '$Equals', sems0),
     Rule('$Compare', '$NotEquals', sems0),
     Rule('$Compare', '$LessThan', sems0),
@@ -90,6 +93,7 @@ compositional_rules = [
     Rule('$ArgX', '$Arg $ArgNum', sems_in_order),
     Rule('$ArgXListAnd', '$ArgX $And $ArgX', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))),
     Rule('$ArgXListOr', '$ArgX $Or $ArgX', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))),
+    # Rule('$Bool', '$ArgListAnd $Equals', lambda ('.allequal', sems))
 ]
 
 # template_rules = []
@@ -106,7 +110,7 @@ ops = {
     '.label': lambda x, y: lambda c: (1 if x(c)==True else -1) if y(c)==True else 0,
     # primitives
     '.bool': lambda x: lambda c: x,
-    '.string': lambda x: lambda c: x.encode('utf-8'),
+    '.string': lambda x: lambda c: x,
     '.int': lambda x: lambda c: x,
     # lists
     '.tuple': lambda x: lambda c: tuple(x(c)),
@@ -116,9 +120,12 @@ ops = {
     '.map': lambda func_, list_: lambda cxy: [func_(cxy)(lambda c: yi)(cxy) for yi in list_(cxy)],
         # call a 'hungry' evaluated function on one or more arguments
     '.call': lambda *x: lambda c: x[0](c)(x[1])(c), #TODO: extend to more than one argument?
-        # apply an element to a list of functions (then call 'any' or 'all' to convert to boolean)
-    '.composite_and': lambda x, y: lambda cxy: lambda z: lambda cz: all([x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)]),
-    '.composite_or':  lambda x, y: lambda cxy: lambda z: lambda cz: any([x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)]),
+        # apply a list of hungry functions to an element, then call 'any' or 'all' to convert to boolean
+    '.composite_and': lambda x, y: lambda cxy: lambda z: lambda cz: all(x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)),
+    '.composite_or':  lambda x, y: lambda cxy: lambda z: lambda cz: any(x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)),
+        # apply a list of full functions to an element, then call 'any' or 'all' to convert to boolean
+    '.composite_and_func': lambda funclist: lambda cx: lambda z: lambda cz: all(func(z)(cz)==True for func in funclist(cx)),
+    '.composite_or_func': lambda funclist: lambda cx: lambda z: lambda cz: any(func(z)(cz)==True for func in funclist(cx)),
     # logic
         # NOTE: and/or expect individual inputs, not/all/any/none expect a single iterable of inputs
     '.and': lambda x, y: lambda c: x(c)==True and y(c)==True, 
@@ -140,6 +147,7 @@ ops = {
     '.count': lambda x: lambda c: len(x(c)),
     '.sum': lambda x: lambda c: sum(x(c)),
     '.intersection': lambda x, y: lambda c: list(set(x(c)).intersection(y(c))),
+    '.all_equal': lambda list_: lambda c: (lambda mylist: all(mylist[0] == elem for elem in mylist))(list_(c)),
     # context
     '.arg': lambda x: lambda c: c['candidate'][x(c) - 1],
     }
@@ -148,15 +156,22 @@ ops = {
 translate_ops = {
     '.root': lambda LF: LF,
     '.label': lambda label, cond: "return {} if {} else 0".format(1 if label else -1, cond),
+    
     '.bool': lambda bool_: bool_=='True',
     '.string': lambda str_: "'{}'".format(str_),
     '.int': lambda int_: int(int_),
     
     '.tuple': lambda list_: "tuple({})".format(list_),
     '.list': lambda *elements: "[{}]".format(','.join(x.encode('utf-8') for x in elements)),
-    '.user_list': lambda name: "${}$".format(name.encode('utf-8')),
-    '.map': lambda func_, list_: "map({}, {})".format(func_, list_),
-    '.call': lambda func_, args_: "call({}, {})".format(func_, args_),
+    '.user_list': lambda name: "user_list({})".format(name.encode('utf-8')),
+    '.map': lambda func_, list_: "[s.{} for s in {}]".format(
+        func_[1:] if func_.startswith('.') else func_, list_),
+    '.call': lambda func_, args_: "{}.{}".format(args_, func_),
+
+    '.composite_and': lambda func_, args_: "({}(z) for all z in {})".format(func_, args_),
+    '.composite_or': lambda func_, args_: "({}(u) for at least one u in {})".format(func_, args_),
+    '.composite_and_func': lambda func_list: "(all({}))".format(func_list),
+    '.composite_or_func': lambda func_list: "(any({}))".format(func_list), 
 
     '.and': lambda x, y: "({} and {})".format(x, y),
     '.or': lambda x, y: "({} or {})".format(x, y),
@@ -165,23 +180,21 @@ translate_ops = {
     '.any': lambda x: "any({})".format(x),
     '.none': lambda x: "not any({})".format(x),
 
-    # '.composite_and': lambda func_, list_: "all(map({}, {}))".format(func_, list_),
-    # '.composite_or':  lambda x, y, z: lambda cz: any([x(lambda c: yi)(cxy)(z)(cz)==True for yi in y(cxy)]),
-
+    '.eq': lambda x: "(= {})".format(x),
+    '.neq': lambda x: "(!= {})".format(x),
     '.lt': lambda x: "(< {})".format(x),
     '.leq': lambda x: "(<= {})".format(x),
-    '.eq': lambda x: "(= {})".format(x),
     '.geq': lambda x: "(>= {})".format(x),
     '.gt': lambda x: "(> {})".format(x),
 
-    '.arg': lambda int_: "arg{}".format(int_),
-    '.arg_to_string': lambda arg_: "text({})".format(arg_),
-    '.cid': lambda arg_: "cid({})".format(arg_),
-
-    '.in': lambda rhs: "in {}".format(rhs),
+    '.in': lambda rhs: "in({})".format(rhs),
     '.contains': lambda rhs: "contains({})".format(rhs),
     '.count': lambda list_: "count({})".format(list_),
     '.sum': lambda arg_: "sum({})".format(arg_),
+    '.intersection': lambda arg_: "intersection({})".format(arg_),
+    '.all_equal': lambda list_: "all_equal({})".format(list_),
+
+    '.arg': lambda int_: ["X", "Y"][int_ - 1],
 }
 
 

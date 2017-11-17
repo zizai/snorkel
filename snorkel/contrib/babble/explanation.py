@@ -1,3 +1,5 @@
+import re
+
 class Explanation(object):
     def __init__(self, condition, label, candidate=None, name=None, 
                  semantics=None, paraphrase=None):
@@ -17,6 +19,8 @@ class Explanation(object):
         :param paraphrase: A paraphrase of the explanation.
         """
         assert(isinstance(condition, basestring))
+        condition = condition.decode('utf-8')
+        condition = re.sub('\s+', ' ', condition, flags=re.UNICODE)
         self.condition = condition
         assert(isinstance(label, bool))
         self.label = label
@@ -24,6 +28,9 @@ class Explanation(object):
         self.name = name
         self.semantics = semantics
         self.paraphrase = paraphrase
+
+    def __hash__(self):
+        return hash((self.label, self.condition))
 
     def __repr__(self):
         if self.name:
