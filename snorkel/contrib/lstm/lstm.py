@@ -5,6 +5,7 @@ import warnings
 
 from snorkel.learning.disc_learning import TFNoiseAwareModel
 from utils import *
+from layers import *
 from six.moves.cPickle import dump, load
 from time import time
 
@@ -38,7 +39,7 @@ class LSTM(TFNoiseAwareModel):
             map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
         data = []
         for candidate in candidates:
-            # Mark sentence based on cadinality of relation
+            # Mark sentence based on cardinality of relation
             if len(candidate) == 2:
                 args = [
                     (candidate[0].get_word_start(), candidate[0].get_word_end(), 1),
@@ -51,7 +52,7 @@ class LSTM(TFNoiseAwareModel):
             # Either extend word table or retrieve from it
             f = self.word_dict.get if extend else self.word_dict.lookup
             data.append(np.array(map(f, s)))
-        return data
+        return np.array(data)
 
     def _check_max_sentence_length(self, ends, max_len=None):
         """Check that extraction arguments are within @self.max_len"""
@@ -146,7 +147,7 @@ class LSTM(TFNoiseAwareModel):
 
         f.close()
 
-    def train_model(self, model, optimizer, criterion, x, y):
+    def train_model(self, model, optimizer, criterion, x, x_mask, y):
         """Train LSTM model"""
         model.train()
         batch_size, max_sent = x.size()
@@ -154,9 +155,10 @@ class LSTM(TFNoiseAwareModel):
         optimizer.zero_grad()
         if self.host_device in self.gpu:
             x = x.cuda()
+            x_mask = x_mask.cuda()
             y = y.cuda()
             state_word = (state_word[0].cuda(), state_word[1].cuda())
-        y_pred = model(x.transpose(0, 1), state_word)
+        y_pred = model(x, x_mask, state_word)
         if self.host_device in self.gpu:
             loss = criterion(y_pred.cuda(), y)
         else:
@@ -238,7 +240,6 @@ class LSTM(TFNoiseAwareModel):
 
     def train(self, X_train, Y_train, X_dev=None, Y_dev=None, print_freq=5, dev_ckpt=True,
               dev_ckpt_delay=0.75, save_dir='checkpoints', **kwargs):
-
         """
         Perform preprocessing of data, construct dataset-specific model, then
         train.
@@ -296,7 +297,6 @@ class LSTM(TFNoiseAwareModel):
             if verbose:
                 print "Done loading pre-trained embeddings..."
 
-        X_train = np.array(X_train)
         Y_train = torch.from_numpy(Y_train).float()
 
         X = torch.from_numpy(np.arange(len(X_train)))
@@ -304,12 +304,14 @@ class LSTM(TFNoiseAwareModel):
         train_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
         n_classes = 1 if self.cardinality == 2 else None
-        self.model = AttentionRNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
-                                  embed_size=self.word_emb_dim,
-                                  lstm_hidden=self.lstm_hidden_dim,
-                                  attention=self.attention,
-                                  dropout=self.dropout,
-                                  bidirectional=True)
+        self.model = RNN(n_classes=n_classes, batch_size=self.batch_size, num_tokens=self.word_dict.s,
+                         embed_size=self.word_emb_dim,
+                         lstm_hidden=self.lstm_hidden_dim,
+                         attention=self.attention,
+                         dropout=self.dropout,
+                         bidirectional=True,
+                         use_cuda=self.host_device in self.gpu)
+
         if self.load_emb:
             self.model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
 
@@ -327,9 +329,9 @@ class LSTM(TFNoiseAwareModel):
         for idx in range(self.n_epochs):
             cost = 0.
             for x, y in train_loader:
-                x = pad_batch(X_train[x.numpy()], self.max_sentence_length)
+                x, x_mask = pad_batch(X_train[x.numpy()], self.max_sentence_length)
                 y = Variable(y.float(), requires_grad=False)
-                cost += self.train_model(self.model, optimizer, loss, x, y)
+                cost += self.train_model(self.model, optimizer, loss, x, x_mask, y)
 
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
@@ -361,7 +363,6 @@ class LSTM(TFNoiseAwareModel):
         """Predict class based on user input"""
         self.model.eval()
         X_w = self._preprocess_data(X, extend=False)
-        X_w = np.array(X_w)
         sigmoid = nn.Sigmoid()
 
         y = np.array([])
@@ -371,13 +372,14 @@ class LSTM(TFNoiseAwareModel):
         data_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
         for x, _ in data_loader:
-            x_w = pad_batch(X_w[x.numpy()], self.max_sentence_length)
+            x_w, x_w_mask = pad_batch(X_w[x.numpy()], self.max_sentence_length)
             batch_size, max_sent = x_w.size()
             w_state_word = self.model.init_hidden(batch_size)
             if self.host_device in self.gpu:
                 x_w = x_w.cuda()
+                x_w_mask = x_w_mask.cuda()
                 w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
-            y_pred = self.model(x_w.transpose(0, 1), w_state_word)
+            y_pred = self.model(x_w, x_w_mask, w_state_word)
             if self.host_device in self.gpu:
                 y = np.append(y, sigmoid(y_pred).data.cpu().numpy())
             else:
