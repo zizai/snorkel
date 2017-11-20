@@ -9,6 +9,7 @@ from torch.autograd import Variable
 from snorkel.learning.disc_learning import TFNoiseAwareModel
 from snorkel.learning.utils import reshape_marginals, LabelBalancer
 from utils import *
+from layers import *
 from six.moves.cPickle import dump, load
 from time import time
 
@@ -22,7 +23,7 @@ class WCLSTM(TFNoiseAwareModel):
     # Set unknown
     unknown_symbol = 1
 
-    """LSTM for relation extraction"""
+    """Hierarchy Bi-LSTM for relation extraction"""
 
     def _preprocess_data(self, candidates, extend=False):
         """Convert candidate sentences to lookup sequences
@@ -38,13 +39,12 @@ class WCLSTM(TFNoiseAwareModel):
         if not hasattr(self, 'char_dict'):
             self.char_dict = SymbolTable()
             # Add paddings for chars
-            map(self.char_dict.get, ['<', '>'])
+            map(self.char_dict.get, self.char_marker)
 
         word_seq_data = []
         char_seq_data = []
         for candidate in candidates:
-
-            # Mark sentence based on cadinality of relation
+            # Mark sentence based on cardinality of relation
             if len(candidate) == 2:
                 args = [
                     (candidate[0].get_word_start(), candidate[0].get_word_end(), 1),
@@ -58,6 +58,7 @@ class WCLSTM(TFNoiseAwareModel):
             f = self.word_dict.get if extend else self.word_dict.lookup
             word_seq_data.append(np.array(map(f, s)))
 
+            # Either extend char table or retrieve from it
             g = self.char_dict.get if extend else self.char_dict.lookup
             char_seq = []
             for w in s:
@@ -67,7 +68,7 @@ class WCLSTM(TFNoiseAwareModel):
                     word_char_seq.append(word[i:i + self.char_gram])
                 char_seq.append(np.array(map(g, word_char_seq)))
             char_seq_data.append(char_seq)
-        return word_seq_data, char_seq_data
+        return np.array(word_seq_data), np.array(char_seq_data)
 
     def _check_max_sentence_length(self, ends, max_len=None):
         """Check that extraction arguments are within @self.max_len"""
@@ -92,7 +93,7 @@ class WCLSTM(TFNoiseAwareModel):
             self.char_dict_all = {}
 
             # Add paddings for chars
-            map(self.char_dict_all.get, ['<', '>'])
+            map(self.char_dict_all.get, self.char_marker)
 
         # Initialize training vocabulary
         for candidate in splits["train"]:
@@ -124,7 +125,7 @@ class WCLSTM(TFNoiseAwareModel):
         map(self.word_dict.get, ['~~[[1', '1]]~~', '~~[[2', '2]]~~'])
 
         # Add paddings for chars
-        map(self.char_dict.get, ['<', '>'])
+        map(self.char_dict.get, self.char_marker)
 
         # Word embeddings
         f = open(self.word_emb_path, 'r')
@@ -208,17 +209,19 @@ class WCLSTM(TFNoiseAwareModel):
                     [float(_) for _ in line[-self.char_emb_dim:]])
         f.close()
 
-    def train_model(self, w_model, c_model, optimizer, criterion, x_w, x_c, y):
+    def train_model(self, w_model, c_model, optimizer, criterion, x_w, x_w_mask, x_c, x_c_mask, y):
         """Train LSTM model"""
         w_model.train()
         c_model.train()
-        max_sent, batch_size, max_token = x_c.size()
+        batch_size, max_sent, max_token = x_c.size()
         w_state_word = w_model.init_hidden(batch_size)
         c_state_word = c_model.init_hidden(batch_size)
 
         if self.host_device in self.gpu:
             x_w = x_w.cuda()
+            x_w_mask = x_w_mask.cuda()
             x_c = x_c.cuda()
+            x_c_mask = x_c_mask.cuda()
             y = y.cuda()
             w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
             c_state_word = (c_state_word[0].cuda(), c_state_word[1].cuda())
@@ -226,10 +229,11 @@ class WCLSTM(TFNoiseAwareModel):
         optimizer.zero_grad()
         s = None
         for i in xrange(max_sent):
-            _s = c_model(x_c[i, :, :].transpose(0, 1), c_state_word)
+            _s = c_model(x_c[:, i, :], x_c_mask[:, i, :], c_state_word)
             _s = _s.unsqueeze(0)
             s = _s if s is None else torch.cat((s, _s), 0)
-        y_pred = w_model(x_w, s, w_state_word)
+        s = s.transpose(0, 1)
+        y_pred = w_model(x_w, x_w_mask, s, w_state_word)
 
         if self.host_device in self.gpu:
             loss = criterion(y_pred.cuda(), y)
@@ -388,8 +392,6 @@ class WCLSTM(TFNoiseAwareModel):
 
             print "Done loading pre-trained embeddings..."
 
-        X_w_train = np.array(X_w_train)
-        X_c_train = np.array(X_c_train)
         Y_train = torch.from_numpy(Y_train).float()
 
         X = torch.from_numpy(np.arange(len(X_w_train)))
@@ -398,34 +400,28 @@ class WCLSTM(TFNoiseAwareModel):
 
         n_classes = 1 if self.cardinality == 2 else None
 
-        self.char_model = AttentionCharRNN(batch_size=self.batch_size, num_tokens=self.char_dict.s,
-                                           embed_size=self.char_emb_dim,
-                                           lstm_hidden=self.lstm_hidden_dim,
-                                           attention=self.attention,
-                                           dropout=self.dropout,
-                                           bidirectional=self.bidirectional)
+        self.char_model = CharRNN(batch_size=self.batch_size, num_tokens=self.char_dict.s,
+                                  embed_size=self.char_emb_dim,
+                                  lstm_hidden=self.lstm_hidden_dim,
+                                  attention=self.attention,
+                                  dropout=self.dropout,
+                                  bidirectional=self.bidirectional,
+                                  use_cuda=self.host_device in self.gpu)
         if self.load_emb:
             # Set pre-trained embedding weights
             self.char_model.lookup.weight.data.copy_(torch.from_numpy(self.char_emb))
 
-        if self.bidirectional:
-            self.word_model = AttentionWordRNN(n_classes=n_classes, batch_size=self.batch_size,
-                                               num_tokens=self.word_dict.s,
-                                               embed_size=self.word_emb_dim,
-                                               input_size=self.word_emb_dim + 2 * self.lstm_hidden_dim,
-                                               lstm_hidden=self.lstm_hidden_dim,
-                                               attention=self.attention,
-                                               dropout=self.dropout,
-                                               bidirectional=True)
-        else:
-            self.word_model = AttentionWordRNN(n_classes=n_classes, batch_size=self.batch_size,
-                                               num_tokens=self.word_dict.s,
-                                               embed_size=self.word_emb_dim,
-                                               input_size=self.word_emb_dim + self.lstm_hidden_dim,
-                                               lstm_hidden=self.lstm_hidden_dim,
-                                               attention=self.attention,
-                                               dropout=self.dropout,
-                                               bidirectional=False)
+        b = 2 if self.bidirectional else 1
+        self.word_model = WordRNN(n_classes=n_classes, batch_size=self.batch_size,
+                                  num_tokens=self.word_dict.s,
+                                  embed_size=self.word_emb_dim,
+                                  input_size=self.word_emb_dim + b * self.lstm_hidden_dim,
+                                  lstm_hidden=self.lstm_hidden_dim,
+                                  attention=self.attention,
+                                  dropout=self.dropout,
+                                  bidirectional=self.bidirectional,
+                                  use_cuda=self.host_device in self.gpu)
+
         if self.load_emb:
             # Set pre-trained embedding weights
             self.word_model.lookup.weight.data.copy_(torch.from_numpy(self.word_emb))
@@ -446,10 +442,10 @@ class WCLSTM(TFNoiseAwareModel):
         for idx in range(self.n_epochs):
             cost = 0.
             for x, y in data_loader:
-                x_w, x_c = pad_batch(X_w_train[x.numpy()], X_c_train[x.numpy()],
-                                     self.max_sentence_length, self.max_word_length)
+                x_w, x_w_mask, x_c, x_c_mask = pad_batch(X_w_train[x.numpy()], X_c_train[x.numpy()],
+                                                         self.max_sentence_length, self.max_word_length)
                 y = Variable(y.float(), requires_grad=False)
-                cost += self.train_model(self.word_model, self.char_model, optimizer, loss, x_w, x_c, y)
+                cost += self.train_model(self.word_model, self.char_model, optimizer, loss, x_w, x_w_mask, x_c, x_c_mask, y)
             if verbose and ((idx + 1) % print_freq == 0 or idx + 1 == self.n_epochs):
                 msg = "[%s] Epoch %s, Training error: %s" % (self.name, idx + 1, cost / n_examples)
                 if X_dev is not None:
@@ -482,8 +478,6 @@ class WCLSTM(TFNoiseAwareModel):
         self.word_model.eval()
 
         X_w, X_c = self._preprocess_data(X, extend=False)
-        X_w = np.array(X_w)
-        X_c = np.array(X_c)
         sigmoid = nn.Sigmoid()
 
         y = np.array([])
@@ -493,24 +487,27 @@ class WCLSTM(TFNoiseAwareModel):
         data_loader = data_utils.DataLoader(data_set, batch_size=self.batch_size, shuffle=False)
 
         for x, _ in data_loader:
-            x_w, x_c = pad_batch(X_w[x.numpy()], X_c[x.numpy()], self.max_sentence_length,
-                                 self.max_word_length)
-            max_sent, batch_size, max_token = x_c.size()
+            x_w, x_w_mask, x_c, x_c_mask = pad_batch(X_w[x.numpy()], X_c[x.numpy()], self.max_sentence_length,
+                                                     self.max_word_length)
+            batch_size, max_sent, max_token = x_c.size()
             w_state_word = self.word_model.init_hidden(batch_size)
             c_state_word = self.char_model.init_hidden(batch_size)
 
             if self.host_device in self.gpu:
                 x_w = x_w.cuda()
+                x_w_mask = x_w_mask.cuda()
                 x_c = x_c.cuda()
+                x_c_mask = x_c_mask.cuda()
                 w_state_word = (w_state_word[0].cuda(), w_state_word[1].cuda())
                 c_state_word = (c_state_word[0].cuda(), c_state_word[1].cuda())
 
             s = None
             for i in xrange(max_sent):
-                _s = self.char_model(x_c[i, :, :].transpose(0, 1), c_state_word)
+                _s = self.char_model(x_c[:, i, :], x_c_mask[:, i, :], c_state_word)
                 _s = _s.unsqueeze(0)
                 s = _s if s is None else torch.cat((s, _s), 0)
-            y_pred = self.word_model(x_w, s, w_state_word)
+            s = s.transpose(0, 1)
+            y_pred = self.word_model(x_w, x_w_mask, s, w_state_word)
             if self.host_device in self.gpu:
                 y = np.append(y, sigmoid(y_pred).data.cpu().numpy())
             else:
