@@ -8,6 +8,7 @@ from scipy.sparse import csr_matrix, coo_matrix
 import scipy.sparse as sparse
 
 from snorkel.annotations import LabelAnnotator, load_gold_labels, csr_AnnotationMatrix
+from snorkel.learning import MajorityVoter
 from snorkel.learning.utils import MentionScorer
 from snorkel.lf_helpers import test_LF
 from snorkel.utils import (
@@ -25,6 +26,7 @@ from snorkel.utils import (
 from snorkel.contrib.babble.filter_bank import FilterBank
 from snorkel.contrib.babble.grammar import Parse
 from snorkel.contrib.babble.semparser import Explanation, SemanticParser
+from snorkel.contrib.babble.utils import score_marginals
 
 
 ConfusionMatrix = namedtuple('ConfusionMatrix', ['correct', 'incorrect', 'abstained'])
@@ -188,7 +190,7 @@ class BabbleStream(object):
         self.user_lists.update(new_user_lists)
         self._build_semparser()
 
-    def preload(self, explanations=None, user_lists=None):
+    def preload(self, explanations=None, user_lists=None, label_others=True):
         """
         Load and commit the provided user_lists and/or explanations.
         """
@@ -199,8 +201,9 @@ class BabbleStream(object):
             if parses:
                 self.commit()
             # Also label train and test
-            self.label_split(0)
-            self.label_split(2)
+            if label_others:
+                self.label_split(0)
+                self.label_split(2)
 
     def apply(self, explanations, split=1, parallelism=1):
         """
@@ -283,12 +286,12 @@ class BabbleStream(object):
                 conf_matrix = (ConfusionMatrix(tp, fp, set(self.dev_candidates) - tp - fp))
                 accuracy = Accuracy(TP, TP + FP)
                 coverage = Coverage(TP + FP, self.num_dev_total)
-                class_coverage = ClassCoverage(TP + FP, self.num_dev_pos)
+                class_coverage = ClassCoverage(TP, self.num_dev_pos)
             elif TN or FN:
                 conf_matrix = (ConfusionMatrix(tn, fn, set(self.dev_candidates) - tn - fn))
                 accuracy = Accuracy(TN, TN + FN)
                 coverage = Coverage(TN + FN, self.num_dev_total)
-                class_coverage = ClassCoverage(TN + FN, self.num_dev_neg)
+                class_coverage = ClassCoverage(TN, self.num_dev_neg)
             else:
                 conf_matrix = ConfusionMatrix(set(), set(), set(self.dev_candidates))
                 accuracy = Accuracy(0, self.num_dev_total)
@@ -436,9 +439,11 @@ class BabbleStream(object):
             cols = []
             data = []
             pb = ProgressBar(len(candidates) * len(lfs))
+            count = 0
             for j, lf in enumerate(lfs):
                 for i, c in enumerate(candidates):
-                    pb.bar(i)
+                    pb.bar(count)
+                    count += 1
                     label = lf(c)
                     if label:
                         rows.append(i)
@@ -454,6 +459,21 @@ class BabbleStream(object):
             self.label_triples[split][4] += len(lfs)
             print("Stored {} triples for split {}. Now shape is ({}, {}).".format(
                 len(data), split, self.label_triples[split][3], self.label_triples[split][4]))
+
+    def get_majority_quality(self, split=1):
+        """Calculates the quality on the dev set using simple majority vote."""
+        majority_voter = MajorityVoter()
+
+        L_split = self.get_label_matrix(split=split)
+        if not L_split.nnz:
+            print("Cannot calculate majority quality for split {} because label "
+                "matrix is empty.".format(split))
+            return None
+        
+        Y_split = load_gold_labels(self.session, annotator_name='gold', split=split)
+        
+        pr, re, f1, cov = score_marginals(majority_voter.marginals(L_split), Y_split)
+        return (f1, pr, re)
 
     def get_global_coverage(self):
         """Calculate stats for the dataset as a whole.

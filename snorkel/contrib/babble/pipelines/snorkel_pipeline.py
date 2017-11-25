@@ -23,7 +23,8 @@ from snorkel.learning import reRNN, SparseLogisticRegression
 from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
-from utils import STAGES, train_model, score_marginals, final_report
+from snorkel.contrib.babble.utils import train_model, score_marginals
+from utils import STAGES, final_report
 
 TRAIN = 0
 DEV = 1
@@ -254,7 +255,7 @@ class SnorkelPipeline(object):
 
             # Pass in the dependencies via default params
             gen_params_default = self.config['gen_params_default']
-            gen_params_default['deps'] = deps
+            gen_params_default['deps'] = list(deps)
 
             # Train generative model with grid search if applicable
             gen_model, opt_b = train_model(
@@ -280,9 +281,9 @@ class SnorkelPipeline(object):
             tp, fp, tn, fn = gen_model.error_analysis(self.session, L_dev, L_gold_dev, b=opt_b, display=True)
             
             # Record generative model performance
-            precision = float(len(tp))/float(len(tp) + len(fp))
-            recall = float(len(tp))/float(len(tp) + len(fn))
-            f1 = float(2 * precision * recall)/(precision + recall)
+            precision = float(len(tp))/float(len(tp) + len(fp)) if len(tp) + len(fp) else 0
+            recall = float(len(tp))/float(len(tp) + len(fn)) if len(tn) + len(fn) else 0
+            f1 = float(2 * precision * recall)/(precision + recall) if (precision or recall) else 0
             self.scores = {}
             self.scores['Gen'] = [precision, recall, f1]
 
@@ -326,17 +327,19 @@ class SnorkelPipeline(object):
             disc_model_class = reRNN
 
             if self.config['supervision'] == 'traditional':
-                print("Warning: this may be broken; apply Paroma fix ASAP!")
-                raise NotImplementedError
 
                 print("In 'traditional' supervision mode...grabbing candidate and gold label subsets.")  
                 if self.config['traditional_split'] != TRAIN:
                     print("NOTE: using split {} for traditional supervision. "
                         "Be aware of unfair evaluation.".format(self.config['traditional_split']))
+                
                 candidates = self.get_candidates(split=self.config['traditional_split'])
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
-                X_train, Y_train = self.traditional_supervision(candidates, L_gold)
+                Y_train = np.array(L_gold.todense()).reshape((L_gold.shape[0],))
+                Y_train[Y_train == -1] = 0
+
+                X_train, Y_train = self.traditional_supervision(candidates, Y_train)
             else:
                 X_train = self.get_candidates(TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
@@ -349,16 +352,20 @@ class SnorkelPipeline(object):
             disc_model_class = SparseLogisticRegression
 
             if self.config['supervision'] == 'traditional':
+                
                 print("In 'traditional' supervision mode...grabbing candidate and gold label subsets.")  
                 if self.config['traditional_split'] != TRAIN:
                     print("NOTE: using split {} for traditional supervision. "
                         "Be aware of unfair evaluation.".format(self.config['traditional_split']))
+                
                 X_train = load_feature_matrix(self.session, 
                                               split=self.config['traditional_split'])
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
+
                 Y_train = np.array(L_gold.todense()).reshape((L_gold.shape[0],))
                 Y_train[Y_train == -1] = 0
+                
                 X_train, Y_train = self.traditional_supervision(X_train, Y_train)
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
@@ -457,7 +464,7 @@ class SnorkelPipeline(object):
         selected = sorted(np.random.permutation(total_size)[:train_size])
         Y_out = Y[selected]
         if isinstance(X, list):
-            X_out = [c for i, c in enumerate(candidates) if i in set(selected)]
+            X_out = [c for i, c in enumerate(X) if i in set(selected)]
         else:
             X_out = X[selected]
         return X_out, Y_out
