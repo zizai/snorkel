@@ -18,11 +18,9 @@ from snorkel.contrib.babble import BabbleStream
 from snorkel.lf_helpers import *
 from tutorials.babble.spouse.spouse_examples import get_explanations, get_user_lists
 import sys  
-
 reload(sys)  
 sys.setdefaultencoding('utf8')
 
-#----------# NOTES #----------#
 
 class ExplanationForm(FlaskForm):
 	explanation = TextAreaField('Explanation', [validators.DataRequired()])
@@ -71,59 +69,89 @@ def sentence_html(c):
 	return html
 
 def apply_filtered_analysis(filtered_parses, translator):
-	sent_tmpl = u'<dl class="row">{}</dl>'
+	row_tmpl = u'<dl class="row">{}</dl>'
+	dt_header_tmpl = u'<dt class="col-sm-12">{}</dt>'
 	dt_tmpl = u'<dt class = "col-sm-3">{}</dt>'
 	dd_tmpl = u'<dd class= "col-sm-9">{}</dd>'
 	text = u""
 
 	if not any(filtered_parses.values()):
 		return None
-	for filter_name, parses in filtered_parses.items():
-	    # if parses:
-	        # text += ("Filter {} removed {} parse(s):".format(filter_name, len(parses)))
-	    for i, filtered_parse in enumerate(parses):
-	        # text += ("\n#{} Filtered parse:".format(i))
-	        text += dt_tmpl.format("Explanation (source)")
-	        text += dd_tmpl.format(filtered_parse.parse.explanation)
-	        text += dt_tmpl.format("Parse (pseudocode)")
-	        text += dd_tmpl.format(translator(filtered_parse.parse.semantics))
+	num_filtered = 0
+	filter_names = [
+	'UnparseableExplanations',
+	'DuplicateSemanticsFilter',
+	'ConsistencyFilter',
+	'UniformSignatureFilter',
+	'DuplicateSignatureFilter']
+	for filter_name in filter_names:
+		parses = filtered_parses.get(filter_name, [])
+		for filtered_parse in parses:
+			num_filtered += 1
 
-	        if filter_name == 'DuplicateSemanticsFilter':
-	            text += dt_tmpl.format("Reason: Collision with parse from this explanation")
-	            text += dd_tmpl.format(filtered_parse.reason.explanation)
-	            
-	        elif filter_name == 'ConsistencyFilter':
-				candidate = filtered_parse.reason
-				consistency_filter = 'Reason: Inconsistent with candidate'
-				text += dt_tmpl.format(consistency_filter)
-				text += dd_tmpl.format(unicode(filtered_parse.reason.get_parent().text).encode('utf-8'))
-	            
-	        elif filter_name == 'UniformSignatureFilter':
-	            text += dt_tmpl.format("Reason:")
-	            text += dd_tmpl.format(filtered_parse.reason)
-	            
-	        elif filter_name == 'DuplicateSignatureFilter':
-	            text += dt_tmpl.format("Reason: Collision with parse from this explanation:")
-	            text += dd_tmpl.format(filtered_parse.reason.explanation)
-	            text += "<br/>"
-	html = sent_tmpl.format(text.strip())
+			if filtered_parse.reason == 'Unparseable':
+			    parse_str = filtered_parse.parse.condition
+			else:
+			    parse_str = translator(filtered_parse.parse.semantics)
+
+			if filter_name == 'UnparseableExplanations':
+			    filter_str = "Unparseable Explanation"
+			    reason_str = "This explanation couldn't be parsed."
+
+			elif filter_name == 'DuplicateSemanticsFilter':
+			    filter_str = "Duplicate Semantics"
+			    reason_str = 'This parse is identical to one produced by the following explanation:\n\t"{}"'.format(filtered_parse.reason.explanation.condition)
+			    
+			elif filter_name == 'ConsistencyFilter':
+			    candidate = filtered_parse.reason
+			    filter_str = "Inconsistency with Example"
+			    reason_str = "This parse did not agree with the candidate ({}, {})".format(candidate[0].get_span(), candidate[1].get_span())
+			    
+			elif filter_name == 'UniformSignatureFilter':
+			    filter_str = "Uniform Signature"
+			    reason_str = "This parse labeled {} of the {} development examples".format(
+			        filtered_parse.reason, self.num_dev_total)
+			    
+			elif filter_name == 'DuplicateSignatureFilter':
+			    filter_str = "Duplicate Signature"
+			    reason_str = "This parse labeled identically to the following existing parse:\n\t{}".format(
+			        translator(filtered_parse.reason.explanation))
+
+			text += '<br/>'
+			text += dt_header_tmpl.format("#{}: {}".format(num_filtered, filter_str))
+			if filtered_parse.reason == 'Unparseable':
+			    text += dt_tmpl.format("Explanation:")
+			    text += dd_tmpl.format(parse_str)
+			else:
+			    text += dt_tmpl.format("Parse:") 
+			    text += dd_tmpl.format(parse_str)
+			text += dt_tmpl.format("Reason:")
+			text +=  dd_tmpl.format(reason_str)
+			text += '<br/>'
+	html = row_tmpl.format(text.strip())
 	return html
 
 def get_metrics(bs):
 	# get the metrics to display
-	lf_stats = bs.get_lf_stats().to_html(columns=['Coverage', 'Overlaps', 'TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
-	coverage = bs.get_global_coverage().numer/float(bs.get_global_coverage().denom) * 100
-	num_labels = len(bs.get_lfs())
+	metrics = {'lf_stats': '', 'coverage': 0, 'num_labels': 0, 'num_examples': 0}
 	num_examples = len(bs.get_explanations())
-	metrics = {'lf_stats': lf_stats, 'coverage': coverage, 'num_labels': num_labels, 'num_examples': num_examples}
+	if num_examples < 1:
+		return metrics
+	metrics['num_examples'] = num_examples
+	metrics['lf_stats'] = bs.get_lf_stats().to_html(columns=['Coverage', 'Overlaps', 'TP', 'FP', 'FN', 'TN', 'Empirical Acc.'])
+	metrics['coverage'] = bs.get_global_coverage().numer/float(bs.get_global_coverage().denom) * 100
+	metrics['num_labels'] = len(bs.get_lfs())
 	return metrics
 
 def finish_pipeline(bs):
 		pipe = current_app.config['pipe']
-		pipe.lfs = bs.get_lfs()
-		pipe.label()
+		# pipe.lfs = bs.get_lfs()
+		# pipe.label()
+		# pipe.supervise()
+		# pipe.featurize()
+		# pipe.classify()
+		pipe.set_babbler_matrices(bs)
 		pipe.supervise()
-		pipe.featurize()
 		pipe.classify()
 
 main_page = Blueprint('main_page', __name__, template_folder='templates')
@@ -138,11 +166,13 @@ def index():
 
 	# CASE 1: SKIP THE CURRENT SAMPLE
 	if request.method == 'POST' and "skip" in request.form:
+		print "SKIPPING"
 		current_app.config['candidate'] = bs.next() # GET THE NEXT CANDIDATE
 		candidate = candidate_html(current_app.config['candidate'])
-		return render_template('index.html', candidate=candidate, form=form1, metrics=metrics)
+		return redirect('/')
 
 	# CASE 2: SUBMIT AN EXPLANATION
+	print request.form
 	if request.method == 'POST' and form1.validate_on_submit() and ("pos" in request.form or "neg" in request.form):
 		candidate = candidate_html(current_app.config['candidate'])
 		if "pos" in request.form: label = True
@@ -176,18 +206,17 @@ def index():
 			return render_template('index.html', candidate=candidate, form=form1, stats=displayed_stats, filtered_analysis=filtered_analysis, form2=form2, metrics=metrics)
 		else:
 			# generated no new parses
-			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True", metrics=metrics)
+			filtered_parses = parse_results[1]
+			filtered_analysis = apply_filtered_analysis(filtered_parses, bs.semparser.grammar.translate)
+			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True", filtered_analysis=filtered_analysis, metrics=metrics)
 
 	# CASE 3: COMMIT THE LFS 
 	elif request.method == 'POST' and "commit" in request.form:
 		bs.commit()
 		# get the next candidate
 		current_app.config['candidate'] = bs.next()
-		candidate = candidate_html(current_app.config['candidate'])
-
-		metrics = get_metrics(bs)
 		flash('You successfully committed your explanation', 'success')
-		return render_template('index.html', candidate=candidate, form=form1, metrics=metrics)
+		return redirect('/')
 
 	# CASE 4: FINISH THE PIPELINE -- LABEL DATASET AND TRAIN MODEL
 	elif request.method == 'POST' and "finish" in request.form:

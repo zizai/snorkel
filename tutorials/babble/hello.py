@@ -136,7 +136,7 @@ if __name__ == "__main__":
 	candidates = session.query(Spouse).filter(Spouse.split == 0).all()
 	spouse_explanations = get_explanations()
 	spouse_user_lists = get_user_lists()
-	bs.preload(explanations=spouse_explanations, user_lists=spouse_user_lists)
+	#bs.preload(explanations=spouse_explanations, user_lists=spouse_user_lists)
 	c = bs.next()
 	app = create_app(bs, c, session, pipe)
 	app.run()
