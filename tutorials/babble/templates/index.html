@@ -9,7 +9,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <button type="button" class="close" data-dismiss="modal">&times;</button>
-              <h4 class="modal-title">Welcome to Babble Labble</h4>
+              <h4 class="modal-title">Train Model</h4>
             </div>
             <div class="modal-body">
           <p> This demonstration focuses on the stage of the pipeline requiring human input. The remaining steps are automatic, but do require some time. In a real-world setting, the following steps would be performed:</p>
@@ -89,8 +89,8 @@
         <button class="button button-plain button-borderless" data-toggle="modal" data-target="#myModal">Help</button>
         <div class="info-metrics" style="margin-top:5%; margin-bottom:5%">
           <h4>{{metrics.num_examples}} Explanation(s)</h4>
-          <h4>{{metrics.num_labels_equiv}} Labels (Equivalent)</h4>
-          <h4>{{'%0.2f' % metrics.f1 | float}}% Majority Vote F1</h4>
+          <h4>{{metrics.num_labels_equiv}} Equivalent # Labels</h4>
+          <h4>{{'%0.2f' % metrics.f1 | float}} Majority Vote F1</h4>
           <h4>{{'%0.2f' % metrics.coverage | float}}% Coverage</h4>
         </div>
         <button style="text-align: center;" class="button button-rounded" data-toggle="modal" data-target="#labelModal">Prev Explanations</button>
