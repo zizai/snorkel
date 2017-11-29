@@ -24,7 +24,7 @@ from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
 from snorkel.contrib.babble.utils import train_model, score_marginals
-from utils import STAGES, final_report
+from .utils import STAGES, final_report
 
 TRAIN = 0
 DEV = 1
@@ -176,7 +176,7 @@ class SnorkelPipeline(object):
             if self.L_dev is None:
                 L_dev = load_label_matrix(self.session, split=DEV)
             else:
-                L_dev = self.L_dev            
+                L_dev = self.L_dev
             assert L_dev.nnz > 0
 
             L_gold_dev = load_gold_labels(self.session, annotator_name='gold', split=DEV)
@@ -271,7 +271,7 @@ class SnorkelPipeline(object):
                 params_default=gen_params_default,
                 model_init_params=self.config['gen_init_params'],
                 model_name='generative_{}'.format(self.config['domain']),
-                save_dir='checkpoints',
+                save_dir=self.config['reports_dir'] + 'checkpoints',
                 beta=self.config['gen_f_beta'],
                 tune_b=self.config['tune_b'],
             )
@@ -336,6 +336,7 @@ class SnorkelPipeline(object):
                 candidates = self.get_candidates(split=self.config['traditional_split'])
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
+
                 Y_train = np.array(L_gold.todense()).reshape((L_gold.shape[0],))
                 Y_train[Y_train == -1] = 0
 
@@ -363,9 +364,10 @@ class SnorkelPipeline(object):
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
 
+
                 Y_train = np.array(L_gold.todense()).reshape((L_gold.shape[0],))
                 Y_train[Y_train == -1] = 0
-                
+
                 X_train, Y_train = self.traditional_supervision(X_train, Y_train)
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
@@ -398,7 +400,7 @@ class SnorkelPipeline(object):
                 params_default=self.config['disc_params_default'],
                 model_init_params=self.config['disc_init_params'],
                 model_name='discriminative_{}'.format(self.config['domain']),
-                save_dir='checkpoints',
+                save_dir=self.config['reports_dir'] + 'checkpoints',
                 eval_batch_size=self.config['disc_eval_batch_size'],
                 tune_b=self.config['tune_b'],
             )
