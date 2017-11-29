@@ -171,8 +171,14 @@ def index():
 		candidate = candidate_html(current_app.config['candidate'])
 		if "pos" in request.form: label = True
 		elif "neg" in request.form: label = False
-		condition = form1.explanation.data 
-		explanation = Explanation(condition, label, candidate=current_app.config['candidate'])
+		condition = form1.explanation.data
+		num_explanations = len(bs.get_explanations())
+		explanation = Explanation(
+			condition, 
+			label, 
+			candidate=current_app.config['candidate'],
+			name='Exp{}:{}...'.format(num_explanations,condition[:25])
+		)
 
 		###### for debugging purposes ######
 		print current_app.config['candidate']
