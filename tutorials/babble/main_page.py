@@ -133,7 +133,7 @@ def apply_filtered_analysis(filtered_parses, translator):
 
 def get_metrics(bs):
 	# get the metrics to display
-	metrics = {'lf_stats': '', 'coverage': 0, 'num_labels': 0, 'num_examples': 0}
+	metrics = current_app.config['metrics']
 	num_examples = len(bs.get_explanations())
 	if num_examples < 1:
 		return metrics
@@ -145,11 +145,6 @@ def get_metrics(bs):
 
 def finish_pipeline(bs):
 		pipe = current_app.config['pipe']
-		# pipe.lfs = bs.get_lfs()
-		# pipe.label()
-		# pipe.supervise()
-		# pipe.featurize()
-		# pipe.classify()
 		pipe.set_babbler_matrices(bs)
 		pipe.supervise()
 		pipe.classify()
@@ -166,7 +161,6 @@ def index():
 
 	# CASE 1: SKIP THE CURRENT SAMPLE
 	if request.method == 'POST' and "skip" in request.form:
-		print "SKIPPING"
 		current_app.config['candidate'] = bs.next() # GET THE NEXT CANDIDATE
 		candidate = candidate_html(current_app.config['candidate'])
 		return redirect('/')
@@ -213,9 +207,16 @@ def index():
 	# CASE 3: COMMIT THE LFS 
 	elif request.method == 'POST' and "commit" in request.form:
 		bs.commit()
+
+		# update the metrics
+		(f1, pr, re) = bs.get_majority_quality(split=1)
+		metrics = current_app.config['metrics']
+		metrics['f1'] = f1
+		metrics['num_labels_equiv'] = bs.get_labeled_equivalent(f1)
+
 		# get the next candidate
 		current_app.config['candidate'] = bs.next()
-		flash('You successfully committed your explanation', 'success')
+		flash('You\'ve successfully committed your explanation', 'success')
 		return redirect('/')
 
 	# CASE 4: FINISH THE PIPELINE -- LABEL DATASET AND TRAIN MODEL

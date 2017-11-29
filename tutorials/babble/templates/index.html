@@ -2,6 +2,35 @@
 {% block content %}
 
           <!-- Modal -->
+      <div id="trainModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+
+          <!-- Modal content-->
+          <div class="modal-content">
+            <div class="modal-header">
+              <button type="button" class="close" data-dismiss="modal">&times;</button>
+              <h4 class="modal-title">Welcome to Babble Labble</h4>
+            </div>
+            <div class="modal-body">
+          <p> This demonstration focuses on the stage of the pipeline requiring human input. The remaining steps are automatic, but do require some time. In a real-world setting, the following steps would be performed:</p>
+
+          <p>1) Apply labeling functions: The functions based on your explanations are used to generate weak labels for a large unlabeled training set of examples. </p>
+
+          <p>2) Aggregate labels: The potentially overlapping and/or conflicting labels from multiple labeling functions are aggregated into probabilistic labels (between 0 and 1) for each example using a simple strategy such as majority vote or a more advanced strategy like data programming.</p>
+
+          <p>3) Train a classifier: The probabilistically labeled training set is used to train a discriminative classifier (such as a neural network) that is capable of generalizing beyond the explanations that you gave.</p>
+
+          <p>Then all that’s left is to deploy your trained classifier on your problem of interest!</p>
+          </div>
+          <div class="modal-footer">
+            <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+          <!-- Modal -->
       <div id="labelModal" class="modal fade" role="dialog">
         <div class="modal-dialog">
 
@@ -15,7 +44,6 @@
               {{ metrics.lf_stats| safe }}
           </div>
           <div class="modal-footer">
-            <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
           </div>
         </div>
 
@@ -34,17 +62,19 @@
             <div class="modal-body">
               <p>In this demo, you are writing <em>weak supervision</em> rules for generating training data. These rules can be used to generated massive amounts of training data for training your favorite deep learning model.</p>
               <p>You will be shown a sentence with two entities highlighted (call them X and Y)</p>
-              <p>First, mark a <strong>label</strong> <font color="green">True</font> or <font color="red">False</font> for the statement: "<mark>X</mark> and <mark>Y</mark> were/are/will be married."<br/>
+              <p>First, think of a <strong>label</strong> <font color="green">True</font> or <font color="red">False</font> for the statement: "<mark>X</mark> and <mark>Y</mark> were/are/will be married."<br/>
               Second, write an <strong>explanation</strong> for why you gave the label you did.<br/>
-              Press "Parse" to view the Accuracy and Coverage of you explanation. If you are happy with your result, press "Submit"<br/>
+              Press the label you thought of to view the Accuracy and Coverage of you explanation. If you are happy with your result, press "Commit"<br/>
               Otherwise, modify your explanation or push the <font color="DarkGray">Skip</font> button.</p>
+              <img style="width: 100%; height: auto;"src="{{ url_for('static', filename='explanation2.gif') }}">
+
               <p>For best results:</p>
               <ul>
                 <li> Start your explanation with the word "because" and refer to the people as "<mark>X</mark>" and "<mark>Y</mark>"</li>
                 <li>Put words that you are quoting from in the text in double quotes</li>
                 <li>Base your explanations on words in the sentence using properties such as spelling, capitalization, keywords and distances between words.</li>
               </ul>
-              <p>We will walk you through the first few explanations to get you started!</p>
+              <p>See the demonstration video for guidance on how to get started.</p>
           </div>
           <div class="modal-footer">
             <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
@@ -55,19 +85,20 @@
     </div>
       <div id="left"> <h1 style="color: #ffffff; text-align: center"> Babble Labble </h1>
         <!-- Trigger the modal with a button -->
-      <div class="information" id="left-metrics">
+      <div class="information" id="left-metrics" style="margin-top: 5%; margin-bottom: 5%">
         <button class="button button-plain button-borderless" data-toggle="modal" data-target="#myModal">Help</button>
-        <h4>Coverage {{'%0.2f' % metrics.coverage|float}}%</h4>
-<!--         <div class="progress" style="height: 7px;">
-          <div class="progress-bar" role="progressbar" style="width: {{'%0.2f' % metrics.coverage|float}}%;" aria-valuenow={{metrics.coverage}} aria-valuemin="0" aria-valuemax="100"></div>
-        </div> -->
-        <h4>Labels {{metrics.num_labels}}</h4>
-        <h4>Examples Seen {{metrics.num_examples}}</h4>
-        <button style="text-align: center;" class="button button-rounded" data-toggle="modal" data-target="#labelModal">Previous Labels</button>
+        <div class="info-metrics" style="margin-top:5%; margin-bottom:5%">
+          <h4>{{metrics.num_examples}} Explanation(s)</h4>
+          <h4>{{metrics.num_labels_equiv}} Labels (Equivalent)</h4>
+          <h4>{{'%0.2f' % metrics.f1 | float}}% Majority Vote F1</h4>
+          <h4>{{'%0.2f' % metrics.coverage | float}}% Coverage</h4>
+        </div>
+        <button style="text-align: center;" class="button button-rounded" data-toggle="modal" data-target="#labelModal">Prev Explanations</button>
+        <button style="text-align: center; margin-top: 5%" class="button button-action button-rounded" data-toggle="modal" data-target="#trainModal">Train Model</button>
       </div>
-      <form method=post style="text-align: center; margin-top: 5%">
+<!--       <form method=post style="text-align: center; margin-top: 5%">
         <input class="button button-action button-rounded" type=submit name=finish value="Train Model"></input>
-      </form>
+      </form> -->
       </div>
 
 <div id="right">
@@ -89,7 +120,7 @@
 	  <dl>
 	  	{{ form.csrf_token }}
 	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
-	    	{{ form.explanation(cols="10", rows="2", placeholder="Think of a label for this sentence, and give an explanation for your label here. Then submit your explanation by selecting the label below.", class="form-control") }}
+	    	{{ form.explanation(cols="10", rows="2", placeholder="Write an explanation starting with 'Because'...", class="form-control") }}
          <p class="col-sm-12 help-block">
             {{ form.explanation.errors[0] }}
 		</div>
@@ -152,19 +183,19 @@
         {{filtered_analysis|safe}}
       </div>
     {% endif %}
-  </div>
     {% endfor %}
-  </div>
 </div>
+  </div>
   <form method=post style="text-align: center; margin-top: 5%">
-  <input class="button button-action button-rounded" type=submit name=commit value="Commit"></input>
+  <input class="button button-action button-rounded" type=submit name=commit value="Commit" style="margin-bottom:5%"></input>
 </form>
   {% endif %}
+<!--   </div> -->
 
   {% if no_parse_error is defined %}
   <p style="text-align: center; margin-top: 5%">Your explanation generated no valid parses -- check your explanation, revisit the <a data-toggle="modal" data-target="#myModal">instructions</a>, or skip this example.</p>
     {% if filtered_analysis is not none %}
-    <div class="panel panel-default" style="width=70% padding:5pt 10pt 5pt 0pt">
+    <div class="panel panel-default" style="width:50% padding:5pt 10pt 5pt 0pt">
       <div class="panel-body">
         <div id="filtered-tab">
           {{filtered_analysis|safe}}

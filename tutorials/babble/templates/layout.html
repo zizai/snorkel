@@ -2,15 +2,6 @@
 <html>
 	<head>
 		<title>Babble Labble Demo</title>
-<!-- 		{% with messages = get_flashed_messages() %}
-		  {% if messages %}
-		    <ul class=flashes>
-		    {% for message in messages %}
-		      <li>{{ message }}</li>
-		    {% endfor %}
-		    </ul>
-		  {% endif %}
-		{% endwith %} -->
 
 		{% with messages = get_flashed_messages(with_categories=true) %}
 		  <!-- Categories: success (green), info (blue), warning (yellow), danger (red) -->
@@ -24,7 +15,6 @@
 		  {% endif %}
 		{% endwith %}
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 		<link href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" media="screen"> -->
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 		<link rel="stylesheet" href="{{ url_for('static', filename='css/button.css') }}">

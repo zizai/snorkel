@@ -30,6 +30,7 @@ def create_app(bs, c, session, pipe):
 	app.config['candidate'] = c
 	app.config['session'] = session
 	app.config['pipe'] = pipe
+	app.config['metrics'] = {'lf_stats': '', 'coverage': 0, 'num_labels': 0, 'num_examples': 0, 'num_labels_equiv': 0, 'f1': 0}
 	app.register_blueprint(main_page)
 	return app
 
