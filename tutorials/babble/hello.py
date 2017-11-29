@@ -133,7 +133,7 @@ if __name__ == "__main__":
 	# pipe.extract()
 	# pipe.load_gold()
 
-	bs = BabbleStream(session, candidate_class=Spouse, balanced=True, seed=123)
+	bs = BabbleStream(session, candidate_class=Spouse, balanced=True, seed=123, soft_start=True)
 	candidates = session.query(Spouse).filter(Spouse.split == 0).all()
 	spouse_explanations = get_explanations()
 	spouse_user_lists = get_user_lists()
