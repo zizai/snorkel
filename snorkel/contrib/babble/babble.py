@@ -248,7 +248,6 @@ class BabbleStream(object):
 
     def next(self):
         c = self.candidate_generator.next()
-        print(c.get_stable_id())
         self.temp_candidate = c
         return c
 
