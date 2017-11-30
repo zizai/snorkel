@@ -108,9 +108,10 @@ def apply_filtered_analysis(filtered_parses, translator):
 			    reason_str = "This parse did not agree with the candidate ({}, {})".format(candidate[0].get_span(), candidate[1].get_span())
 			    
 			elif filter_name == 'UniformSignatureFilter':
-			    filter_str = "Uniform Signature"
-			    reason_str = "This parse labeled {} of the {} development examples".format(
-			        filtered_parse.reason, self.num_dev_total)
+				filter_str = "Uniform Signature"
+				bs = current_app.config['babble_stream_object']
+				reason_str = "This parse labeled {} of the {} development examples".format(
+			        filtered_parse.reason, bs.num_dev_total)
 			    
 			elif filter_name == 'DuplicateSignatureFilter':
 			    filter_str = "Duplicate Signature"
