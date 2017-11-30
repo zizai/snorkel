@@ -92,7 +92,7 @@ class CandidateGenerator(object):
             else:
                 self.candidate_generator = itertools.chain(
                     priority_generator, self.linear_generator(
-                        candidates, labels, seed, shuffled=shuffled))
+                        candidates, seed, shuffled=shuffled))
 
     def __iter__(self):
         return self
