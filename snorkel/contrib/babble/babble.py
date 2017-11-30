@@ -200,7 +200,7 @@ class BabbleStream(object):
                 # F: "X or Y is in all caps"
                 '9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:204:208~~9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:239:243',
                 # T: "The first word of X is different than the first word of Y and the last word of X is the same as the last word of Y"
-                '63d7922b-ba07-47d2-88c1-06431c7302a9::span:1720:1729~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:1890:1898'
+                '63d7922b-ba07-47d2-88c1-06431c7302a9::span:1720:1729~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:1890:1898',
                 # F: Because 'rapper', 'actress', or 'author' is in the sentence
                 'c393a09d-b1a5-4161-b0e2-073fbcc57cec::span:7205:7215~~c393a09d-b1a5-4161-b0e2-073fbcc57cec::span:7253:7266'
                 # T: "and her husband"
