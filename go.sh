@@ -17,14 +17,11 @@ echo ""
 for ITER in 1 
 do
 
-for MAX_TRAIN in 50 5000
-do
-
-RUN="${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
+RUN="${DOMAIN}_${EXP}_${TIME}_${ITER}"
 
 DB_NAME="babble_${RUN}"
 echo "Using db: $DB_NAME"
-cp babble_${DOMAIN}_labeled_tocopy.db $DB_NAME.db
+cp babble_${DOMAIN}_featurized_tocopy.db $DB_NAME.db
 
 REPORTS_SUBDIR="$REPORTS_DIR/$RUN/"
 mkdir -p $REPORTS_SUBDIR
@@ -36,15 +33,13 @@ echo "Saving log to '$LOGFILE'"
 python -u snorkel/contrib/babble/pipelines/run.py \
     --domain $DOMAIN \
     --reports_dir $REPORTS_SUBDIR \
-    --start_at 8 \
-    --end_at 10 \
-    --supervision traditional \
+    --start_at 5 \
+    --end_at 7 \
+    --supervision majority \
     --gen_model_search_space 1 \
-    --max_train $MAX_TRAIN \
     --disc_model_class lstm \
     --disc_model_search_space 10 \
     --verbose --no_plots |& tee -a $LOGFILE &
 sleep 3
 
-done
 done

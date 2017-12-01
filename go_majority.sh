@@ -14,7 +14,7 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for ITER in 1 2 3
+for ITER in 1 2 3 4 5
 do
 
 RUN="${DOMAIN}_${EXP}_${TIME}_${ITER}"
@@ -33,7 +33,7 @@ echo "Saving log to '$LOGFILE'"
 python -u snorkel/contrib/babble/pipelines/run.py \
     --domain $DOMAIN \
     --reports_dir $REPORTS_SUBDIR \
-    --start_at 8 \
+    --start_at 7 \
     --end_at 10 \
     --supervision majority \
     --disc_model_class lstm \
