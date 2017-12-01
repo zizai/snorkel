@@ -50,6 +50,7 @@ if __name__ == '__main__':
     # Babble args
     argparser.add_argument('--max_explanations', type=int)
     argparser.add_argument('--apply_filters', type=str2bool)
+    argparser.add_argument('--BL50_test', type=str2bool)
 
     # Supervision args
     SUPERVISION = ['traditional', 'majority', 'generative']
