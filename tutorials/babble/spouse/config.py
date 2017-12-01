@@ -2,6 +2,8 @@ config = {
     'candidate_name' : 'Spouse',
     'candidate_entities' : ['person1', 'person2'],
 
+    'BL50_test': False,
+
     'babbler_label_split': 1,
 
     'gen_init_params': {

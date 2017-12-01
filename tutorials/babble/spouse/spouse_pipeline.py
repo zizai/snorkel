@@ -2,6 +2,7 @@ from collections import defaultdict
 import csv
 import os
 import numpy as np
+import random
 
 from snorkel.candidates import Ngrams, CandidateExtractor
 from snorkel.matchers import PersonMatcher
@@ -56,6 +57,11 @@ class SpousePipeline(BabblePipeline):
             if not too_many_people(sent):
                 doc_name = sent.get_parent().name
                 if doc_name in split_assignments[0]:
+                    # HACK
+                    if self.config['BL50_test']:
+                        if random.random() < 0.5:
+                            continue
+                    # HACK
                     train_sents.append(sent)
                 elif doc_name in split_assignments[1]:
                     dev_sents.append(sent)
