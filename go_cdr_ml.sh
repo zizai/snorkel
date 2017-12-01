@@ -14,7 +14,7 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for ITER in 1
+for ITER in 2
 do
 
 for MAX_TRAIN in 30 60 90 150 300 1500 3000 6667
