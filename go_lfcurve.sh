@@ -24,7 +24,7 @@ RUN="${DOMAIN}_${EXP}_${TIME}_${MAX_EXP}_${ITER}"
 
 DB_NAME="babble_${RUN}"
 echo "Using db: $DB_NAME"
-cp babble_${DOMAIN}_labeled_tocopy.db $DB_NAME.db
+cp babble_${DOMAIN}_featurized_tocopy.db $DB_NAME.db
 
 REPORTS_SUBDIR="$REPORTS_DIR/$RUN/"
 mkdir -p $REPORTS_SUBDIR
@@ -36,7 +36,7 @@ echo ""
 python -u snorkel/contrib/babble/pipelines/run.py \
     --domain $DOMAIN \
     --reports_dir $REPORTS_SUBDIR \
-    --db_name $DBNAME \
+    --db_name $DB_NAME \
     --start_at 5 \
     --max_explanations $MAX_EXP \
     --supervision majority \
