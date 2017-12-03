@@ -180,25 +180,35 @@ class BabbleStream(object):
         ### TEMP HARDCODE ###
         if soft_start:
             priority_ids = [
-                # T EXAMPLE 1: Because "husband" is right before Y
+                # T EXAMPLE 1: 
+                    # Because "husband" is right before Y
+                    # Because 'with' and 'husband' are within 5 words to the left of Y
                 '48355563-37ab-4fb8-9525-4762d6be7fc8::span:7317:7320~~48355563-37ab-4fb8-9525-4762d6be7fc8::span:7378:7383',
-                # T EXAMPLE 2: Because "his wife" is within five words of X and Y
-                '40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:115:123~~40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:138:153',
-                # F EXAMPLE 3: Because X and Y are identical.
+                # F EXAMPLE __3__: 
+                    # Because X and Y are the same person.
+                    # Because X starts with Y.
                 '24a08559-a824-4331-9028-fbeac1f3ca5a::span:1637:1640~~24a08559-a824-4331-9028-fbeac1f3ca5a::span:1706:1709',
-                # ? EXAMPLE 4: [video only] ("almost appeared like an old married couple")
-                '355137fd-21b3-426e-a87e-1c81b0f5326b::span:136:145~~355137fd-21b3-426e-a87e-1c81b0f5326b::span:151:166',
-                # F EXAMPLE 5: Because none of the words "wife", "husband", "spouse", or "married" are in the sentence.
-                '6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:711:726~~6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:770:779',
-                # T EXAMPLE 6: Because "married to" is between X and Y and there are no people are between them
+                # T EXAMPLE 6: 
+                    # Because "married to" is between X and Y and there are no people are between them
+                    # Because "got married" is between X and Y
                 'a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:1108:1117~~a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:1179:1193',
-                # F EXAMPLE 7: Because either "son" or "daughter" is immediately to the left of X or Y
+                # F EXAMPLE 5: 
+                    # Because none of the words "wife", "husband", "spouse", or "married" are in the sentence.
+                    # Because the last word of X is different than the last word of Y
+                '6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:711:726~~6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:770:779',
+                # T EXAMPLE __2__: 
+                    # Because "husband" or "wife" is within five words of X and Y
+                    # Because "his wife" is within five words of X and Y
+                '40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:115:123~~40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:138:153',
+                # F EXAMPLE 7: 
+                    # Because either "son" or "daughter" is immediately to the left of X or Y
+                    # Because "son" is between X and Y
                 '7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:4942:4950~~7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:4973:4978',
+                # F: "X or Y is in all caps"
+                '9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:204:208~~9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:239:243',
                 # OTHERS:
                 # T: "tied the knot"
                 'e6307d27-db6b-4d6c-b67d-0bd4d9647e69::span:392:399~~e6307d27-db6b-4d6c-b67d-0bd4d9647e69::span:405:412',
-                # F: "X or Y is in all caps"
-                '9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:204:208~~9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:239:243',
                 # T: "The first word of X is different than the first word of Y and the last word of X is the same as the last word of Y"
                 '63d7922b-ba07-47d2-88c1-06431c7302a9::span:1720:1729~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:1890:1898',
                 # F: Because 'rapper', 'actress', or 'author' is in the sentence
@@ -209,6 +219,8 @@ class BabbleStream(object):
                 '5c4ff333-53d5-4e01-90aa-c048508a0403::span:1289:1292~~5c4ff333-53d5-4e01-90aa-c048508a0403::span:1298:1302',
                 # OTHER?
                 '55138a30-e5a7-4a3e-ad24-0a42d125d247::span:5558:5571~~55138a30-e5a7-4a3e-ad24-0a42d125d247::span:5586:5599',
+                # ? EXAMPLE __4__: [video only] ("almost appeared like an old married couple")
+                '355137fd-21b3-426e-a87e-1c81b0f5326b::span:136:145~~355137fd-21b3-426e-a87e-1c81b0f5326b::span:151:166',
             ]
         else:
             priority_ids = []
