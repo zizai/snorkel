@@ -31,6 +31,42 @@ def create_app(bs, c, session, pipe):
 	app.config['session'] = session
 	app.config['pipe'] = pipe
 	app.config['metrics'] = {'lf_stats': '', 'coverage': 0, 'num_labels': 0, 'num_examples': 0, 'num_labels_equiv': 0, 'f1': 0}
+	app.config['priority_ids'] = {
+                # T EXAMPLE 1: 
+                    # Because "husband" is right before Y
+                    # Because 'with' and 'husband' are within 5 words to the left of Y
+                '48355563-37ab-4fb8-9525-4762d6be7fc8::span:7317:7320~~48355563-37ab-4fb8-9525-4762d6be7fc8::span:7378:7383':
+                ['Because "husband" is right before Y' , 'Because "with" and "husband" are within 5 words to the left of Y'],
+                # F EXAMPLE __3__: 
+                    # Because X and Y are the same person.
+                    # Because X starts with Y.
+                '24a08559-a824-4331-9028-fbeac1f3ca5a::span:1637:1640~~24a08559-a824-4331-9028-fbeac1f3ca5a::span:1706:1709':
+                ['Because X and Y are the same person.', 'Because X starts with Y.'],
+                # T EXAMPLE 6: 
+                    # Because "married to" is between X and Y and there are no people are between them
+                    # Because "got married" is between X and Y
+                'a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:1108:1117~~a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:1179:1193':
+                ['Because "married to" is between X and Y and there are no people are between them','Because "got married" is between X and Y'],
+                # F EXAMPLE 5: 
+                    # Because none of the words "wife", "husband", "spouse", or "married" are in the sentence.
+                    # Because the last word of X is different than the last word of Y
+                '6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:711:726~~6807fb8a-333f-41fd-bf8b-4b47681a5a08::span:770:779':
+                ['Because none of the words "wife", "husband", "spouse", or "married" are in the sentence.',
+                  'Because the last word of X is different than the last word of Y'],
+                # T EXAMPLE __2__: 
+                    # Because "husband" or "wife" is within five words of X and Y
+                    # Because "his wife" is within five words of X and Y
+                '40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:115:123~~40cb15fa-0186-4868-a5b7-eb2fc6a317cf::span:138:153':
+                ['Because "husband" or "wife" is within five words of X and Y', 'Because "his wife" is within five words of X and Y'],
+                # F EXAMPLE 7: 
+                    # Because either "son" or "daughter" is immediately to the left of X or Y
+                    # Because "son" is between X and Y
+                '7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:4942:4950~~7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:4973:4978':
+                ['Because either "son" or "daughter" is immediately to the left of X or Y', 'Because "son" is between X and Y'],
+                # F: "X or Y is in all caps"
+                '9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:204:208~~9ee7265a-b7e3-4ebe-a60e-ef145884b80a::span:239:243':
+                ['X or Y is in all caps'],
+            }
 	app.register_blueprint(main_page)
 	return app
 
