@@ -12,7 +12,7 @@ lexical_rules = (
     [Rule('$Arg', w, '.arg') for w in ['arg', 'argument']] +
     [Rule('$True', w, ('.bool', True)) for w in ['true', 'correct']] +
     [Rule('$False', w, ('.bool', False)) for w in ['false', 'incorrect', 'wrong']] +
-    [Rule('$And', w, '.and') for w in ['and']] +
+    [Rule('$And', w, '.and') for w in ['and', 'but']] +
     [Rule('$Or', w, '.or') for w in ['or', 'nor']] +
     [Rule('$Not', w, '.not') for w in ['not', "n't"]] +
     [Rule('$All', w, '.all') for w in ['all', 'both']] +
