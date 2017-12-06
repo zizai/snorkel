@@ -134,6 +134,9 @@
 	<form method=post style="text-align: center; width: 70%; margin: auto; padding-top: 4%">
 	  <dl>
 	  	{{ form.csrf_token }}
+      {% if suggested_explanations is not none %}
+      <p style="color: gray"> Hint, you can try: {{ suggested_explanations[0] }} </p>
+      {% endif %}
 	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
 	    	{{ form.explanation(cols="10", rows="2", placeholder="Write an explanation starting with 'Because'...", class="form-control") }}
          <p class="col-sm-12 help-block">

@@ -160,6 +160,13 @@ def index():
 
 	metrics = get_metrics(bs)
 
+	suggested_explanations = None
+	candidate_id = current_app.config['candidate'].get_stable_id()
+	if candidate_id in current_app.config['priority_ids'].keys():
+		priority_ids_dict = current_app.config['priority_ids']
+		suggested_explanations = priority_ids_dict[candidate_id]
+
+
 	# CASE 1: SKIP THE CURRENT SAMPLE
 	if request.method == 'POST' and "skip" in request.form:
 		current_app.config['candidate'] = bs.next() # GET THE NEXT CANDIDATE
@@ -182,6 +189,7 @@ def index():
 		)
 
 		###### for debugging purposes ######
+		print current_app.config['priority_ids']
 		print current_app.config['candidate']
 		print label
 		print condition
@@ -204,12 +212,13 @@ def index():
 			filtered_analysis = apply_filtered_analysis(filtered_parses, bs.semparser.grammar.translate)
 
 			displayed_stats = zip(parse_list, correct_incorrect_sentences, stats_list)
-			return render_template('index.html', candidate=candidate, form=form1, stats=displayed_stats, filtered_analysis=filtered_analysis, form2=form2, metrics=metrics)
+
+			return render_template('index.html', candidate=candidate, form=form1, stats=displayed_stats, filtered_analysis=filtered_analysis, form2=form2, metrics=metrics, suggested_explanations=suggested_explanations)
 		else:
 			# generated no new parses
 			filtered_parses = parse_results[1]
 			filtered_analysis = apply_filtered_analysis(filtered_parses, bs.semparser.grammar.translate)
-			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True", filtered_analysis=filtered_analysis, metrics=metrics)
+			return render_template('index.html', candidate=candidate, form=form1, no_parse_error = "True", filtered_analysis=filtered_analysis, metrics=metrics, suggested_explanations=suggested_explanations)
 
 	# CASE 3: COMMIT THE LFS 
 	elif request.method == 'POST' and "commit" in request.form:
@@ -231,5 +240,12 @@ def index():
 		finish_pipeline(bs)
 		
 	candidate = candidate_html(current_app.config['candidate'])
-	return render_template('index.html', candidate=candidate, form=form1, metrics=metrics)
+
+	# suggested_explanations = None
+	# candidate_id = current_app.config['candidate'].get_stable_id()
+	# if candidate_id in current_app.config['priority_ids'].keys():
+	# 	priority_ids_dict = current_app.config['priority_ids']
+	# 	suggested_explanations = priority_ids_dict[candidate_id]
+
+	return render_template('index.html', candidate=candidate, form=form1, metrics=metrics, suggested_explanations=suggested_explanations)
 
