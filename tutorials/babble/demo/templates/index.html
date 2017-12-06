@@ -12,7 +12,12 @@
               <h4 class="modal-title">Train Model</h4>
             </div>
             <div class="modal-body">
-          <p> This demonstration focuses on the stage of the pipeline requiring human input. The remaining steps are automatic, but do require some time. In a real-world setting, the following steps would be performed:</p>
+          <p>This functionality is disabled for speed during demo mode.</p>
+          <p>During regular execution, the explanations you provided would be 
+            used here to generate a large weakly labeled dataset for training a 
+            powerful discriminative model with better generalization properties 
+            than majority vote.</p>
+          <!-- <p> This demonstration focuses on the stage of the pipeline requiring human input. The remaining steps are automatic, but do require some time. In a real-world setting, the following steps would be performed:</p>
 
           <p>1) Apply labeling functions: The functions based on your explanations are used to generate weak labels for a large unlabeled training set of examples. </p>
 
@@ -20,7 +25,7 @@
 
           <p>3) Train a classifier: The probabilistically labeled training set is used to train a discriminative classifier (such as a neural network) that is capable of generalizing beyond the explanations that you gave.</p>
 
-          <p>Then all that’s left is to deploy your trained classifier on your problem of interest!</p>
+          <p>Then all that’s left is to deploy your trained classifier on your problem of interest!</p> -->
           </div>
           <div class="modal-footer">
             <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
@@ -60,21 +65,36 @@
               <h4 class="modal-title">Welcome to Babble Labble</h4>
             </div>
             <div class="modal-body">
-              <p>In this demo, you are writing <em>weak supervision</em> rules for generating training data. These rules can be used to generated massive amounts of training data for training your favorite deep learning model.</p>
-              <p>You will be shown a sentence with two entities highlighted (call them X and Y)</p>
-              <p>First, think of a <strong>label</strong> <font color="green">True</font> or <font color="red">False</font> for the statement: "<mark>X</mark> and <mark>Y</mark> were/are/will be married."<br/>
-              Second, write an <strong>explanation</strong> for why you gave the label you did.<br/>
-              Press the label you thought of to view the Accuracy and Coverage of you explanation. If you are happy with your result, press "Commit"<br/>
-              Otherwise, modify your explanation or push the <font color="DarkGray">Skip</font> button.</p>
+              <p>In this demo, you will be writing <em>weak supervision</em> rules for generating training data. 
+                These rules can be used to generated massive amounts of training data for training your favorite deep learning model.</p>
+              <p>You will be shown a sentence with two entities highlighted (call them X and Y).
+                You are teaching a system to classify whether or not "X and Y were/are/will be married."
+              </p>
+              <ol type="1">
+                <li>First, write an explanation stating why the given example should 
+                    be classified a certain way.</li>
+                <li>Then click the green check (<font color="green">True</font>) 
+                    or red X (<font color="red">False</font>) to submit your 
+                    explanation with the given label.</li>
+                <li>If you are happy with the quality of your explanation (ideally
+                    Accuracy > 60% and Coverage > 1%), press "Commit" at the bottom
+                    of the page.</li>
+                <li>Otherwise, modify your explanation or push the 
+                    (<font color="DarkGray">Skip</font>) button to move on to the next
+                    example.</li>
+              </ol>
               <img style="width: 100%; height: auto;"src="{{ url_for('static', filename='explanation2.gif') }}">
-
               <p>For best results:</p>
               <ul>
-                <li> Start your explanation with the word "because" and refer to the people as "<mark>X</mark>" and "<mark>Y</mark>"</li>
+                <li>Start your explanation with the word "because" and refer to the people as "<mark>X</mark>" and "<mark>Y</mark>"</li>
                 <li>Put words that you are quoting from in the text in double quotes</li>
-                <li>Base your explanations on words in the sentence using properties such as spelling, capitalization, keywords and distances between words.</li>
+                <li>Base your explanations on words in the sentence using properties 
+                  such as spelling, capitalization, keywords and distances between words.
+                  You may also assume the system recognizes which words are persons, 
+                  locations, or organizations.</li>
               </ul>
-              <p>See the demonstration video for guidance on how to get started.</p>
+              <p>See the <a href="https://www.youtube.com/watch?v=7I1mCEjXL4I&t=20s">demonstration video</a> for guidance on how to get started.</p>
+              <p>We'll provide suggested explanations for the first few examples to get you started!</p>
           </div>
           <div class="modal-footer">
             <small class="text-muted">This demo was built by Stephanie Wang and Braden Hancock</small>
