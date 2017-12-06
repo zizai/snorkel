@@ -49,7 +49,7 @@
 
       </div>
     </div>
-          <!-- Modal -->
+      <!-- Modal -->
       <div id="myModal" class="modal fade" role="dialog">
         <div class="modal-dialog">
 
@@ -120,7 +120,12 @@
 	  <dl>
 	  	{{ form.csrf_token }}
       {% if suggested_explanations is not none %}
-      <p style="color: gray"> Hint, you can try: {{ suggested_explanations[0] }} </p>
+        <p style="color: gray">
+          Hint: <br/>
+          {% for exp in suggested_explanations %}
+           {{ exp }} <br/>
+        {% endfor %}
+      </p>
       {% endif %}
 	  	<div class="form-group {% if form.explanation.errors %} has-error {% endif %}">
 	    	{{ form.explanation(cols="10", rows="2", placeholder="Write an explanation starting with 'Because'...", class="form-control") }}

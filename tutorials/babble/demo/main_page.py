@@ -72,7 +72,7 @@ def apply_filtered_analysis(filtered_parses, translator):
 	row_tmpl = u'<dl class="row">{}</dl>'
 	dt_header_tmpl = u'<dt class="col-sm-12">{}</dt>'
 	dt_tmpl = u'<dt class = "col-sm-3">{}</dt>'
-	dd_tmpl = u'<dd class= "col-sm-9">{}</dd>'
+	dd_tmpl = u'<dd class= "col-sm-9">{}</dd><br/>'
 	text = u""
 
 	if not any(filtered_parses.values()):
