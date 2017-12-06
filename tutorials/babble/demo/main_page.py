@@ -28,14 +28,12 @@ class ExplanationForm(FlaskForm):
 class LabelingFunctionForm(FlaskForm):
 	pass
 
-# https://stackoverflow.com/questions/46653424/flask-wtforms-fieldlist-with-booleanfield
-def parse_list_form_builder(parses, translator):
-	class ParseListForm(FlaskForm):
-		pass
-	for (idx, parse) in enumerate(parses):
-		label = "Parse {}:\n{}\n".format(idx, translator(parse.semantics))
-		setattr(ParseListForm, 'parse', BooleanField(label=label))
-	return ParseListForm()
+def restart():
+	session = current_app.config['session']
+	Spouse = candidate_subclass('Spouse', ['person1', 'person2'])
+	current_app.config['babble_stream_object'] = BabbleStream(session, candidate_class=Spouse, balanced=True, seed=123, soft_start=True)
+	current_app.config['metrics'] = {'lf_stats': '', 'coverage': 0, 'num_labels': 0, 'num_examples': 0, 'num_labels_equiv': 0, 'f1': 0}
+	current_app.config['candidate'] = current_app.config['babble_stream_object'].next()
 
 def candidate_html(c):
 	chunks = get_text_splits(c)
@@ -236,16 +234,12 @@ def index():
 		return redirect('/')
 
 	# CASE 4: FINISH THE PIPELINE -- LABEL DATASET AND TRAIN MODEL
-	elif request.method == 'POST' and "finish" in request.form:
-		finish_pipeline(bs)
+	elif request.method == 'POST' and "restart" in request.form:
+		# finish_pipeline(bs)
+		restart()
+		return redirect('/')
 		
 	candidate = candidate_html(current_app.config['candidate'])
-
-	# suggested_explanations = None
-	# candidate_id = current_app.config['candidate'].get_stable_id()
-	# if candidate_id in current_app.config['priority_ids'].keys():
-	# 	priority_ids_dict = current_app.config['priority_ids']
-	# 	suggested_explanations = priority_ids_dict[candidate_id]
 
 	return render_template('index.html', candidate=candidate, form=form1, metrics=metrics, suggested_explanations=suggested_explanations)
 
