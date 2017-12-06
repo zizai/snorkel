@@ -14,10 +14,9 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for ITER in 5 6 7 8 9
+for MAX_TRAIN in 30 60 300 3000 25000
 do
-
-for MAX_TRAIN in 30 60 90 150 300 1500 3000 6667
+for ITER in 1 2 3 4 5
 do
 
 RUN="${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
@@ -36,15 +35,15 @@ echo "Saving log to '$LOGFILE'"
 python -u snorkel/contrib/babble/pipelines/run.py \
     --domain $DOMAIN \
     --reports_dir $REPORTS_SUBDIR \
-    --start_at 8 \
+    --start_at 7 \
     --end_at 10 \
     --supervision traditional \
-    --gen_model_search_space 1 \
     --max_train $MAX_TRAIN \
     --disc_model_class lstm \
     --disc_model_search_space 10 \
     --verbose --no_plots |& tee -a $LOGFILE &
-sleep 600
+
+sleep 300
 
 done
 done
