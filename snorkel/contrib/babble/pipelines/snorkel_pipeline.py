@@ -201,7 +201,7 @@ class SnorkelPipeline(object):
                 print("Using L_gold_test: {0}".format(L_gold_test.__repr__()))
                 total = L_gold_test.shape[0]
                 positive = float(sum(L_gold_test.todense() == 1))
-                #print("Positive Fraction: {:.1f}%\n".format(positive/total * 100))
+                print("Positive Fraction: {:.1f}%\n".format(positive/total * 100))
             #assert L_gold_test.nonzero()[0].shape[0] > 0
 
         if self.config['supervision'] == 'majority':
