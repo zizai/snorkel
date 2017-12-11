@@ -162,7 +162,7 @@ translate_ops = {
     '.int': lambda int_: int(int_),
     
     '.tuple': lambda list_: "tuple({})".format(list_),
-    '.list': lambda *elements: "[{}]".format(','.join(x.encode('utf-8') for x in elements)),
+    '.list': lambda *elements: "[{}]".format(','.join(unicode(x).encode('utf-8') for x in elements)),
     '.user_list': lambda name: "user_list({})".format(name.encode('utf-8')),
     '.map': lambda func_, list_: "[s.{} for s in {}]".format(
         func_[1:] if func_.startswith('.') else func_, list_),

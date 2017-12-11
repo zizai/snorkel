@@ -38,8 +38,14 @@ class BabblePipeline(SnorkelPipeline):
         
         if any(isinstance(exp.candidate, basestring) for exp in explanations):
             print("Linking candidates...")
-            candidates = self.session.query(self.candidate_class).filter(
-                self.candidate_class.split == self.config['babbler_candidate_split']).all()
+            babbler_candidate_splits = (self.config['babbler_candidate_split'] if
+                isinstance(self.config['babbler_candidate_split'], list) else 
+                [self.config['babbler_candidate_split']])
+            candidates = []
+            for split in babbler_candidate_splits:
+                candidates.extend(self.session.query(self.candidate_class).filter(
+                    self.candidate_class.split == split).all())
+            print("# CANDIDATES: {}".format(len(candidates)))
             explanations = link_explanation_candidates(explanations, candidates)
         
         # Trim number of explanations
