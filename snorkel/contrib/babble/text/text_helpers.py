@@ -146,7 +146,10 @@ def get_within_phrase(span, num=0, unit='words'):
         k = span.get_word_end()
         return phrase[max(0, j - num):min(k + num + 1, len(phrase))]
     elif unit == 'chars':
-        raise NotImplementedError
+        # Get the indices of the words at right distance, then index with those
+        j = max(0, span.char_to_word_index(span.char_start - num))
+        k = min(len(phrase), span.char_to_word_index(span.char_end + num))
+        return phrase[j:k]
     else:        
         raise Exception("Expected unit in ('words', 'chars'), got '{}'".format(unit))
 
