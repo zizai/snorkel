@@ -109,7 +109,6 @@ class CdrPipeline(BabblePipeline):
             self.session.commit()
 
     def collect(self):
-        candidates = self.get_candidates(split=self.config['babbler_candidate_split'])
         explanations = get_explanations()
         user_lists = get_user_lists()
         super(CdrPipeline, self).babble('text', explanations, user_lists, self.config)

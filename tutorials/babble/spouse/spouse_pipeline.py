@@ -101,7 +101,6 @@ class SpousePipeline(BabblePipeline):
             self.labeler = LabelAnnotator(lfs=self.lfs)
         elif lf_source == 'intro_exps':
             from tutorials.babble.spouse.spouse_examples import (get_explanations, get_user_lists)                        
-            candidates = self.get_candidates(split=self.config['babbler_candidate_split'])
             explanations = get_explanations()
             user_lists = get_user_lists()
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
@@ -110,7 +109,6 @@ class SpousePipeline(BabblePipeline):
             from snorkel.contrib.babble.utils import ExplanationIO
             fpath = (os.environ['SNORKELHOME'] + 
                 '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
-            candidates = self.get_candidates(split=self.config['babbler_candidate_split'])
             exp_reader = ExplanationIO()
             explanations = exp_reader.read(fpath)
             user_lists = {}

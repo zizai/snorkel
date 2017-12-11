@@ -73,10 +73,6 @@ class DrinkPipeline(ImagePipeline, BabblePipeline):
         output_csv_path = (os.environ['SNORKELHOME'] + 
                         '/tutorials/babble/drink/data/Reach_Explanation_out.csv')
         explanations = helper.postprocess_visual(output_csv_path, set_name='train', verbose=False)
-        
-        from snorkel.contrib.babble import link_explanation_candidates
-        candidates = self.session.query(self.candidate_class).filter(self.candidate_class.split == self.config['babbler_candidate_split']).all()
-        explanations = link_explanation_candidates(explanations, candidates)
         user_lists = {}
         super(DrinkPipeline, self).babble('image', explanations, user_lists, self.config)
 
