@@ -54,7 +54,7 @@ python -u snorkel/contrib/babble/pipelines/run.py \
     --disc_model_class lstm \
     --disc_model_search_space 10 \
     --verbose --no_plots |& tee -a $LOGFILE &
-sleep 3
+sleep 600
 
 done
 done
