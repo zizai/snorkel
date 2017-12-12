@@ -55,6 +55,11 @@ class CdrPipeline(BabblePipeline):
         for i, doc in enumerate(docs):
             for s in doc.sentences:
                 if doc.name in train_ids:
+                    # HACK
+                    if self.config['BL50_test']:
+                        if random.random() < 0.5:
+                            continue
+                    # HACK
                     train_sents.add(s)
                 elif doc.name in dev_ids:
                     dev_sents.add(s)
