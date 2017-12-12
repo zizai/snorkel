@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # Parse command-line args
     argparser = argparse.ArgumentParser(description="Run SnorkelPipeline object.")
     
-    DOMAINS = ['spouse', 'cdr', 'bike', 'drink', 'stub']
+    DOMAINS = ['spouse', 'cdr', 'protein', 'bike', 'drink', 'stub']
     argparser.add_argument('--domain', type=str, default='stub', choices=DOMAINS,
         help="Name of experiment subdirectory in tutorials/babble/")
 
