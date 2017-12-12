@@ -85,6 +85,7 @@ class ProteinKinaseLookupTagger (object):
                            'pten-induced putative kinase 1' ])
 
     def tag(self, parts):
+        blacklist = set(['was','impact'])
         for i, word in enumerate(parts['words']):
             tag = parts['entity_types'][i]
             if len(word) > 2 and tag in (None,'O'):
@@ -93,6 +94,6 @@ class ProteinKinaseLookupTagger (object):
                 # is necessary
                 if wl in self.kinase_set:
                     parts['entity_types'][i] = 'kinase'
-                elif wl.encode('utf-8') in self.protein_set:
+                elif wl.encode('utf-8') in self.protein_set and wl.encode('utf-8') not in blacklist:
                     parts['entity_types'][i] = 'protein'
         return parts

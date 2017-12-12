@@ -449,7 +449,9 @@ class BabbleStream(object):
                     filter_str = "Inconsistency with Example"
                     reason_str = "This parse did not agree with the candidate ({}, {})".format(
                         candidate[0].get_span(), candidate[1].get_span())
-                        # filtered_parse.reason.get_parent().text.encode('utf-8')))
+                    # TEMP
+                    # print(filtered_parse.reason.get_parent().text.encode('utf-8'))
+                    # TEMP
                     
                 elif filter_name == 'UniformSignatureFilter':
                     filter_str = "Uniform Signature"
@@ -468,7 +470,6 @@ class BabbleStream(object):
                 else:
                     print("\nParse: {}".format(parse_str))
                 print("\nReason: {}\n".format(reason_str))
-
 
     def commit(self, idxs='all'):
         """
