@@ -14,12 +14,10 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for MAX_TRAIN in 9000 10000 11000 12000 13000 14000 15000 16000 17000 18000 19000 20000 21000 22000
-do
 for ITER in 1 2 3 4 5
 do
 
-RUN="${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
+RUN="${DOMAIN}_${EXP}_${TIME}_${ITER}"
 
 DB_NAME="babble_${RUN}"
 echo "Using db: $DB_NAME"
@@ -37,13 +35,19 @@ python -u snorkel/contrib/babble/pipelines/run.py \
     --reports_dir $REPORTS_SUBDIR \
     --start_at 7 \
     --end_at 10 \
-    --supervision traditional \
-    --max_train $MAX_TRAIN \
+    --supervision generative \
+    --learn_deps false \
+    --gen_init_params:lf_propensity true \
+    --gen_init_params:lf_class_propensity false \
+    --gen_init_params:class_prior false \
+    --gen_model_search_space 20 \
     --disc_model_class lstm \
     --disc_model_search_space 10 \
     --verbose --no_plots |& tee -a $LOGFILE &
+sleep 3
 
-sleep 600
-
+done
+done
+done
 done
 done
