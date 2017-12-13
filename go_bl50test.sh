@@ -14,15 +14,15 @@ echo "Saving reports to '$REPORTS_DIR'"
 echo ""
 echo "Note: If you are not starting at stage 0, confirm database exists already."
 
-echo "Make starter db..."
-python -u snorkel/contrib/babble/pipelines/run.py \
-    --domain $DOMAIN \
-    --db_name babble_spouse_bl50_featurized_tocopy \
-    --start_at 0 \
-    --end_at 5 \
-    --BL50_test true \
-    --supervision majority \
-    --verbose --no_plots
+#echo "Make starter db..."
+#python -u snorkel/contrib/babble/pipelines/run.py \
+#    --domain $DOMAIN \
+#    --db_name babble_${DOMAIN}_bl50_featurized_tocopy \
+#    --start_at 0 \
+#    --end_at 5 \
+#    --BL50_test true \
+#    --supervision majority \
+#    --verbose --no_plots
 
 
 # Run tests
@@ -33,7 +33,7 @@ RUN="${DOMAIN}_${EXP}_${TIME}_${ITER}"
 
 DB_NAME="babble_${RUN}"
 echo "Using db: $DB_NAME"
-cp babble_spouse_bl50_featurized_tocopy.db $DB_NAME.db
+cp babble_${DOMAIN}_bl50_featurized_tocopy.db $DB_NAME.db
 
 REPORTS_SUBDIR="$REPORTS_DIR/$RUN/"
 mkdir -p $REPORTS_SUBDIR
@@ -46,7 +46,7 @@ python -u snorkel/contrib/babble/pipelines/run.py \
     --domain $DOMAIN \
     --reports_dir $REPORTS_SUBDIR \
     --db_name $DB_NAME \
-    --start_at 5 \
+    --start_at 0 \
     --max_explanations 30 \
     --BL50_test true \
     --supervision majority \
