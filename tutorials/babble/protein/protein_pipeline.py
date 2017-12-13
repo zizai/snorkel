@@ -1,5 +1,6 @@
 import csv
 import os
+import random
 
 import numpy as np
 from six.moves.cPickle import load
