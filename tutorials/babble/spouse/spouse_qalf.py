@@ -1,8 +1,9 @@
 import csv
 
-from scipy.sparse import csr_matrix
+import numpy as np
+from scipy.sparse import csr_matrix, coo_matrix
 
-from snorkel.annotations import csr_LabelMatrix
+from snorkel.annotations import csr_LabelMatrix, LabelAnnotator
 
 NUM_SPLITS = 3
 
@@ -12,7 +13,7 @@ class QalfConverter(object):
         self.session = session
         self.candidate_class = candidate_class
     
-    def convert(self, matrix_tsv_path):
+    def convert(self, matrix_tsv_path, stats_tsv_path):
         candidate_map = {}
         split_sizes = [0] * NUM_SPLITS
         for split in [0, 1, 2]:
@@ -22,19 +23,37 @@ class QalfConverter(object):
             split_sizes[split] = len(candidates)
             for c in candidates:
                 candidate_map[c.get_stable_id()] = (c.id, split)
-                
-        label_matrices = self.tsv_to_matrix(matrix_tsv_path, candidate_map)
+
+        lf_names = self._extract_lf_names(stats_tsv_path)
+        label_matrices = self._tsv_to_matrix(matrix_tsv_path, lf_names, candidate_map)
 
         for i, label_matrix in enumerate(label_matrices):
             assert(label_matrix.shape[0] == split_sizes[i])
             
         return label_matrices
 
-    def tsv_to_matrix(self, matrix_tsv_path, candidate_map):
+    def _extract_lf_names(self, stats_tsv_path):
+        """
+        Args:
+            matrix_tsv_path: path to tsv where first column is QA question.
+        Returns:
+            list of strings containing the questions with spaces replaced by
+                underscores.
+        """
+        lf_names = []
+        with open(stats_tsv_path, 'rb') as tsv:
+            tsv_reader = csv.reader(tsv, delimiter='\t')
+            for row in tsv_reader:    
+                question = row[0]
+                lf_names.append('_'.join(question.split()))
+        return lf_names
+
+    def _tsv_to_matrix(self, matrix_tsv_path, lf_names, candidate_map):
         """
         Args:
             matrix_tsv_path: path to tsv where first column is candidate_ids
                 and all remaining columns contains labels from qa queries.
+            lf_names: a list of strings containing the names of the lfs
             candidate_map: dict mapping candidate_ids to their split
         Returns:
             L_train, L_dev, L_test: a csrAnnotationMatrix for each split
@@ -72,25 +91,25 @@ class QalfConverter(object):
 
         label_matrices = [None] * NUM_SPLITS
         for split in [0, 1, 2]:
-            csr = csr_matrix((data[split], (rows[split], cols[split])), 
-                shape=(len(row_ids[split]), len(col_ids[split]))).tocsr()
-            label_matrices[split] = self.csr_to_labelmatrix(
-                csr, row_ids[split], col_ids[split])
+            coo = coo_matrix((data[split], (rows[split], cols[split])), 
+                shape=(len(row_ids[split]), len(col_ids[split])))
+            label_matrices[split] = self.coo_to_labelmatrix(coo, row_ids[split], lf_names, split)
+        
         return label_matrices
 
-    def csr_to_labelmatrix(self, csr, row_ids, col_ids):
-        # NOTE: col_ids currently goes unused
+    def coo_to_labelmatrix(self, coo, row_ids, lf_names, split):
         candidate_index = {candidate_id: i for i, candidate_id in enumerate(row_ids)}
-        row_index = {v: k for k, v in candidate_index.items()}
-        return csr_LabelMatrix(csr, 
-                               candidate_index=candidate_index,
-                               row_index=row_index)
+        
+        def label_generator(c):
+            candidate_idx = candidate_index[c.id]
+            row = np.ravel(coo.getrow(candidate_idx).todense())
+            for i, label in enumerate(row):
+                yield lf_names[i], int(label)
 
-# NOTE:
-# This is not yet a completely valid LabelMatrix, as we do not create the
-# col_index or key_index. Once you do, you should be able to run the following
-# lines to see a printout of LF performance:
-
-# from snorkel.annotations import load_gold_labels
-# L_gold_dev = load_gold_labels(session, annotator_name='gold', split=1)
-# print(L_dev.lf_stats(session, labels=L_gold_dev))
+        labeler = LabelAnnotator(label_generator=label_generator)
+        
+        if split == 0:
+            L = labeler.apply(split=split, parallelism=1)
+        else:
+            L = labeler.apply_existing(split=split, parallelism=1)
+        return L
