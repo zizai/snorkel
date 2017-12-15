@@ -285,8 +285,3 @@ explanations = [
 
 def get_explanations():
     return explanations
-
-# def get_explanations(fpath='razor_explanations.csv'):
-#     return extract_explanations(fpath)
-    # return link_explanation_candidates(explanations, candidates)
-            
