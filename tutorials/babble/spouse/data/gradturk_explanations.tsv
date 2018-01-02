@@ -23,7 +23,7 @@ c9062ccc-f63b-4bd1-95e2-3d3ccc6391eb::span:2765:2768~~c9062ccc-f63b-4bd1-95e2-3d
 445ee1bb-f00d-4fb6-a917-ad4609c37918::span:1714:1728~~445ee1bb-f00d-4fb6-a917-ad4609c37918::span:1756:1767	False	the last word of person1 is not the same as the last word of person2.	
 df8eb686-7023-4020-ad9b-e05194728ac9::span:0:13~~df8eb686-7023-4020-ad9b-e05194728ac9::span:176:198	False	there's an extra word highlighted.	
 3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4242:4245~~3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4273:4288	True	"the words ""and her husband"" appear between person1 and person2. "	
-302c9acb-a874-421b-b926-7426d32e0ef2::span:3625:3637~~302c9acb-a874-421b-b926-7426d32e0ef2::span:3643:3657	True	"of the words ""married couple"" before person1 and the word ""and"" between person1 and person2."	
+302c9acb-a874-421b-b926-7426d32e0ef2::span:3625:3637~~302c9acb-a874-421b-b926-7426d32e0ef2::span:3643:3657	True	"because of the words ""married couple"" before person1 and the word ""and"" between person1 and person2."	
 940a06e6-b0e0-4e71-a44b-936700ccd6cc::span:67:86~~940a06e6-b0e0-4e71-a44b-936700ccd6cc::span:119:130	True	"the words ""and her husband"" appears between person1 and person2."	
 940a06e6-b0e0-4e71-a44b-936700ccd6cc::span:67:86~~940a06e6-b0e0-4e71-a44b-936700ccd6cc::span:119:130	False	there is no context of relation between person1 and person2.	
 e9f73bb0-d758-40a7-bf59-d42521a88294::span:2287:2291~~e9f73bb0-d758-40a7-bf59-d42521a88294::span:2317:2319	False	"""wife"" occurs after person1 and person2"	
@@ -59,7 +59,7 @@ e7b41f2f-d98a-45a1-9616-1d4a65e24501::span:81:84~~e7b41f2f-d98a-45a1-9616-1d4a65
 2b4e8570-08a6-445e-9ca4-d84d4eed102c::span:2035:2039~~2b4e8570-08a6-445e-9ca4-d84d4eed102c::span:2087:2089	True	"""wife"" is immediately before person2"	
 c6a853a3-960e-4857-b048-abb692d1b2cc::span:5882:5889~~c6a853a3-960e-4857-b048-abb692d1b2cc::span:5905:5915	True	"""wife"" is immediately before person2"	
 416228c4-81cb-4e38-8c4c-5ca61e385055::span:2721:2734~~416228c4-81cb-4e38-8c4c-5ca61e385055::span:2876:2886	False	"""executive director"" is between person1 and person2"	
-931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"	
+931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"
 e9f73bb0-d758-40a7-bf59-d42521a88294::span:2297:2302~~e9f73bb0-d758-40a7-bf59-d42521a88294::span:2317:2319	True	the last 3 characters of person2 is the same as the last 3 characters of the person before person1	
 07d7a528-1959-4bc8-8bb2-d2cbf2e1579f::span:1122:1133~~07d7a528-1959-4bc8-8bb2-d2cbf2e1579f::span:1208:1228	True	"the word ""spouse"" is used to describe the relationship between person1 and person2"	
 63d7922b-ba07-47d2-88c1-06431c7302a9::span:8815:8828~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:8873:8883	False	the sentence only suggests that person2 offered condolences to person1 after his defeat	
@@ -81,10 +81,10 @@ affed66e-3a08-40d0-b11f-51b5727dccc4::span:61:64~~affed66e-3a08-40d0-b11f-51b572
 6f9b06d9-36aa-4fd3-bbfd-5d257957a3a0::span:2061:2066~~6f9b06d9-36aa-4fd3-bbfd-5d257957a3a0::span:2092:2097	True	"""wife"" follows person1 in the sentence, and ""wife"" comes within 1 word of person2."	
 258873e6-1f83-4f6c-9ddd-7e23b4332e41::span:0:4~~258873e6-1f83-4f6c-9ddd-7e23b4332e41::span:53:64	True	"""tied the knot with"" comes after person1 in the sentence, and ""tied the knot with"" is less than 3 words before person2."	
 a8488aab-31dc-49d7-83f0-8921c4bda307::span:1084:1092~~a8488aab-31dc-49d7-83f0-8921c4bda307::span:1175:1188	True	"""and"" is between person1 and person2, and ""their son"" comes less than 10 words after person1 and person2."	
-e329654e-46f6-4f54-b478-d850cf9c1c08::span:728:731~~e329654e-46f6-4f54-b478-d850cf9c1c08::span:850:871	False	"of the words ""her captor"" between person1 and person2."	
+e329654e-46f6-4f54-b478-d850cf9c1c08::span:728:731~~e329654e-46f6-4f54-b478-d850cf9c1c08::span:850:871	False	"because of the words ""her captor"" between person1 and person2."	
 6c242461-04a2-4d76-89b7-ecf20995032f::span:3757:3766~~6c242461-04a2-4d76-89b7-ecf20995032f::span:3782:3786	False	person2 is a location.	
 3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:37:42~~3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:246:256	False	person1 is not a person.	
-8ed8e52a-d1e9-4df2-b7cf-c5bf3961d40d::span:4006:4022~~8ed8e52a-d1e9-4df2-b7cf-c5bf3961d40d::span:4044:4048	True	"of the words ""his wife"" between person1 and person2."	
+8ed8e52a-d1e9-4df2-b7cf-c5bf3961d40d::span:4006:4022~~8ed8e52a-d1e9-4df2-b7cf-c5bf3961d40d::span:4044:4048	True	"because of the words ""his wife"" between person1 and person2."	
 b8202a40-f2cf-416b-bf45-f4992a7bd819::span:39:43~~b8202a40-f2cf-416b-bf45-f4992a7bd819::span:135:148	False	person1 and person2 are the same person.	
 d83554df-ec54-4ffc-a56d-f7145374dcdd::span:929:933~~d83554df-ec54-4ffc-a56d-f7145374dcdd::span:1236:1239	True	"""his wife"" is before person1"	
 451184bd-fdc7-4152-9aef-dbc23a71cde2::span:2499:2515~~451184bd-fdc7-4152-9aef-dbc23a71cde2::span:2564:2570	False	"""as his"" is in between person1 and person2"	
@@ -106,8 +106,8 @@ cd9b993c-e130-461a-b072-739402ea3d73::span:1405:1410~~cd9b993c-e130-461a-b072-73
 f40939d2-dab0-4921-bd60-56ad4e99b94a::span:3462:3469~~f40939d2-dab0-4921-bd60-56ad4e99b94a::span:3540:3546	True	"""ex-husband"" occurs right before person2"	
 c9062ccc-f63b-4bd1-95e2-3d3ccc6391eb::span:2765:2768~~c9062ccc-f63b-4bd1-95e2-3d3ccc6391eb::span:2858:2862	True	"""proposal"" occurs after person1 and person2"	
 445ee1bb-f00d-4fb6-a917-ad4609c37918::span:1714:1728~~445ee1bb-f00d-4fb6-a917-ad4609c37918::span:1756:1767	False	"""books"" occur before person1 and person2"	
-a933e597-8f1f-4ccd-abdc-fadf12afaa88::span:978:981~~a933e597-8f1f-4ccd-abdc-fadf12afaa88::span:1018:1029	False	"of the words ""and her husband"" after person2."	
-c19bb988-3bec-4ceb-b26a-ac0d2c32999d::span:1346:1350~~c19bb988-3bec-4ceb-b26a-ac0d2c32999d::span:1426:1437	False	"of the word ""co-host"" between person1 and person2."	
+a933e597-8f1f-4ccd-abdc-fadf12afaa88::span:978:981~~a933e597-8f1f-4ccd-abdc-fadf12afaa88::span:1018:1029	False	"because of the words ""and her husband"" after person2."	
+c19bb988-3bec-4ceb-b26a-ac0d2c32999d::span:1346:1350~~c19bb988-3bec-4ceb-b26a-ac0d2c32999d::span:1426:1437	False	"because of the word ""co-host"" between person1 and person2."	
 48355563-37ab-4fb8-9525-4762d6be7fc8::span:3854:3856~~48355563-37ab-4fb8-9525-4762d6be7fc8::span:3862:3865	True	"""and"" occurs directly between person1 and person2 and the phrase ""they married"" occurs after person2"	
 c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1476:1484~~c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1562:1568	True	"the word ""hubby"" is directly before person2"	
 ef25a434-f534-4957-87bd-2807d46a70a3::span:1007:1012~~ef25a434-f534-4957-87bd-2807d46a70a3::span:1015:1024	False	there are no marriage words in the sentence and person1 and person2 are part of a list of names	
@@ -118,9 +118,9 @@ d925621f-5004-4a55-8122-f5da4865a483::span:7652:7664~~d925621f-5004-4a55-8122-f5
 6d1ef90f-ba46-48f4-91d4-860ba96671f7::span:134:138~~6d1ef90f-ba46-48f4-91d4-860ba96671f7::span:144:163	True	"The word ""and"" occurs between person1 and person2, and the word ""son"" occurs after person2."	
 c2d70dbd-3aaf-4091-ba53-d04abf545c6e::span:3081:3088~~c2d70dbd-3aaf-4091-ba53-d04abf545c6e::span:3153:3164	True	"The words ""husband"" occurs before person2 and the word ""with"" occurs between person1 and person2."	
 60244564-b6a9-4b2e-b35f-a01d07e8f75a::span:1387:1391~~60244564-b6a9-4b2e-b35f-a01d07e8f75a::span:1472:1479	False	person1 and person2 are the same.	
-9aee8633-0b59-4446-81d9-a7d281be8e09::span:2880:2888~~9aee8633-0b59-4446-81d9-a7d281be8e09::span:2950:2957	True	"of the words ""she married"" between person1 and person2."	
+9aee8633-0b59-4446-81d9-a7d281be8e09::span:2880:2888~~9aee8633-0b59-4446-81d9-a7d281be8e09::span:2950:2957	True	"because of the words ""she married"" between person1 and person2."	
 80707f8e-7668-43cb-a0a0-04c258274e51::span:3:13~~80707f8e-7668-43cb-a0a0-04c258274e51::span:66:77	False	person1 is the author of the sentence.	
-5b421541-4922-418f-a054-886ce4965d02::span:549:552~~5b421541-4922-418f-a054-886ce4965d02::span:569:579	True	"of the word ""wife"" between person1 and person2."	
+5b421541-4922-418f-a054-886ce4965d02::span:549:552~~5b421541-4922-418f-a054-886ce4965d02::span:569:579	True	"because of the word ""wife"" between person1 and person2."	
 a24c965c-06d1-4a9e-abf1-aba00eaddb8d::span:1545:1547~~a24c965c-06d1-4a9e-abf1-aba00eaddb8d::span:1588:1610	False	extra word is highlighted for person2.	
 05ae8661-f643-4974-ab9b-93648737e1ad::span:2206:2215~~05ae8661-f643-4974-ab9b-93648737e1ad::span:2221:2233	False	person1 and person2 are not people.	
 63d7922b-ba07-47d2-88c1-06431c7302a9::span:3765:3769~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:3786:3799	False	"""("" is between person1 and person2"	

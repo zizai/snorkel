@@ -104,15 +104,22 @@ class SpousePipeline(BabblePipeline):
             explanations = get_explanations()
             user_lists = get_user_lists()
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
-        elif lf_source == 'gradturk':
+        elif lf_source.startswith('gradturk'):
             from tutorials.babble.spouse.spouse_examples import get_user_lists
             from snorkel.contrib.babble.utils import ExplanationIO
-            fpath = (os.environ['SNORKELHOME'] + 
-                '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
+            if lf_source == 'gradturk':
+                fpath = (os.environ['SNORKELHOME'] + 
+                    '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
+            elif lf_source == 'gradturk30':
+                fpath = (os.environ['SNORKELHOME'] + 
+                    '/tutorials/babble/spouse/data/gradturk_explanations30.tsv')
             exp_reader = ExplanationIO()
             explanations = exp_reader.read(fpath)
             user_lists = {}
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
+        elif lf_source='gradturk30':
+
+            
         else:
             raise Exception('Invalid lf_source {}'.format(lf_source))
   
