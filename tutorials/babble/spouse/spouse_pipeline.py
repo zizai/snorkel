@@ -117,9 +117,6 @@ class SpousePipeline(BabblePipeline):
             explanations = exp_reader.read(fpath)
             user_lists = {}
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
-        elif lf_source='gradturk30':
-
-            
         else:
             raise Exception('Invalid lf_source {}'.format(lf_source))
   
