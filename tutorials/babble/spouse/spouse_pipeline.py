@@ -92,7 +92,7 @@ class SpousePipeline(BabblePipeline):
                              annotator_name='gold', path=fpath, 
                              splits=self.config['splits'])
 
-    def collect(self, lf_source='gradturk'):
+    def collect(self, lf_source='gradturk30'):
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...skipping 'collect' stage.")
             return
