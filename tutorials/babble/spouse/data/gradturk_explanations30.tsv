@@ -1,4 +1,4 @@
-931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"
+931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"	
 d6500075-c7f8-40ed-968c-d08f3d66b112::span:1569:1573~~d6500075-c7f8-40ed-968c-d08f3d66b112::span:1720:1739	False	"The word ""Chief"" appears before person2"	
 9aee8633-0b59-4446-81d9-a7d281be8e09::span:2880:2888~~9aee8633-0b59-4446-81d9-a7d281be8e09::span:2950:2957	True	"of the words ""she married"" between person1 and person2."	
 176fbe18-c256-4206-be21-6eb361ffd3e4::span:1600:1604~~176fbe18-c256-4206-be21-6eb361ffd3e4::span:1621:1624	True	"person1 is preceded by ""wife"" and person2 occurs within 3 words of person1"	
@@ -9,7 +9,7 @@ d6500075-c7f8-40ed-968c-d08f3d66b112::span:1569:1573~~d6500075-c7f8-40ed-968c-d0
 a8488aab-31dc-49d7-83f0-8921c4bda307::span:315:323~~a8488aab-31dc-49d7-83f0-8921c4bda307::span:329:342	True	"""husband"" is in the sentence before person1"	
 416228c4-81cb-4e38-8c4c-5ca61e385055::span:2721:2734~~416228c4-81cb-4e38-8c4c-5ca61e385055::span:2876:2886	False	"""executive director"" is between person1 and person2"	
 affed66e-3a08-40d0-b11f-51b5727dccc4::span:61:64~~affed66e-3a08-40d0-b11f-51b5727dccc4::span:112:121	True	"person2 is the subject of the sentence and person1 is immediately preceded by ""husband"""	
-df8eb686-7023-4020-ad9b-e05194728ac9::span:0:13~~df8eb686-7023-4020-ad9b-e05194728ac9::span:176:198	False	there's an extra word highlighted.
+df8eb686-7023-4020-ad9b-e05194728ac9::span:0:13~~df8eb686-7023-4020-ad9b-e05194728ac9::span:176:198	False	there's an extra word highlighted.	
 77c632db-103a-491e-ae8c-cd7ef3aace00::span:14775:14779~~77c632db-103a-491e-ae8c-cd7ef3aace00::span:15046:15050	False	person1 is the same as person2	
 2a339c82-5086-40e8-91ba-e705418acc0d::span:2635:2636~~2a339c82-5086-40e8-91ba-e705418acc0d::span:2668:2683	False	person2 occurs in a phrase surrounded by quotes	
 0466d5cb-256b-41a0-9cd2-cc41d8916ede::span:6979:6984~~0466d5cb-256b-41a0-9cd2-cc41d8916ede::span:7242:7248	False	person1 is more than 20 words away from person2	
@@ -19,7 +19,7 @@ a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:1108:1117~~a587afeb-715c-44ee-bdef-75
 8e22cef3-8de7-4a48-8d2f-30e123af3827::span:0:14~~8e22cef3-8de7-4a48-8d2f-30e123af3827::span:137:146	True	"the relationship because person2 is referred to as person1's ""wife"", and because the sentence talks about person1's desire to ""start a family"" with person2"	
 3494f8e0-ecd4-4f10-86db-95b920744162::span:18:33~~3494f8e0-ecd4-4f10-86db-95b920744162::span:120:125	True	"""his wife"" comes after person1 and ""his wife"" comes within three words of person2."	
 b9d99514-0043-4b56-a952-28f977550fcc::span:1032:1050~~b9d99514-0043-4b56-a952-28f977550fcc::span:1064:1080	True	"""and married"" is between person1 and person2"	
-3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4242:4245~~3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4273:4288	True	"the words ""and her husband"" appear between person1 and person2. "
+3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4242:4245~~3dc9c69c-3e30-4711-ac8b-7bc2c8d928bf::span:4273:4288	True	"the words ""and her husband"" appear between person1 and person2."	
 4dea8778-67ba-40a6-af3f-e4303f2f4dc7::span:463:467~~4dea8778-67ba-40a6-af3f-e4303f2f4dc7::span:482:494	True	"person1 is said to have ""married"" person2 in ""2008"""	
 a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:805:819~~a587afeb-715c-44ee-bdef-75f61cb7c6e8::span:867:881	False	person1 is the same as person2	
 d925621f-5004-4a55-8122-f5da4865a483::span:7766:7771~~d925621f-5004-4a55-8122-f5da4865a483::span:7839:7843	False	"""children"" occurs between person1 and person2"	
@@ -27,4 +27,4 @@ d925621f-5004-4a55-8122-f5da4865a483::span:7766:7771~~d925621f-5004-4a55-8122-f5
 5b421541-4922-418f-a054-886ce4965d02::span:549:552~~5b421541-4922-418f-a054-886ce4965d02::span:569:579	True	"because of the word ""wife"" between person1 and person2."	
 72c336af-f0c4-477a-8014-0bf97b6e979e::span:817:830~~72c336af-f0c4-477a-8014-0bf97b6e979e::span:1171:1174	True	"""his widow"" is before person2"	
 d83554df-ec54-4ffc-a56d-f7145374dcdd::span:0:3~~d83554df-ec54-4ffc-a56d-f7145374dcdd::span:9:25	True	"The word ""and"" appears between person1 and person2"	
-c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1476:1484~~c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1562:1568	True	"the word ""hubby"" is directly before person2"
+c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1476:1484~~c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1562:1568	True	"the word ""hubby"" is directly before person2"	
