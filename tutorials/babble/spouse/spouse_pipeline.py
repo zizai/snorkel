@@ -4,6 +4,7 @@ import os
 import numpy as np
 import random
 
+from snorkel.annotations import LabelAnnotator
 from snorkel.candidates import Ngrams, CandidateExtractor
 from snorkel.matchers import PersonMatcher
 from snorkel.models import Document, Sentence, StableLabel
@@ -92,25 +93,25 @@ class SpousePipeline(BabblePipeline):
                              annotator_name='gold', path=fpath, 
                              splits=self.config['splits'])
 
-    def collect(self, lf_source='gradturk30'):
+    def collect(self):
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...skipping 'collect' stage.")
             return
-        if lf_source == 'intro_func':
-            self.lfs = self.use_intro_lfs()
+        if self.config['lf_source'] == 'intro_funcs':
+            self.lfs = self.get_intro_lfs()
             self.labeler = LabelAnnotator(lfs=self.lfs)
-        elif lf_source == 'intro_exps':
+        elif self.config['lf_source'] == 'intro_exps':
             from tutorials.babble.spouse.spouse_examples import (get_explanations, get_user_lists)                        
             explanations = get_explanations()
             user_lists = get_user_lists()
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
-        elif lf_source.startswith('gradturk'):
+        elif self.config['lf_source'].startswith('gradturk'):
             from tutorials.babble.spouse.spouse_examples import get_user_lists
             from snorkel.contrib.babble.utils import ExplanationIO
-            if lf_source == 'gradturk':
+            if self.config['lf_source'] == 'gradturk':
                 fpath = (os.environ['SNORKELHOME'] + 
                     '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
-            elif lf_source == 'gradturk30':
+            elif self.config['lf_source'] == 'gradturk30':
                 fpath = (os.environ['SNORKELHOME'] + 
                     '/tutorials/babble/spouse/data/gradturk_explanations30.tsv')
             exp_reader = ExplanationIO()
@@ -120,7 +121,7 @@ class SpousePipeline(BabblePipeline):
         else:
             raise Exception('Invalid lf_source {}'.format(lf_source))
   
-    def use_intro_lfs(self):
+    def get_intro_lfs(self):
         import re
         from snorkel.lf_helpers import (
             get_left_tokens, get_right_tokens, get_between_tokens,

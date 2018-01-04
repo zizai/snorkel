@@ -5,6 +5,7 @@ config = {
     'BL50_test': False,
 
     'babbler_label_split': 1,
+    'lf_source': 'gradturk30',
 
     'gen_init_params': {
 		'class_prior'           : False, # TRUE!?
