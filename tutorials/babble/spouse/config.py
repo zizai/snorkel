@@ -5,6 +5,7 @@ config = {
     'BL50_test': False,
 
     'babbler_label_split': 1,
+    'babbler_candidate_split': [0,1,2], # Only need all three if using intro_exps
     'lf_source': 'gradturk30',
 
     'gen_init_params': {
