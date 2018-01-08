@@ -57,6 +57,9 @@ class BabblePipeline(SnorkelPipeline):
             else:
                 print("Since max_explanations > len(explanations), using all {} Explanations".format(
                     len(explanations)))
+            if self.config['verbose']:
+                for exp in explanations:
+                    print(exp)
         
         print("Calling babbler...")
         self.babbler = Babbler(self.session,

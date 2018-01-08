@@ -119,7 +119,7 @@ class SpousePipeline(BabblePipeline):
             user_lists = {}
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
         else:
-            raise Exception('Invalid lf_source {}'.format(lf_source))
+            raise Exception('Invalid lf_source {}'.format(self.config['lf_source']))
   
     def get_intro_lfs(self):
         import re
