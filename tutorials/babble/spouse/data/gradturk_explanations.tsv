@@ -59,7 +59,7 @@ e7b41f2f-d98a-45a1-9616-1d4a65e24501::span:81:84~~e7b41f2f-d98a-45a1-9616-1d4a65
 2b4e8570-08a6-445e-9ca4-d84d4eed102c::span:2035:2039~~2b4e8570-08a6-445e-9ca4-d84d4eed102c::span:2087:2089	True	"""wife"" is immediately before person2"	
 c6a853a3-960e-4857-b048-abb692d1b2cc::span:5882:5889~~c6a853a3-960e-4857-b048-abb692d1b2cc::span:5905:5915	True	"""wife"" is immediately before person2"	
 416228c4-81cb-4e38-8c4c-5ca61e385055::span:2721:2734~~416228c4-81cb-4e38-8c4c-5ca61e385055::span:2876:2886	False	"""executive director"" is between person1 and person2"	
-931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"
+931042dc-36bd-4b59-8b1d-3b59796ceb59::span:3923:3930~~931042dc-36bd-4b59-8b1d-3b59796ceb59::span:4122:4126	False	"""sisters"" is between person1 and person2"	
 e9f73bb0-d758-40a7-bf59-d42521a88294::span:2297:2302~~e9f73bb0-d758-40a7-bf59-d42521a88294::span:2317:2319	True	the last 3 characters of person2 is the same as the last 3 characters of the person before person1	
 07d7a528-1959-4bc8-8bb2-d2cbf2e1579f::span:1122:1133~~07d7a528-1959-4bc8-8bb2-d2cbf2e1579f::span:1208:1228	True	"the word ""spouse"" is used to describe the relationship between person1 and person2"	
 63d7922b-ba07-47d2-88c1-06431c7302a9::span:8815:8828~~63d7922b-ba07-47d2-88c1-06431c7302a9::span:8873:8883	False	the sentence only suggests that person2 offered condolences to person1 after his defeat	
