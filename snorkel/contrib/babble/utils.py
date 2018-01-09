@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 
+from snorkel.annotations import LabelAnnotator
 from snorkel.models import Candidate
 from snorkel.learning import RandomSearch
 
@@ -98,6 +99,24 @@ def link_explanation_candidates(explanations, candidates):
     print("Linked {}/{} explanations".format(linked, len(explanations)))
 
     return explanations
+
+
+def sparse_to_labelmatrix(sparse_matrix, candidate_map, lf_names, split, replace_key_set=False):
+    """Converts a sparse matrix into a csr_LabelMatrix for Snorkel."""
+    
+    def label_generator(c):
+        candidate_idx = candidate_map[c.id]
+        row = np.ravel(sparse_matrix.getrow(candidate_idx).todense())
+        for i, label in enumerate(row):
+            yield lf_names[i], int(label)
+
+    labeler = LabelAnnotator(label_generator=label_generator)
+    
+    if split == 0 or replace_key_set:
+        L = labeler.apply(split=split, parallelism=1)
+    else:
+        L = labeler.apply_existing(split=split, parallelism=1)
+    return L
 
 
 ### MODEL TRAINING ROUTINES
