@@ -38,7 +38,7 @@ basic = [
         #     chemical and the disease""",
         condition="""between the chemical and the disease, 
             there is a causal word and the word 'not' is not between them.""",
-        candidate="11999899::span:1310:1318~~11999899::span:1292:1297",
+        candidate="2572625::span:314:328~~2572625::span:432:440",
         label=True,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', True), ('.and', ('.any', ('.map', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.user_list', ('.string', u'causal')))), ('.not', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'not'))))))),
     # LF_c_d
@@ -173,7 +173,7 @@ basic = [
         #     'develop' and 'following' is between the disease and the chemical""",
         condition="""a word containing 'develop' appears somewhere before the chemical, 
             and the word 'following' is between the disease and the chemical.""",
-        candidate="14698717::span:322:330~~14698717::span:302:310", # NOTE: This is in TRAIN
+        candidate="12639165::span:779:789~~12639165::span:849:869", # NOTE: This is in TRAIN
         label=True,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', True), ('.and', ('.any', ('.map', ('.contains', ('.string', u'develop')), ('.extract_text', ('.left', ('.arg', ('.int', 1)))))), ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 2)), ('.arg', ('.int', 1)))))), ('.string', u'following')))))),
     # LF_far_c_d
@@ -267,7 +267,7 @@ basic = [
         #     disease ends with 'induced'""",
         condition="""a word between the chemical and the 
             disease ends with "induced".""",
-        candidate="19721134::span:1078:1084~~19721134::span:1017:1026",
+        candidate="1564236::span:1176:1187~~1564236::span:1241:1257",
         label=False,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', False), ('.any', ('.map', ('.endswith', ('.string', u'induced')), ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))))))),
     # LF_level
@@ -275,7 +275,7 @@ basic = [
         name='LF_level',
         # original_condition="""'level' comes after the chemical""",
         condition="""the word "level" comes after the chemical.""",
-        candidate="17574447::span:110:122~~17574447::span:311:323",
+        candidate="8643973::span:167:171~~8643973::span:328:341",
         label=False,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', False), ('.call', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 1))))), ('.string', u'level'))))),
     # LF_measure
@@ -296,7 +296,7 @@ basic = [
         condition=""""none", "not", or "no" precedes the 
             disease by no more than 30 characters.
         """,
-        candidate="11999899::span:962:970~~11999899::span:1112:1121",
+        candidate="14659530::span:1916:1919~~14659530::span:1850:1857",
         label=False,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', False), ('.any', ('.map', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 2)), ('.string', '.leq'), ('.int', 30), ('.string', 'chars')))), ('.list', ('.string', u'none'), ('.string', u'not'), ('.string', u'no'))))))),
     # LF_risk_d
@@ -315,7 +315,7 @@ basic = [
         #     50 characters before the disease""",
         condition="""there is at least one treat word 
             no more than 50 characters before the disease.""",
-        candidate="10728962::span:32:40~~10728962::span:50:60",
+        candidate="14568327::span:932:935~~14568327::span:1075:1078",
         label=False,
         semantics=None), # OLD: ('.root', ('.label', ('.bool', False), ('.call', ('.geq', ('.int', 1)), ('.sum', ('.map', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 2)), ('.string', '.lt'), ('.int', 50), ('.string', 'chars')))), ('.user_list', ('.string', u'treat')))))))),
     # LF_uncertain

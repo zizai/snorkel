@@ -4,6 +4,7 @@ config = {
 
     # collect
     'babbler_label_split': 1,
+    'babbler_candidate_split': [0,1,2],
 
     # supervise
     'gen_init_params': {
