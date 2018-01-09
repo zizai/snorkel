@@ -27,7 +27,7 @@ from snorkel.utils import (
 from snorkel.contrib.babble.filter_bank import FilterBank
 from snorkel.contrib.babble.grammar import Parse
 from snorkel.contrib.babble.semparser import Explanation, SemanticParser
-from snorkel.contrib.babble.utils import score_marginals
+from snorkel.contrib.babble.utils import score_marginals, sparse_to_labelmatrix
 
 
 ConfusionMatrix = namedtuple('ConfusionMatrix', ['correct', 'incorrect', 'abstained'])
@@ -571,7 +571,7 @@ class BabbleStream(object):
         """Calculates the quality on the dev set using simple majority vote."""
         majority_voter = MajorityVoter()
 
-        L_split = self.get_label_matrix(split=split)
+        L_split = self.get_label_matrix(split=split, replace_key_set=True)
         if not L_split.nnz:
             print("Cannot calculate majority quality for split {} because label "
                 "matrix is empty.".format(split))
@@ -591,15 +591,6 @@ class BabbleStream(object):
         num_labeled = sum(np.asarray(abs(np.sum(self.label_matrix, 1))).ravel() != 0)
 
         return GlobalCoverage(num_labeled, self.num_dev_total)
-
-    # def _sparse_to_csr_annotation_matrix(self, label_matrix)
-    #     """Convert a sparse label_matrix into a csr_AnnotationMatrix.
-        
-    #     Note: assumes it will only be applied to dev_candidates.
-    #     """
-    #     candidate_index = {c.id: i for i, c in enumerate(self.dev_candidates)}
-    #     row_index = {v: k for k, v in candidate_index.iteritems()}
-    #     key_index = 
 
     def get_parses(self, idx=None, translate=True):
         if idx is None:
@@ -658,23 +649,22 @@ class BabbleStream(object):
 
         return DataFrame(data=d, index=lf_names)[col_names]
 
-    def get_label_matrix(self, split=1):
+    def get_label_matrix(self, split=1, replace_key_set=False):
         if split == 1:
             if self.temp_parses is not None:
                 print("You must commit before retrieving the label matrix.")
                 return None
-            label_matrix = self.label_matrix
+            sparse_matrix = self.label_matrix
         else:
             rows, cols, data, shape_row, shape_col = self.label_triples[split]
-            label_matrix = coo_matrix((data, (rows, cols)), shape=(shape_row, shape_col)).tocsr()
+            sparse_matrix = coo_matrix((data, (rows, cols)), shape=(shape_row, shape_col)).tocsr()
         
         candidates = self.session.query(self.candidate_class).filter(
             self.candidate_class.split == split).all()
-        candidate_index = {c.id: i for i, c in enumerate(candidates)}
-        row_index = {v: k for k, v in candidate_index.items()}
-        return csr_AnnotationMatrix(label_matrix, 
-                                    candidate_index=candidate_index,
-                                    row_index=row_index)
+        candidate_map = {c.id: i for i, c in enumerate(candidates)}
+        lf_names = [parse.function.__name__ for parse in self.parses]
+        return sparse_to_labelmatrix(sparse_matrix, candidate_map, lf_names, 
+                                     split=split, replace_key_set=replace_key_set)
 
 
 class Babbler(BabbleStream):

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from pandas import DataFrame, Series
 
 from snorkel.models import Sentence
+from snorkel.utils import ProgressBar
 
 from core import core_grammar
 from text import text_grammar
@@ -64,7 +65,9 @@ class SemanticParser(object):
         explanations = explanations if isinstance(explanations, list) else [explanations]
         names = names if isinstance(names, list) or names is None else [names]
         self.name_explanations(explanations, names)
+        pb = ProgressBar(len(explanations))
         for i, exp in enumerate(explanations):
+            pb.bar(i)
             exp_normalized = u'label {} if {}'.format(exp.label, exp.condition)
             if (self.mode == 'text' and self.string_format == 'implicit' and 
                 getattr(exp.candidate, 'get_parent', None) and
@@ -81,6 +84,8 @@ class SemanticParser(object):
                 lf.__name__ = "{}_{}".format(exp.name, j)
                 LFs.append(lf)
             self.explanation_counter += 1
+        pb.close()
+        
         if verbose:
             return_object = 'parse(s)' if return_parses else "LF(s)"
             print("{} explanation(s) out of {} were parseable.".format(

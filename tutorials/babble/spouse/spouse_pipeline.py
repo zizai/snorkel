@@ -97,7 +97,7 @@ class SpousePipeline(BabblePipeline):
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...skipping 'collect' stage.")
             return
-        if self.config['lf_source'] == 'intro_funcs':
+        if self.config['lf_source'] == 'intro_lfs':
             self.lfs = self.get_intro_lfs()
             self.labeler = LabelAnnotator(lfs=self.lfs)
         elif self.config['lf_source'] == 'intro_exps':

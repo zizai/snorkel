@@ -3,7 +3,9 @@ import csv
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix
 
-from snorkel.annotations import csr_LabelMatrix, LabelAnnotator
+from snorkel.annotations import csr_LabelMatrix
+
+from snorkel.contrib.babble import sparse_to_labelmatrix
 
 NUM_SPLITS = 3
 
@@ -91,25 +93,9 @@ class QalfConverter(object):
 
         label_matrices = [None] * NUM_SPLITS
         for split in [0, 1, 2]:
-            coo = coo_matrix((data[split], (rows[split], cols[split])), 
+            csr = csr_matrix((data[split], (rows[split], cols[split])), 
                 shape=(len(row_ids[split]), len(col_ids[split])))
-            label_matrices[split] = self.coo_to_labelmatrix(coo, row_ids[split], lf_names, split)
+            candidate_map = {candidate_id: i for i, candidate_id in enumerate(row_ids[split])}
+            label_matrices[split] = sparse_to_labelmatrix(csr, candidate_map, lf_names, split)
         
         return label_matrices
-
-    def coo_to_labelmatrix(self, coo, row_ids, lf_names, split):
-        candidate_index = {candidate_id: i for i, candidate_id in enumerate(row_ids)}
-        
-        def label_generator(c):
-            candidate_idx = candidate_index[c.id]
-            row = np.ravel(coo.getrow(candidate_idx).todense())
-            for i, label in enumerate(row):
-                yield lf_names[i], int(label)
-
-        labeler = LabelAnnotator(label_generator=label_generator)
-        
-        if split == 0:
-            L = labeler.apply(split=split, parallelism=1)
-        else:
-            L = labeler.apply_existing(split=split, parallelism=1)
-        return L
