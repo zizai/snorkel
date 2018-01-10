@@ -1,5 +1,7 @@
 import random
 
+from collections import namedtuple
+
 from snorkel.annotations import LabelAnnotator, load_gold_labels
 from snorkel.db_helpers import reload_annotator_labels
 from snorkel.models import StableLabel
@@ -60,18 +62,58 @@ class BabblePipeline(SnorkelPipeline):
             if self.config['verbose']:
                 for exp in explanations:
                     print(exp)
-        
+
         print("Calling babbler...")
         self.babbler = Babbler(self.session,
                                mode=mode, 
                                candidate_class=self.candidate_class, 
                                user_lists=user_lists,
                                apply_filters=self.config['apply_filters'])
-        self.babbler.apply(explanations, 
-                           split=self.config['babbler_label_split'], 
-                           parallelism=self.config['parallelism'])
-        self.explanations = self.babbler.get_explanations()
-        self.lfs = self.babbler.get_lfs()
+        
+        # TEMP
+        # This temporary block is being used to identify how often the correct
+        # parse is found by the babbler.
+        # for exp in explanations:
+        #     print("Run Babbler...")
+        #     self.babbler.parses = []
+        #     self.babbler.apply([exp], 
+        #                     split=self.config['babbler_label_split'], 
+        #                     parallelism=self.config['parallelism'])
+        #     print("-----------------------------------------------------------")
+        #     print("\nCandidate:")
+        #     print(exp.candidate[0].get_span(), exp.candidate[1].get_span())
+        #     print(exp.candidate.get_parent().text)
+        #     print("\nExplanation:")
+        #     print(exp.name)
+        #     print("")
+        #     print(exp)
+        #     print("\nParses:")
+        #     parses = self.babbler.get_parses(translate=False)
+        #     translated = self.babbler.get_parses()
+        #     print("{} TOTAL:".format(len(parses)))
+        #     for p, t in zip(parses, translated):
+        #         print("")
+        #         print(t)
+        #         print("")
+        #         print(p.semantics)
+        #     print("\nFiltered Parses:")
+        #     self.babbler.filtered_analysis()
+        #     print("\n")
+        # TEMP
+
+
+        if self.config['gold_explanations']:
+            self.explanations = explanations
+            ParseMock = namedtuple('ParseMock', ['semantics'])
+            self.lfs = [self.babbler.semparser.grammar.evaluate(ParseMock(exp.semantics)) 
+                for exp in self.explanations]
+        else:
+            self.babbler.apply(explanations, 
+                    split=self.config['babbler_label_split'], 
+                    parallelism=self.config['parallelism'])            
+            self.explanations = self.babbler.get_explanations()
+            self.lfs = self.babbler.get_lfs()
+        
         self.labeler = LabelAnnotator(lfs=self.lfs)
         # NOTE: This is unnecessary for some runs; 
         # this info is printed in supervise() when supervise != traditional

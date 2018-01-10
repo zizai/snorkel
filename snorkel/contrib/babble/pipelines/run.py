@@ -48,8 +48,9 @@ if __name__ == '__main__':
     argparser.add_argument('--end_at', type=int)
 
     # Babble args
-    argparser.add_argument('--max_explanations', type=int)
     argparser.add_argument('--lf_source', type=str)
+    argparser.add_argument('--max_explanations', type=int)
+    argparser.add_argument('--gold_explanations', type=str2bool)
     argparser.add_argument('--apply_filters', type=str2bool)
     argparser.add_argument('--BL50_test', type=str2bool)
 

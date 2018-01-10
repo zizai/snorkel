@@ -470,6 +470,8 @@ class BabbleStream(object):
                 else:
                     print("\nParse: {}".format(parse_str))
                 print("\nReason: {}\n".format(reason_str))
+                
+                print("Semantics: {}\n".format(filtered_parse.parse.semantics))
 
     def commit(self, idxs='all'):
         """

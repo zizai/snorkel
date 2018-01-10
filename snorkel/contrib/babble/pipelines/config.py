@@ -30,6 +30,7 @@ global_config = {
     'beam_width': 10,
     'top_k': -1,
     'max_explanations': None,
+    'gold_explanations': False,
 
     ## FilterBank
     'apply_filters': True,
