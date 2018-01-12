@@ -3,6 +3,8 @@ from utils import STAGES
 global_config = {
     ### SETUP ###
     'domain': None,
+    'project': 'babble',
+
     'log_dir': 'logs',
     'reports_dir': 'reports', # nested under $SNORKELHOME/
     'postgres': False,

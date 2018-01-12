@@ -6,15 +6,18 @@ from config import global_config
 def merge_configs(config):
     if 'domain' not in config:
         raise Exception("config must have non-None value for 'domain'.")
-    local_config = get_local_config(config['domain'])
+    local_config = get_local_config(domain=config['domain'], project=config.get('project', 'babble'))
     config = recursive_merge_dicts(local_config, config)
     config = recursive_merge_dicts(global_config, config)
     return config  
 
 
-def get_local_config(domain):
+def get_local_config(domain, project='babble'):
+    if project not in ['babble', 'qalf']:
+        raise ValueError
+
     local_config_path = os.path.join(os.environ['SNORKELHOME'], 
-        'tutorials', 'babble', domain, 'config.py')
+        'tutorials', project, domain, 'config.py')
     if not os.path.exists(local_config_path):
         raise Exception("The config.py for the {} domain was not found at {}.".format(
             domain, local_config_path))
@@ -22,15 +25,23 @@ def get_local_config(domain):
     return local_config.config
 
 
-def get_local_pipeline(domain):
-    pipeline_path = os.path.join(os.environ['SNORKELHOME'],
-        'tutorials', 'babble', domain, '{}_pipeline.py'.format(domain))
+def get_local_pipeline(domain, project='babble'):
+    if project == 'babble':
+        pipeline_path = os.path.join(os.environ['SNORKELHOME'],
+            'tutorials', project, domain, '{}_pipeline.py'.format(domain))
+        pipeline_name = '{}Pipeline'.format(domain.capitalize())
+    elif project == 'qalf':
+        pipeline_path = os.path.join(os.environ['SNORKELHOME'],
+            'tutorials', project, domain, '{}_qalf_pipeline.py'.format(domain))
+        pipeline_name = '{}QalfPipeline'.format(domain.capitalize())
+    else:
+        raise ValueError
     if not os.path.exists(pipeline_path):
-        raise Exception("Pipeline for the {} domain was not found at {}.".format(
-            domain, pipeline_path))
+        raise Exception("Pipeline for the {} domain ({}) was not found at {}.".format(
+            domain, pipeline_name, pipeline_path))
     pipeline_module = load_source('pipeline_module', pipeline_path)
-    pipeline_name = '{}Pipeline'.format(domain.capitalize())
     pipeline = getattr(pipeline_module, pipeline_name)
+    print("Using {} object.".format(pipeline_name))
     return pipeline
 
 

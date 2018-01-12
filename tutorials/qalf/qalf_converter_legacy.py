@@ -1,7 +1,7 @@
 import csv
 
 import numpy as np
-from scipy.sparse import csr_matrix, coo_matrix
+from scipy.sparse import csr_matrix
 
 from snorkel.annotations import csr_LabelMatrix
 
@@ -9,7 +9,7 @@ from snorkel.contrib.babble import sparse_to_labelmatrix
 
 NUM_SPLITS = 3
 
-class QalfConverter(object):
+class LegacyQalfConverter(object):
     """Converts a matrix_*.tsv qalf file into csrAnnotationMatrix's."""
     def __init__(self, session, candidate_class):
         self.session = session
