@@ -26,8 +26,8 @@ def get_local_pipeline(domain):
     pipeline_path = os.path.join(os.environ['SNORKELHOME'],
         'tutorials', 'babble', domain, '{}_pipeline.py'.format(domain))
     if not os.path.exists(pipeline_path):
-        raise Exception("Pipeline for the {} domain ({}) was not found at {}.".format(
-            domain, pipeline_name, pipeline_path))
+        raise Exception("Pipeline for the {} domain was not found at {}.".format(
+            domain, pipeline_path))
     pipeline_module = load_source('pipeline_module', pipeline_path)
     pipeline_name = '{}Pipeline'.format(domain.capitalize())
     pipeline = getattr(pipeline_module, pipeline_name)

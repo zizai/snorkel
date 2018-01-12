@@ -54,6 +54,10 @@ tutorials/babble/spouse/data/*.tsv
 tutorials/babble/protein/genia*
 tutorials/babble/cdr/data/
 
+tutorials/qalf/spouse/data/
+tutorials/qalf/tacred/binary_task/data/
+tutorials/qalf/tacred/samples/
+
 #Babble Labble Image
 *.csv
 *.log
