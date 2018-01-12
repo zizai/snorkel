@@ -2,7 +2,7 @@ import bz2
 import cPickle
 import os
 
-from snorkel.contrib.babble import Explanation, link_explanation_candidates
+from snorkel.contrib.babble import Explanation
 
 def get_user_lists():
     ctd_pickle_path = os.path.join(os.environ['SNORKELHOME'], 

@@ -105,19 +105,22 @@ class SpousePipeline(BabblePipeline):
             explanations = get_explanations()
             user_lists = get_user_lists()
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
-        elif self.config['lf_source'].startswith('gradturk'):
+        elif self.config['lf_source'] == 'gradturk':
             from tutorials.babble.spouse.spouse_examples import get_user_lists
             from snorkel.contrib.babble.utils import ExplanationIO
-            if self.config['lf_source'] == 'gradturk':
-                fpath = (os.environ['SNORKELHOME'] + 
-                    '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
-            elif self.config['lf_source'] == 'gradturk30':
-                fpath = (os.environ['SNORKELHOME'] + 
-                    '/tutorials/babble/spouse/data/gradturk_explanations30.tsv')
+            fpath = (os.environ['SNORKELHOME'] + 
+                '/tutorials/babble/spouse/data/gradturk_explanations.tsv')
+            # fpath = (os.environ['SNORKELHOME'] + 
+            #     '/tutorials/babble/spouse/data/gradturk_explanations30.tsv')
             exp_reader = ExplanationIO()
             explanations = exp_reader.read(fpath)
             user_lists = {}
             super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)
+        elif self.config['lf_source'] == 'gradturk30':
+            from tutorials.babble.spouse.spouse_examples_gradturk30 import get_explanations
+            explanations = get_explanations()
+            user_lists = {}
+            super(SpousePipeline, self).babble('text', explanations, user_lists, self.config)            
         else:
             raise Exception('Invalid lf_source {}'.format(self.config['lf_source']))
   
