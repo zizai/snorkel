@@ -54,12 +54,13 @@ class TacredParserUDF(UDF):
         # Create one Sentence per Document
 
         (indices, tokens, subjs, subj_types, objs, obj_types, pos_tags, 
-            ner_tags, _, dep_parents) = zip(*(example.tokens))
+            ner_tags, dep_labels, dep_parents) = zip(*(example.tokens))
         
         parts = {
             'words': [PTB.get(t, t) for t in tokens],
             'pos_tags': pos_tags,
             'ner_tags': ner_tags,
+            'dep_labels': dep_labels,
             'dep_parents': dep_parents,
         }
         word_lengths_with_space = map(lambda x: len(x) + 1, tokens)

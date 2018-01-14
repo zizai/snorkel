@@ -102,10 +102,19 @@ def link_explanation_candidates(explanations, candidates):
 
 
 def sparse_to_labelmatrix(sparse_matrix, candidate_map, lf_names, split, replace_key_set=False):
-    """Converts a sparse matrix into a csr_LabelMatrix for Snorkel."""
+    """Converts a sparse matrix into a csr_LabelMatrix for Snorkel.
+    
+    Args:
+        sparse_matrix: num_candidates x num_lfs
+        candidate_map: a map from a candidate's orm id to its row in the matrix
+        lf_names: a list of the names of the lfs
+    """
     
     def label_generator(c):
-        candidate_idx = candidate_map[c.id]
+        try:
+            candidate_idx = candidate_map[c.id]
+        except:
+            import pdb; pdb.set_trace()
         row = np.ravel(sparse_matrix.getrow(candidate_idx).todense())
         for i, label in enumerate(row):
             yield lf_names[i], int(label)

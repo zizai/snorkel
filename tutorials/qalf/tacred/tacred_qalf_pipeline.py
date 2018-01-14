@@ -1,16 +1,22 @@
 import os
 
 from snorkel.candidates import PretaggedCandidateExtractor
+from snorkel.db_helpers import reload_annotator_labels
 from snorkel.models import Document, Sentence
+from snorkel.models import StableLabel
+from snorkel.utils import ProgressBar
 
 from tutorials.babble.spouse import SpousePipeline
 from tutorials.qalf import QalfPipeline
 from tutorials.qalf.qalf_converter_legacy import LegacyQalfConverter
 from tutorials.qalf.tacred import TacredReader, TacredParser
 
-TACRED_DATA = os.path.join(os.environ['SNORKELHOME'], 
-    'tutorials/qalf/tacred/binary_task/data')
+TACRED_BINARY = os.path.join(os.environ['SNORKELHOME'], 
+    'tutorials/qalf/tacred/binary_task/')
+TACRED_DATA = os.path.join(TACRED_BINARY, 'data')
+TACRED_MATRICES = os.path.join(TACRED_BINARY, 'matrices')
 
+SPLIT_NAMES = ['train', 'dev', 'test']
 
 class TacredQalfPipeline(QalfPipeline):
     
@@ -24,7 +30,7 @@ class TacredQalfPipeline(QalfPipeline):
         parser = TacredParser()
         
         for split in self.config['splits']:
-            split_name = ['train', 'dev', 'test'][split]
+            split_name = SPLIT_NAMES[split]
             filename = "{}.{}.conll".format(self.config['relation'], split_name)
             filepath = os.path.join(TACRED_DATA, filename)            
             reader = TacredReader(filepath)
@@ -40,9 +46,9 @@ class TacredQalfPipeline(QalfPipeline):
             for e in examples:
                 # Store sentence split assignments
                 self.sentence_splits[e.uid] = split
-                # Store sentence-level gold
+                # Store sentence-level gold, adjusted from {0, 1} -> {-1, 1}
                 self.sentence_gold[e.uid] = (e.relation == 
-                    self.config['relation'].replace('_', ':'))
+                    self.config['relation'].replace('_', ':')) * 2 - 1
 
             # Only allow a clear operation before the first parsing. 
             # Without this, each split overwrites the previous ones for this run.
@@ -84,6 +90,49 @@ class TacredQalfPipeline(QalfPipeline):
                     self.candidate_class.split == split).count()
                 print("Split {}: Extracted {} Candidates".format(split, num_cands))
 
-    def load_gold(self):
+    def load_gold(self, annotator='gold'):
         # Loop through candidates, getting gold from sentence's metadata
-       raise NotImplementedError
+        for split in self.config['splits']:
+            candidates = self.session.query(self.candidate_class).filter(
+                self.candidate_class.split == split).all()
+
+            pb = ProgressBar(len(candidates))
+            for i, c in enumerate(candidates):
+                pb.bar(i)
+                # Get stable ids and check to see if label already exits
+                context_stable_ids = '~~'.join(x.get_stable_id() for x in c)
+                query = self.session.query(StableLabel).filter(
+                    StableLabel.context_stable_ids == context_stable_ids)
+                query = query.filter(StableLabel.annotator_name == annotator)
+                # If does not already exist, add label
+                uid = c.get_parent().stable_id.split('::')[0]
+                label = self.sentence_gold[uid]
+                if query.count() == 0:
+                    self.session.add(StableLabel(
+                        context_stable_ids=context_stable_ids,
+                        annotator_name=annotator,
+                        value=label))
+            pb.close()
+
+            self.session.commit()
+
+            # Reload annotator labels
+            reload_annotator_labels(self.session, self.candidate_class, annotator,
+                                    split=split, filter_label_split=False)
+
+    def label(self):
+        for split in self.config['splits']:
+            split_name = SPLIT_NAMES[split]
+            filename = "{}.{}.mat".format(self.config['relation'], split_name)
+            filepath = os.path.join(TACRED_MATRICES, filename)    
+            L = super(TacredQalfPipeline, self).label(filepath, split)
+
+            # TEMP (for debugging convenience)
+            if split == 0:
+                self.L_train = L
+            elif split == 1:
+                self.L_dev = L
+            elif split == 2:
+                self.L_test = L
+            else:
+                raise ValueError

@@ -1,4 +1,4 @@
 config = {
-    'candidate_name' : 'TacredRelation',
+    'candidate_name' : 'TacredCandidate',
     'candidate_entities' : ['Subject', 'Object'],
 }
