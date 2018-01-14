@@ -43,4 +43,4 @@ cd "$FONDUERHOME"
 
 # Launch jupyter notebook!
 echo "Launching Jupyter Notebook..."
-jupyter notebook --notebook-dir="$FONDUERHOME"
+jupyter notebook --notebook-dir="$FONDUERHOME" --port=8890
