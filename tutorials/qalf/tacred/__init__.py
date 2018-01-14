@@ -1,2 +1,2 @@
 from tacred_reader import TacredReader
-from tacred_extractor import TacredExtractor
+from tacred_parser import TacredParser

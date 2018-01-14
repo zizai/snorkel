@@ -10,13 +10,13 @@ from tutorials.qalf.tacred import TacredReader
 
 PTB = {'-RRB-': ')', '-LRB-': '(', '-RCB-': '}', '-LCB-': '{', '-RSB-': ']', '-LSB-': '['}
 
-class TacredExtractor(UDFRunner):
+class TacredParser(UDFRunner):
 
-    def __init__(self, relation):
-        super(TacredExtractor, self).__init__(TacredExtractorUDF)
+    def __init__(self):
+        super(TacredParser, self).__init__(TacredParserUDF)
 
     def apply(self, xs, split=0, **kwargs):
-        super(TacredExtractor, self).apply(xs, split=split, **kwargs)
+        super(TacredParser, self).apply(xs, split=split, **kwargs)
 
     def clear(self, session, **kwargs):
         session.query(Context).delete()
@@ -26,10 +26,10 @@ class TacredExtractor(UDFRunner):
         # session.query(Candidate).filter(Candidate.split == split).delete()
 
 
-class TacredExtractorUDF(UDF):
+class TacredParserUDF(UDF):
 
     def __init__(self, **kwargs):
-        super(TacredExtractorUDF, self).__init__(**kwargs)
+        super(TacredParserUDF, self).__init__(**kwargs)
 
     def apply(self, example, split=0, **kwargs):
         """Convert each TacredExample into one Doc -> Sentence -> Candidate
@@ -38,9 +38,8 @@ class TacredExtractorUDF(UDF):
             xs: Iterator of TacredExamples
         """
         doc = self._create_doc(example)
+        yield doc
         sentence = self._create_sentence(example, doc)
-        # Create candidate
-        # Store gold
         yield sentence
 
     def _create_doc(self, example):

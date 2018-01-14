@@ -38,7 +38,7 @@ class UDFRunner(object):
             session.close()
 
         # Execute the UDF
-        print("Running UDF...")
+        print("\nRunning UDF...")
         if parallelism is None or parallelism < 2:
             self.apply_st(xs, progress_bar, clear=clear, count=count, **kwargs)
         else:
