@@ -16,8 +16,9 @@ def expand_dicts(args):
     """
     Expand flags that correspond to values in dictionaries in the config file 
     so that they match the structure of the config file.
-    """    
-    for k, v in args.items():
+    """
+    args2 = dict(args) 
+    for k, v in args2.items():
         if ':' in k:
             group, var = k.split(':')
             if group not in args:
@@ -39,9 +40,13 @@ if __name__ == '__main__':
     # Parse command-line args
     argparser = argparse.ArgumentParser(description="Run SnorkelPipeline object.")
     
-    DOMAINS = ['spouse', 'cdr', 'protein', 'bike', 'drink', 'stub']
-    argparser.add_argument('--domain', type=str, default='stub', choices=DOMAINS,
-        help="Name of experiment subdirectory in tutorials/babble/")
+    PROJECTS = ['babble', 'qalf']
+    DOMAINS = ['spouse', 'cdr', 'protein', 'bike', 'drink', 'stub', 'tacred']
+    RELATIONS = ['per_title']
+
+    argparser.add_argument('--project', type=str, default='babble', choices=PROJECTS)
+    argparser.add_argument('--domain', type=str, default='stub', choices=DOMAINS)
+    argparser.add_argument('--relation', type=str, default='per_title', choices=RELATIONS)
 
     # Control flow args
     argparser.add_argument('--start_at', type=int)
@@ -112,6 +117,7 @@ if __name__ == '__main__':
 
     # Parse arguments
     args = vars(argparser.parse_args())
+    print(args)
     args = expand_dicts(args)
 
     # Get the DB connection string and add to globals
@@ -149,7 +155,7 @@ if __name__ == '__main__':
                                          config['candidate_entities'])
 
     # Create pipeline 
-    pipeline = get_local_pipeline(args['domain'])
+    pipeline = get_local_pipeline(args['domain'], args['project'])
     pipe = pipeline(session, candidate_class, config)
 
     # Run!
