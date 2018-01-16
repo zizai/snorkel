@@ -38,6 +38,7 @@ global_config = {
     'apply_filters': True,
 
     ### LABEL ###
+    'max_lfs': None,
 
     ### SUPERVISE ###
     'supervision': 'generative', # ['traditional', 'majority', 'generative'],
@@ -48,7 +49,7 @@ global_config = {
     
     ## generative
     'gen_model_search_space': 10,
-    'gen_f_beta': 0.5,
+    'gen_f_beta': 1.0,
     'gen_init_params': {
 		'class_prior'           : False,
         'lf_prior'              : False, 

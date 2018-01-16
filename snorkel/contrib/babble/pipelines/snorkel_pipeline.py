@@ -208,6 +208,14 @@ class SnorkelPipeline(object):
             gen_model = MajorityVoter()
             train_marginals = gen_model.marginals(L_train)
 
+            if self.config['verbose']:
+                print("Simple QA score (1 question) on dev set:")
+                L_dev = L_dev[:,0]
+                tp, fp, tn, fn = gen_model.error_analysis(self.session, L_dev, L_gold_dev, display=True)
+
+                print("Gen. model score on dev set:")
+                tp, fp, tn, fn = gen_model.error_analysis(self.session, L_dev, L_gold_dev, display=True)
+
         elif self.config['supervision'] == 'generative':
 
             # Learn dependencies
@@ -407,26 +415,27 @@ class SnorkelPipeline(object):
         self.disc_model = disc_model
 
         self.scores = {}
-        with PrintTimer("[7.2] Evaluate generative model (opt_b={})".format(opt_b)):
-            if self.gen_model is not None:
-                # Score generative model on test set
-                if self.L_test is None:
-                    L_test = load_label_matrix(self.session, split=TEST)
+        if TEST in self.config['splits']:
+            with PrintTimer("[7.2] Evaluate generative model (opt_b={})".format(opt_b)):
+                if self.gen_model is not None:
+                    # Score generative model on test set
+                    if self.L_test is None:
+                        L_test = load_label_matrix(self.session, split=TEST)
+                    else:
+                        L_test = self.L_test            
+                    assert L_test.nnz > 0         
+
+                    np.random.seed(self.config['seed'])
+                    self.scores['Gen'] = score_marginals(
+                        self.gen_model.marginals(L_test), Y_test, b=opt_b)
                 else:
-                    L_test = self.L_test            
-                assert L_test.nnz > 0         
+                    print("gen_model is undefined. Skipping.")
 
+            with PrintTimer("[7.3] Evaluate discriminative model (opt_b={})".format(opt_b)):
+                # Score discriminative model trained on generative model predictions
                 np.random.seed(self.config['seed'])
-                self.scores['Gen'] = score_marginals(
-                    self.gen_model.marginals(L_test), Y_test, b=opt_b)
-            else:
-                print("gen_model is undefined. Skipping.")
-
-        with PrintTimer("[7.3] Evaluate discriminative model (opt_b={})".format(opt_b)):
-            # Score discriminative model trained on generative model predictions
-            np.random.seed(self.config['seed'])
-            self.scores['Disc'] = score_marginals(self.disc_model.marginals(X_test, 
-                    batch_size=self.config['disc_eval_batch_size']), Y_test, b=opt_b)
+                self.scores['Disc'] = score_marginals(self.disc_model.marginals(X_test, 
+                        batch_size=self.config['disc_eval_batch_size']), Y_test, b=opt_b)
 
         final_report(self.config, self.scores)
 
