@@ -12,5 +12,5 @@ class QalfPipeline(SnorkelPipeline):
     def label(self, mat_path, split):
         """Converts a .mat qalf matrix into a csr_LabelMatrix for a single split."""
         qc = QalfConverter(self.session, self.candidate_class)
-        L = qc.convert(mat_path, split)
+        L = qc.convert(mat_path, split, max_lfs=self.config['max_lfs'])
         return L

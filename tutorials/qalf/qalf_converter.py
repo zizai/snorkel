@@ -13,14 +13,16 @@ class QalfConverter(object):
         self.session = session
         self.candidate_class = candidate_class
     
-    def convert(self, mat_path, split):
+    def convert(self, mat_path, split, max_lfs=None):
         """
         Args:
             mat_path: path to qalf .mat file
                 The first row is a header
                 For all other rows, the first column is candidate_ids
                 All remaining columns contain labels from QA queries.
-            split: int: the split the mat file corresponds to
+            split: int: the split the mat file corresponds to.
+            max_lfs: int or None: if non-None, then only read the first
+                this many columns of labels.
         Returns:
             L: a csr_LabelMatrix for this split
         """
@@ -42,7 +44,7 @@ class QalfConverter(object):
 
             header = tsv_reader.next()
             lf_names = header[1:]
-            num_lfs = len(lf_names)
+            num_lfs = len(lf_names) if not max_lfs else max_lfs
 
             for i, row in enumerate(tsv_reader):
                 candidate_id = row[0]
@@ -50,6 +52,10 @@ class QalfConverter(object):
                 row_ids.append(orm_id)
                 
                 for j, label in enumerate(row[1:]):
+                    
+                    if max_lfs and j == max_lfs:
+                        break
+
                     label = int(label)
                     if label:
                         rows.append(i)
