@@ -36,8 +36,10 @@ class TacredQalfPipeline(QalfPipeline):
             reader = TacredReader(filepath)
             
             # WARNING: This line brings the entire split into memory
+            # This is done so that we can fill sentence_splits and sentence_gold
+            # without having to read the data from file more than once.
             examples = [e for e in reader]
-            
+
             parser.apply(examples,
                          split=split, 
                          parallelism=self.config['parallelism'], 
@@ -68,7 +70,9 @@ class TacredQalfPipeline(QalfPipeline):
             raise Exception("You must run .parse() before running .extract()")
 
         candidate_extractor = PretaggedCandidateExtractor(
-            self.candidate_class, ['Subject', 'Object'])
+            self.candidate_class, ['Subject', 'Object'], 
+            entity_sep=',',
+            nested_relations=True)
 
         sentences_by_split = {split: [] for split in self.config['splits']}
         sentences = self.session.query(Sentence).all()

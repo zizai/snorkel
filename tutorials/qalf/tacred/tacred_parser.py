@@ -58,25 +58,34 @@ class TacredParserUDF(UDF):
         
         parts = {
             'words': [PTB.get(t, t) for t in tokens],
-            'pos_tags': pos_tags,
-            'ner_tags': ner_tags,
-            'dep_labels': dep_labels,
-            'dep_parents': dep_parents,
+            'pos_tags': list(pos_tags),
+            'ner_tags': list(ner_tags),
+            'dep_labels': list(dep_labels),
+            'dep_parents': list(dep_parents),
         }
         word_lengths_with_space = map(lambda x: len(x) + 1, tokens)
         char_offsets = list(np.cumsum([0] + word_lengths_with_space[:-1]))
         parts['char_offsets'] = char_offsets
         parts['abs_char_offsets'] = char_offsets
 
-        parts['entity_cids'] = ['O' for _ in parts['words']]
+        # parts['entity_cids'] = ['O' for _ in parts['words']]
+        entity_cids = []
         entity_types = []
         for i, (subj, obj) in enumerate(zip(subjs, objs)):
+            ent_i_types = []
             if subj == 'SUBJECT':
-                entity_types.append('Subject')
-            elif obj == 'OBJECT':
-                entity_types.append('Object')
+                ent_i_types.append('Subject')
+            if obj == 'OBJECT':
+                ent_i_types.append('Object')
+            
+            if ent_i_types:
+                entity_types.append(','.join(ent_i_types))
+                entity_cids.append(','.join(['O'] * len(ent_i_types)))
             else:
                 entity_types.append('O')
+                entity_cids.append('O')
+
+        parts['entity_cids'] = entity_cids
         parts['entity_types'] = entity_types
 
         text = ' '.join(tokens)
