@@ -2,6 +2,8 @@ config = {
     'candidate_name' : 'TacredCandidate',
     'candidate_entities' : ['Subject', 'Object'],
 
+    'splits': [0, 1],
+
     # Classifier
     'disc_model_class': 'lstm',
     'disc_model_search_space': 10,
@@ -19,7 +21,7 @@ config = {
         'dim':        50,
         'n_epochs':   20,
         'dropout':    0.5,
-        'rebalance':  0.25,
+        'rebalance':  False,
         'batch_size': 128,
         'max_sentence_length': 200,
         'print_freq': 1,

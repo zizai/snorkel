@@ -68,8 +68,8 @@ class SnorkelPipeline(object):
             self.config['disc_params_default']['n_epochs'] = 5
 
         result = None
-        for stage in ['parse', 'extract', 'load_gold', 'featurize', 'collect', 'label', 
-                      'supervise', 'classify']:
+        for stage in ['parse', 'extract', 'load_gold', 'featurize', 'collect', 
+                      'label', 'supervise', 'classify']:
             stage_id = getattr(STAGES, stage.upper())
             if is_valid_stage(stage_id):
                 with PrintTimer('[{}] {}...'.format(stage_id, stage.capitalize())):
