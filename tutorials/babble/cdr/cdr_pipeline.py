@@ -12,9 +12,10 @@ from snorkel.models import Document, Sentence, StableLabel
 from snorkel.parser import CorpusParser, XMLMultiDocPreprocessor
 from snorkel.parser.spacy_parser import Spacy
 
+from snorkel.contrib.pipelines.snorkel_pipeline import TRAIN, DEV, TEST
+
 from snorkel.contrib.babble import Babbler
-from snorkel.contrib.babble.pipelines import BabblePipeline
-from snorkel.contrib.babble.pipelines.snorkel_pipeline import TRAIN, DEV, TEST
+from snorkel.contrib.babble import BabblePipeline
 
 from tutorials.babble.cdr.utils import TaggerOneTagger
 from tutorials.babble.cdr.load_external_annotations import load_external_labels

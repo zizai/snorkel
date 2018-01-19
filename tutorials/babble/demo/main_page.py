@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.append('/Users/Stephaniewang/Documents/snorkel')
 from snorkel import SnorkelSession
-from snorkel.contrib.babble.pipelines import merge_configs
+from snorkel.contrib.pipelines import merge_configs
 from snorkel.models import candidate_subclass
 from snorkel.contrib.babble import ExplanationIO
 from tutorials.babble.spouse import SpousePipeline

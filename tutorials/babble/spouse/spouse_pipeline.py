@@ -10,10 +10,10 @@ from snorkel.matchers import PersonMatcher
 from snorkel.models import Document, Sentence, StableLabel
 from snorkel.parser import TSVDocPreprocessor
 
-from tutorials.babble.spouse.utils import load_external_labels
+from snorkel.contrib.pipelines import TRAIN, DEV, TEST
+from snorkel.contrib.babble import BabblePipeline
 
-from snorkel.contrib.babble.pipelines import BabblePipeline
-from snorkel.contrib.babble.pipelines.snorkel_pipeline import TRAIN, DEV, TEST
+from tutorials.babble.spouse.utils import load_external_labels
 
 DATA_ROOT = os.environ['SNORKELHOME'] + '/tutorials/babble/spouse/data/'
 

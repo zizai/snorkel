@@ -6,7 +6,7 @@ from snorkel.annotations import LabelAnnotator, load_gold_labels
 from snorkel.db_helpers import reload_annotator_labels
 from snorkel.models import StableLabel
 
-from snorkel_pipeline import SnorkelPipeline, TRAIN, DEV, TEST
+from snorkel.contrib.pipelines import SnorkelPipeline, TRAIN, DEV, TEST
 
 from snorkel.contrib.babble import Babbler, BabbleStream, link_explanation_candidates
 

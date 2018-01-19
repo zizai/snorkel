@@ -23,12 +23,7 @@ from snorkel.learning import reRNN, SparseLogisticRegression
 from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
-from snorkel.contrib.babble.utils import train_model, score_marginals
-from .utils import STAGES, final_report
-
-TRAIN = 0
-DEV = 1
-TEST = 2
+from .utils import STAGES, TRAIN, DEV, TEST, final_report, train_model, score_marginals
 
 class SnorkelPipeline(object):
     """

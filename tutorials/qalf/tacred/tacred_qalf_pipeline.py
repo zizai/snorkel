@@ -6,7 +6,6 @@ from snorkel.models import Document, Sentence
 from snorkel.models import StableLabel
 from snorkel.utils import ProgressBar
 
-from tutorials.babble.spouse import SpousePipeline
 from tutorials.qalf import QalfPipeline
 from tutorials.qalf.qalf_converter_legacy import LegacyQalfConverter
 from tutorials.qalf.tacred import TacredReader, TacredParser

@@ -1,6 +1,6 @@
 import os
 
-from snorkel.contrib.babble.pipelines import SnorkelPipeline
+from snorkel.contrib.pipelines import SnorkelPipeline
 
 from tutorials.qalf.qalf_converter import QalfConverter
 
