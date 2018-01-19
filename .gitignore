@@ -57,6 +57,7 @@ tutorials/babble/cdr/data/
 tutorials/qalf/spouse/data/
 tutorials/qalf/tacred/binary_task/data/
 tutorials/qalf/tacred/samples/
+tutorials/qalf/**/matrices/
 
 #Babble Labble Image
 *.csv
