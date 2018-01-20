@@ -106,8 +106,12 @@ class BabblePipeline(SnorkelPipeline):
         if self.config['gold_explanations']:
             self.explanations = explanations
             ParseMock = namedtuple('ParseMock', ['semantics'])
-            self.lfs = [self.babbler.semparser.grammar.evaluate(ParseMock(exp.semantics)) 
-                for exp in self.explanations]
+            lfs = []
+            for exp in explanations:
+                lf = self.babbler.semparser.grammar.evaluate(ParseMock(exp.semantics))
+                lf.__name__ = exp.name + '_gold'
+                lfs.append(lf)
+            self.lfs = lfs
         else:
             self.babbler.apply(explanations, 
                     split=self.config['babbler_label_split'], 
@@ -116,9 +120,6 @@ class BabblePipeline(SnorkelPipeline):
             self.lfs = self.babbler.get_lfs()
         
         self.labeler = LabelAnnotator(lfs=self.lfs)
-        # NOTE: This is unnecessary for some runs; 
-        # this info is printed in supervise() when supervise != traditional
-        # print(self.babbler.get_lf_stats()) 
 
     def set_babbler_matrices(self, babbler, split=None):
         if split == 0 or split is None:
@@ -152,4 +153,3 @@ class BabblePipeline(SnorkelPipeline):
                 if self.config['display_accuracies'] and split == DEV:
                     L_gold_dev = load_gold_labels(self.session, annotator_name='gold', split=1)
                     print(L.lf_stats(self.session, labels=L_gold_dev))
-        
