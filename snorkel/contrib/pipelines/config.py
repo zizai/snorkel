@@ -1,4 +1,4 @@
-from .utils import STAGES
+from snorkel.contrib.pipelines.utils import STAGES
 
 global_config = {
     ### SETUP ###
@@ -92,14 +92,12 @@ global_config = {
         'n_threads': 16,
         'seed'     : 123,
     },
-    'disc_params_range': {},
-        # IDEAS:
-        # 'l1_penalty': [1e0, 1e-1, 1e-2, 1e-3, 1e-4],
-        # 'l2_penalty': [1e0, 1e-1, 1e-2, 1e-3, 1e-4],
-        # 'lr'        : [1e-2, 1e-3, 1e-4],
-        # 'dim'       : [64, 128],
-        # 'dropout'   : [0.1, 0.25, 0.5],
-        # 'rebalance' : [0.25, 0.5, False],
+    'disc_params_range': {
+        'lr'        : [1e-2, 1e-3, 1e-4],
+        'dim'       : [64, 128],
+        'dropout'   : [0.1, 0.25, 0.5],
+        'rebalance' : [0.25, 0.5, False],
+    },
     'disc_params_default': {
         'l1_penalty': 1.0,
         'l2_penalty': 1.0,
