@@ -38,8 +38,9 @@ explanations = [
         condition="person2 is the subject of the sentence and person1 is immediately preceded by 'husband'",
         candidate='affed66e-3a08-40d0-b11f-51b5727dccc4::span:61:64~~affed66e-3a08-40d0-b11f-51b5727dccc4::span:112:121',
         label=True,
-        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'husband'))))
+        semantics=('.root', ('.label', ('.bool', False), ('.call', ('.eq', ('.bool', True)), ('.bool', False)))) # NOTE: this is not the actual correct parse, but the specified condition is unrepresentable.
         ),
+        # partial: semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'husband'))))
 
     Explanation(
         name='LF6',
@@ -198,7 +199,7 @@ explanations = [
         condition="'husband' is in the sentence before person1",
         candidate='a8488aab-31dc-49d7-83f0-8921c4bda307::span:315:323~~a8488aab-31dc-49d7-83f0-8921c4bda307::span:329:342',
         label=True,
-        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1))))), ('.string', u'husband'))))
+        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.sentence',))), ('.string', u'husband'))))
         ),
 
     Explanation(
