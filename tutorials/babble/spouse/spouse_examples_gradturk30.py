@@ -38,8 +38,9 @@ explanations = [
         condition="person2 is the subject of the sentence and person1 is immediately preceded by 'husband'",
         candidate='affed66e-3a08-40d0-b11f-51b5727dccc4::span:61:64~~affed66e-3a08-40d0-b11f-51b5727dccc4::span:112:121',
         label=True,
-        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'husband'))))
+        semantics=('.root', ('.label', ('.bool', False), ('.call', ('.eq', ('.bool', True)), ('.bool', False)))) # NOTE: this is not the actual correct parse, but the specified condition is unrepresentable.
         ),
+        # partial: semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'husband'))))
 
     Explanation(
         name='LF6',
