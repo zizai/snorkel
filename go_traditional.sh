@@ -1,5 +1,7 @@
 DOMAIN=$1
 EXP=$2
+PROJECT="qalf"
+RELATION="org_top_members_employees"
 
 DATE=`date +"%m_%d_%y"`
 TIME=`date +"%H_%M_%S"`
@@ -14,16 +16,18 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for MAX_TRAIN in 9000 10000 11000 12000 13000 14000 15000 16000 17000 18000 19000 20000 21000 22000
+for MAX_TRAIN in 500 1000 2000 4000 7000
 do
-for ITER in 1 2 3 4 5
+for ITER in 1 2 3
 do
 
-RUN="${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
+RUN="${PROJECT}_${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
 
-DB_NAME="babble_${RUN}"
-echo "Using db: $DB_NAME"
-cp babble_${DOMAIN}_labeled_tocopy.db $DB_NAME.db
+BASE_DB="${PROJECT}_${DOMAIN}_${RELATION}"
+DB_NAME=$RUN
+cp $BASE_DB.db $DB_NAME.db
+echo "Copying db: $BASE_DB.db"
+echo "Using db: $DB_NAME.db"
 
 REPORTS_SUBDIR="$REPORTS_DIR/$RUN/"
 mkdir -p $REPORTS_SUBDIR
@@ -32,18 +36,20 @@ echo "Saving reports to '$REPORTS_SUBDIR'"
 LOGFILE="$LOGDIR/$RUN.log"
 echo "Saving log to '$LOGFILE'"
 
-python -u snorkel/contrib/babble/pipelines/run.py \
+python -u snorkel/contrib/pipelines/run.py \
     --domain $DOMAIN \
+    --project $PROJECT \
+    --relation $RELATION \
+    --db_name $DB_NAME \
     --reports_dir $REPORTS_SUBDIR \
     --start_at 7 \
     --end_at 10 \
     --supervision traditional \
     --max_train $MAX_TRAIN \
-    --disc_model_class lstm \
-    --disc_model_search_space 10 \
+    --disc_model_search_space 3 \
     --verbose --no_plots |& tee -a $LOGFILE &
 
-sleep 600
+sleep 3
 
 done
 done

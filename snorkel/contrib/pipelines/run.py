@@ -42,7 +42,7 @@ if __name__ == '__main__':
     
     PROJECTS = ['babble', 'qalf']
     DOMAINS = ['spouse', 'cdr', 'protein', 'bike', 'drink', 'stub', 'tacred']
-    RELATIONS = ['per_title']
+    RELATIONS = ['per_title', 'org_top_members_employees', 'org_alternate_names']
 
     argparser.add_argument('--project', type=str, default='babble', choices=PROJECTS)
     argparser.add_argument('--domain', type=str, default='stub', choices=DOMAINS)
