@@ -10,9 +10,10 @@ from snorkel.matchers import PersonMatcher
 from snorkel.models import Document, Sentence, StableLabel
 from snorkel.parser import CorpusParser, TSVDocPreprocessor
 
+from snorkel.contrib.pipelines import TRAIN, DEV, TEST
+
 from snorkel.contrib.babble import Babbler
-from snorkel.contrib.babble.pipelines import BabblePipeline
-from snorkel.contrib.babble.pipelines.snorkel_pipeline import TRAIN, DEV, TEST
+from snorkel.contrib.babble import BabblePipeline
 
 from tutorials.babble.protein.utils import ProteinKinaseLookupTagger
 from tutorials.babble.protein.load_external_annotations import load_external_labels

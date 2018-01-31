@@ -244,6 +244,9 @@ compositional_rules = [
         # "sentence contains 'foo'"
     Rule('$Bool', '$Sentence $Contains $String',
         lambda (sent_, cont_, str_): ('.call', (cont_, str_), ('.extract_text', (sent_,)))),
+        # "sentence contains a bar word"
+    Rule('$Bool', '$Sentence $Contains $StringListOr',
+        lambda (sent_, cont_, strlist_): ('.any', ('.map', ('.in', ('.extract_text', (sent_,))), strlist_))),
 
     # Phrases
         # standard directions: "to the left of arg 1"

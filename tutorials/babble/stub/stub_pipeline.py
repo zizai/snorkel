@@ -1,4 +1,4 @@
-from snorkel.contrib.babble.pipelines import SnorkelPipeline
+from snorkel.contrib.pipelines import SnorkelPipeline
 
 class StubPipeline(SnorkelPipeline):
     def __init__(self, session, candidate_class, config):

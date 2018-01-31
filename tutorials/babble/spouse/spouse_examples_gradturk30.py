@@ -6,7 +6,7 @@ explanations = [
         condition="person2 occurs in a phrase surrounded by quotes",
         candidate='2a339c82-5086-40e8-91ba-e705418acc0d::span:2635:2636~~2a339c82-5086-40e8-91ba-e705418acc0d::span:2668:2683',
         label=False,
-        semantics=None #TBD
+        semantics=('.root', ('.label', ('.bool', False), ('.and', ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 2))))), ('.string', u'"')), ('.call', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 2))))), ('.string', u'"')))))
         ),
 
     Explanation(
@@ -22,7 +22,7 @@ explanations = [
         condition=""" "Beau Ryan's (Wife)" occurs before person1""",
         candidate='bd43aacf-2b13-40fa-bd9d-e08a3f26d89d::span:2055:2066~~bd43aacf-2b13-40fa-bd9d-e08a3f26d89d::span:2128:2136',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1))))), ('.string', u"Beau Ryan's (Wife)"))))
         ),
 
     Explanation(
@@ -30,7 +30,7 @@ explanations = [
         condition="The word 'rape' appears before person1 and the word 'trying' appears between person1 and person2",
         candidate='d38fa137-ac2d-4e43-b216-18dacf22426d::span:3814:3823~~d38fa137-ac2d-4e43-b216-18dacf22426d::span:3957:3970',
         label=False,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', False), ('.and', ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1))))), ('.string', u'rape')), ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'trying')))))
         ),
 
     Explanation(
@@ -38,8 +38,9 @@ explanations = [
         condition="person2 is the subject of the sentence and person1 is immediately preceded by 'husband'",
         candidate='affed66e-3a08-40d0-b11f-51b5727dccc4::span:61:64~~affed66e-3a08-40d0-b11f-51b5727dccc4::span:112:121',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', False), ('.call', ('.eq', ('.bool', True)), ('.bool', False)))) # NOTE: this is not the actual correct parse, but the specified condition is unrepresentable.
         ),
+        # partial: semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 1)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'husband'))))
 
     Explanation(
         name='LF6',
@@ -54,7 +55,7 @@ explanations = [
         condition="'said' occurs between person1 and person2 and 'investigation' occurs after person2",
         candidate='75e1d890-c481-40fb-8d12-34fe6bcbd56d::span:4417:4422~~75e1d890-c481-40fb-8d12-34fe6bcbd56d::span:4446:4457',
         label=False,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', False), ('.and', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'said')), ('.call', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 2))))), ('.string', u'investigation')))))
         ),
 
     Explanation(
@@ -86,7 +87,7 @@ explanations = [
         condition='person2 is an empty string.',
         candidate='7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:6956:6966~~7fc3e510-c4e6-44c2-a24b-f9a39bfcfb07::span:7134:7135',
         label=False,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', False), ('.call', ('.eq', ('.string', u'  ')), ('.arg_to_string', ('.arg', ('.int', 2))))))
         ),
 
     Explanation(
@@ -102,7 +103,7 @@ explanations = [
         condition="(person2 contains 'Osteen') and (person1 contains 1 token) and ('and' is between person1 and person2)",
         candidate='e7b41f2f-d98a-45a1-9616-1d4a65e24501::span:81:84~~e7b41f2f-d98a-45a1-9616-1d4a65e24501::span:90:104',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.and', ('.call', ('.contains', ('.string', u'Osteen')), ('.arg_to_string', ('.arg', ('.int', 2)))), ('.and', ('.call', ('.eq', ('.index_word', ('.arg_to_string', ('.arg', ('.int', 1))), ('.int', -1))), ('.index_word', ('.arg_to_string', ('.arg', ('.int', 1))), ('.int', 1))), ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'and'))))))
         ),
 
     Explanation(
@@ -110,7 +111,7 @@ explanations = [
         condition="the word 'hubby' is directly before person2",
         candidate='c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1476:1484~~c4631b6d-747f-470d-a8ce-74b5b379cb86::span:1562:1568',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.left', ('.arg', ('.int', 2)), ('.string', '.eq'), ('.int', 1), ('.string', 'words')))), ('.string', u'hubby'))))
         ),
 
     Explanation(
@@ -134,7 +135,7 @@ explanations = [
         condition="'and' is between person1 and person2, and 'their son' comes less than 10 words after person1 and person2.",
         candidate='a8488aab-31dc-49d7-83f0-8921c4bda307::span:1084:1092~~a8488aab-31dc-49d7-83f0-8921c4bda307::span:1175:1188',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.and', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'and')), ('.call', ('.composite_and_func', ('.list', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 1)), ('.string', '.lt'), ('.int', 10), ('.string', 'words')))), ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 2)), ('.string', '.lt'), ('.int', 10), ('.string', 'words')))))), ('.string', u'their son')))))
         ),
 
     Explanation(
@@ -142,7 +143,7 @@ explanations = [
         condition='person1 and person2 are not people.',
         candidate='05ae8661-f643-4974-ab9b-93648737e1ad::span:2206:2215~~05ae8661-f643-4974-ab9b-93648737e1ad::span:2221:2233',
         label=False,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', False), ('.call', ('.eq', ('.bool', True)), ('.bool', False)))) # NOTE: this is not the actual correct parse, but by definition, the system thinks both arg1 and arg2 are people, so this condition will never fire.
         ),
 
     Explanation(
@@ -174,7 +175,7 @@ explanations = [
         condition="person1 is said to be 'married' to person2 'from 1983 to 1988'",
         candidate='c24931e6-be98-4056-ae2d-ab91fe5a2514::span:2453:2461~~c24931e6-be98-4056-ae2d-ab91fe5a2514::span:2508:2518',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.and', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'married')), ('.call', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 2))))), ('.string', u'from 1983 to 1988'))))) # NOTE: This is my best guess at what they meant?
         ),
 
     Explanation(
@@ -198,7 +199,7 @@ explanations = [
         condition="'husband' is in the sentence before person1",
         candidate='a8488aab-31dc-49d7-83f0-8921c4bda307::span:315:323~~a8488aab-31dc-49d7-83f0-8921c4bda307::span:329:342',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.call', ('.in', ('.extract_text', ('.sentence',))), ('.string', u'husband'))))
         ),
 
     Explanation(
@@ -206,7 +207,7 @@ explanations = [
         condition="'wife' appears between person1 and person2 and the last word of person1 is the same as the last word of person2",
         candidate='c6a853a3-960e-4857-b048-abb692d1b2cc::span:1271:1280~~c6a853a3-960e-4857-b048-abb692d1b2cc::span:1469:1481',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.and', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'wife')), ('.call', ('.eq', ('.index_word', ('.arg_to_string', ('.arg', ('.int', 2))), ('.int', -1))), ('.index_word', ('.arg_to_string', ('.arg', ('.int', 1))), ('.int', -1))))))
         ),
 
     Explanation(
@@ -230,7 +231,7 @@ explanations = [
         condition="'and' is between person1 and person2, and 'proposal' follows (person1 and person2) in the sentence.",
         candidate='c9062ccc-f63b-4bd1-95e2-3d3ccc6391eb::span:2765:2768~~c9062ccc-f63b-4bd1-95e2-3d3ccc6391eb::span:2858:2862',
         label=True,
-        semantics=None
+        semantics=('.root', ('.label', ('.bool', True), ('.and', ('.call', ('.in', ('.extract_text', ('.between', ('.list', ('.arg', ('.int', 1)), ('.arg', ('.int', 2)))))), ('.string', u'and')), ('.call', ('.composite_and_func', ('.list', ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 1))))), ('.in', ('.extract_text', ('.right', ('.arg', ('.int', 2))))))), ('.string', u'proposal')))))
         ),
 
     Explanation(

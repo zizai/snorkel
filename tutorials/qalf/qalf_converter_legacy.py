@@ -5,7 +5,7 @@ from scipy.sparse import csr_matrix
 
 from snorkel.annotations import csr_LabelMatrix
 
-from snorkel.contrib.babble import sparse_to_labelmatrix
+from snorkel.contrib.pipelines import sparse_to_labelmatrix
 
 NUM_SPLITS = 3
 

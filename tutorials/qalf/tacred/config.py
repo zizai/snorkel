@@ -5,25 +5,19 @@ config = {
     'splits': [0, 1],
 
     # Classifier
-    'disc_model_class': 'lstm',
-    'disc_model_search_space': 10,
-	'disc_init_params': {
-        'n_threads': 16,
-        'seed'     : None,
-    },
+    'disc_model_class': 'logreg',
     'disc_params_range': {
-        'lr'        : [1e-2, 1e-3, 1e-4],
-        'n_epochs'  : [10, 20, 50],
-        'batch_size': [32, 64, 128, 256],
+        # 'lr'        : [1e-1, 1e-2, 1e-3, 1e-4, 1e-5],
+        # 'l1_penalty': [0, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4],
+        # 'l2_penalty': [0, 1e1, 1e0, 1e-1, 1e-2, 1e-3, 1e-4],
     },
     'disc_params_default': {
         'lr':         0.01,
-        'dim':        50,
-        'n_epochs':   20,
-        'dropout':    0.5,
+        'l1_penalty': 0,
+        'l2_penalty': 0,
+        'n_epochs':   25,
         'rebalance':  False,
-        'batch_size': 128,
-        'max_sentence_length': 200,
+        'batch_size': 64,
         'print_freq': 1,
     },
     'disc_eval_batch_size': 256,    

@@ -27,7 +27,7 @@ from snorkel.utils import (
 from snorkel.contrib.babble.filter_bank import FilterBank
 from snorkel.contrib.babble.grammar import Parse
 from snorkel.contrib.babble.semparser import Explanation, SemanticParser
-from snorkel.contrib.babble.utils import score_marginals, sparse_to_labelmatrix
+from snorkel.contrib.pipelines import score_marginals, sparse_to_labelmatrix
 
 
 ConfusionMatrix = namedtuple('ConfusionMatrix', ['correct', 'incorrect', 'abstained'])

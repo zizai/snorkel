@@ -15,7 +15,8 @@ from snorkel.models import StableLabel
 from snorkel.db_helpers import reload_annotator_labels
 from snorkel.annotations import load_marginals, load_gold_labels
 
-from snorkel.contrib.babble.pipelines import BabblePipeline, final_report
+from snorkel.contrib.pipelines import final_report
+from snorkel.contrib.babble import BabblePipeline
 
 from tutorials.babble import MTurkHelper
 

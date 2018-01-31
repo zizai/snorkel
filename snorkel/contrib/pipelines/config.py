@@ -1,4 +1,4 @@
-from utils import STAGES
+from snorkel.contrib.pipelines.utils import STAGES
 
 global_config = {
     ### SETUP ###
@@ -96,14 +96,15 @@ global_config = {
         'lr'        : [1e-2, 1e-3, 1e-4],
         'dim'       : [64, 128],
         'dropout'   : [0.1, 0.25, 0.5],
-        'rebalance' : [0.25, 0.5, False],
     },
     'disc_params_default': {
+        'l1_penalty': 1.0,
+        'l2_penalty': 1.0,
         'lr':         0.01,
         'dim':        50,
         'n_epochs':   20,
         'dropout':    0.5,
-        'rebalance':  0.25,
+        'rebalance':  False,
         'batch_size': 128,
         'max_sentence_length': 100,
         'print_freq': 1,

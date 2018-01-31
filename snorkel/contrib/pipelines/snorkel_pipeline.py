@@ -23,12 +23,7 @@ from snorkel.learning import reRNN, SparseLogisticRegression
 from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
-from snorkel.contrib.babble.utils import train_model, score_marginals
-from .utils import STAGES, final_report
-
-TRAIN = 0
-DEV = 1
-TEST = 2
+from .utils import STAGES, TRAIN, DEV, TEST, final_report, train_model, score_marginals
 
 class SnorkelPipeline(object):
     """
@@ -380,7 +375,7 @@ class SnorkelPipeline(object):
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
-                    else load_marginals(self.session, split=0))
+                    else load_marginals(self.session, split=TRAIN))
 
             X_dev = load_feature_matrix(self.session, split=DEV)
             X_test = load_feature_matrix(self.session, split=TEST)

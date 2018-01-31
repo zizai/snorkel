@@ -2,7 +2,7 @@ import unittest
 
 from snorkel import SnorkelSession
 from snorkel.models import candidate_subclass
-from snorkel.contrib.babble.pipelines import global_config, STAGES
+from snorkel.contrib.pipelines import global_config, STAGES
 
 from tutorials.babble.stub.stub_pipeline import StubPipeline
 

@@ -117,7 +117,8 @@ if __name__ == '__main__':
 
     # Parse arguments
     args = vars(argparser.parse_args())
-    print(args)
+    if args['verbose']:
+        print(args)
     args = expand_dicts(args)
 
     # Get the DB connection string and add to globals
