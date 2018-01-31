@@ -24,6 +24,10 @@ class TacredQalfPipeline(QalfPipeline):
         self.sentence_splits = {}
         self.sentence_gold = {}
 
+    def _strip_punctuation(self, string):
+        """Removes all non alphanumeric characters from a string"""
+        return ''.join(x for x in string if x.isalpha())
+
     def parse(self, clear=True):
         """Parse files into Documents with one Sentence per Document."""
         parser = TacredParser()
@@ -48,8 +52,9 @@ class TacredQalfPipeline(QalfPipeline):
                 # Store sentence split assignments
                 self.sentence_splits[e.uid] = split
                 # Store sentence-level gold, adjusted from {0, 1} -> {-1, 1}
-                self.sentence_gold[e.uid] = (e.relation == 
-                    self.config['relation'].replace('_', ':')) * 2 - 1
+                self.sentence_gold[e.uid] = (
+                    self._strip_punctuation(e.relation) == 
+                    self._strip_punctuation(self.config['relation'])) * 2 - 1
 
             # Only allow a clear operation before the first parsing. 
             # Without this, each split overwrites the previous ones for this run.
