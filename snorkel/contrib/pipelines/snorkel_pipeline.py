@@ -375,7 +375,7 @@ class SnorkelPipeline(object):
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
-                    else load_marginals(self.session, split=0))
+                    else load_marginals(self.session, split=TRAIN))
 
             X_dev = load_feature_matrix(self.session, split=DEV)
             X_test = load_feature_matrix(self.session, split=TEST)
