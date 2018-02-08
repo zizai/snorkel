@@ -93,7 +93,7 @@ global_config = {
         'seed'     : 123,
     },
     'disc_params_range': {
-        'lr'        : [1e-1, 1e-2, 1e-3, 1e-4],
+        'lr'        : [1e-2, 1e-3, 1e-4],
         'dim'       : [32, 64, 128],
         'batch_size': [32, 64, 128],
         'l1_penalty': [0, 1e-5, 1e-4, 1e-3, 1e-2], 
