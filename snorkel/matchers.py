@@ -1,3 +1,9 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import *
+
 import os
 import re
 import warnings
@@ -186,7 +192,7 @@ class SlotFillMatch(NgramMatcher):
 
         # Parse slot fill pattern
         split        = re.split(r'\{(\d+)\}', self.pattern)
-        self._ops    = map(int, split[1::2])
+        self._ops    = list(map(int, split[1::2]))
         self._splits = split[::2]
 
         # NOTE: Must have non-null splits!!
@@ -267,7 +273,7 @@ class LocationMatcher(RegexMatchEach):
     """
     def __init__(self, *children, **kwargs):
         kwargs['attrib'] = 'ner_tags'
-        kwargs['rgx'] = 'LOCATION'
+        kwargs['rgx'] = 'LOCATION|LOC'
         super(LocationMatcher, self).__init__(*children, **kwargs)
 
 
@@ -280,7 +286,7 @@ class OrganizationMatcher(RegexMatchEach):
     """
     def __init__(self, *children, **kwargs):
         kwargs['attrib'] = 'ner_tags'
-        kwargs['rgx'] = 'ORGANIZATION'
+        kwargs['rgx'] = 'ORGANIZATION|ORG'
         super(OrganizationMatcher, self).__init__(*children, **kwargs)
 
 
@@ -306,7 +312,7 @@ class NumberMatcher(RegexMatchEach):
     """
     def __init__(self, *children, **kwargs):
         kwargs['attrib'] = 'ner_tags'
-        kwargs['rgx'] = 'NUMBER'
+        kwargs['rgx'] = 'NUMBER|QUANTITY'
         super(NumberMatcher, self).__init__(*children, **kwargs)
 
 

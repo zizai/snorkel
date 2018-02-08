@@ -1,3 +1,9 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import *
+
 from functools import partial
 
 from models.candidate import wrap_candidate
@@ -7,9 +13,9 @@ from snorkel.models.meta import snorkel_conn_string
 from snorkel.models.views import create_serialized_candidate_view
 
 
-class SparkLabelAnnotator:
+class SparkLabelAnnotator(object):
     """
-    Distributes candidates to a Spark cluster and applies labeling functions 
+    Distributes candidates to a Spark cluster and applies labeling functions
     over them. See snorkel.annotations.LabelAnnotator.
     """
     def __init__(self, snorkel_session, spark_session, candidate_class):
@@ -36,8 +42,8 @@ class SparkLabelAnnotator:
 
         :param LFs: collection of labeling functions
         :param split: the split of candidates to label
-        :param use_cached: If True, distributed candidate sets are cached by 
-            split for the annotator, so  repeated calls to apply() will operate 
+        :param use_cached: If True, distributed candidate sets are cached by
+            split for the annotator, so  repeated calls to apply() will operate
             over the same split of candidates as the first call for that split,
             regardless of how the underlying database changes. Intended for e.g.
             usage during iterative development of LFs given fixed Candidate set.
@@ -50,6 +56,7 @@ class SparkLabelAnnotator:
             self._load_candidates(split)
         else:
             print("Using cached Candidate set for split %s" % split)
+        print('Applying labelling functions to %d candidates' % self.split_cache[split].count())
 
         # Bulk insert the LF labels (output values)
         key_query = LabelKey.__table__.insert()
@@ -59,7 +66,7 @@ class SparkLabelAnnotator:
                 {'name': lf.__name__, 'group': 0}).inserted_primary_key[0]
 
             labels = self.split_cache[split].map(lambda c: (c.id, lf(c)))
-            labels.filter(lambda (_, value): value != 0 and value is not None)
+            labels.filter(lambda __value: __value[1] != 0 and __value[1] is not None)
             for cid, value in labels.toLocalIterator():
                 label_tuples.append({
                     'candidate_id': cid, 'key_id': lf_id, 'value': value})
@@ -68,7 +75,6 @@ class SparkLabelAnnotator:
                 if len(label_tuples) >= 100000:
                     self.snorkel_session.execute(Label.__table__.insert(), label_tuples)
                     label_tuples = []
-
         # Flushes the remaining labels
         self.snorkel_session.execute(Label.__table__.insert(), label_tuples)
 
@@ -86,7 +92,7 @@ class SparkLabelAnnotator:
 
     def _load_candidates(self, split):
         """
-        Loads a set of candidates as a Spark RDD and caches the results as 
+        Loads a set of candidates as a Spark RDD and caches the results as
         self.split_cache[split]
 
         :param split: the split of candidates to load
@@ -94,7 +100,7 @@ class SparkLabelAnnotator:
         jdbcDF = self.spark_session.read \
             .format("jdbc") \
             .option("url", "jdbc:" + snorkel_conn_string) \
-            .option("dbtable", 
+            .option("dbtable",
                 self.candidate_class.__tablename__ + "_serialized") \
             .load()
 
@@ -102,8 +108,8 @@ class SparkLabelAnnotator:
             wrap_candidate,
             class_name=self.candidate_class.__name__,
             argnames=self.candidate_class.__argnames__
-        ))
+        )).filter(lambda c: c.split == split)
+
         rdd = rdd.setName("Snorkel Candidates, Split " + str(split) + \
             " (" + self.candidate_class.__name__ + ")")
         self.split_cache[split] = rdd.cache()
-
