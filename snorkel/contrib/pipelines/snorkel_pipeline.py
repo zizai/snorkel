@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import os
 import random
 import csv
-import cPickle
 import bz2
 from pprint import pprint
 from scipy.sparse import coo_matrix

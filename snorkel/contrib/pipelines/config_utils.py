@@ -1,15 +1,14 @@
 from imp import load_source
 import os
 
-from config import global_config
+from .config import global_config
 
 def merge_configs(config):
     if 'domain' not in config:
         raise Exception("config must have non-None value for 'domain'.")
     local_config = get_local_config(domain=config['domain'], project=config.get('project', 'babble'))
-    config = recursive_merge_dicts(local_config, config)
-    config = recursive_merge_dicts(global_config, config)
-    return config  
+    merged_config = recursive_merge_dicts([global_config, local_config, config])
+    return merged_config  
 
 
 def get_local_config(domain, project='babble'):
@@ -45,16 +44,25 @@ def get_local_pipeline(domain, project='babble'):
     return pipeline
 
 
-def recursive_merge_dicts(x, y):
+def recursive_merge_dicts(dicts):
     """
-    Merge dictionary y into x, overwriting elements of x when there is a
+    Merge dictionary a to z, overwriting elements of a when there is a
     conflict, except if the element is a dictionary, in which case recurse.
     """
-    for k, v in y.iteritems():
-        if k in x and isinstance(x[k], dict):
-            x[k] = recursive_merge_dicts(x[k], v)
-        elif v is not None:
-            if k in x and x[k] != v:
-                print("Overwriting {}={} to {}={}".format(k, x[k], k, v))
-            x[k] = v
+    def merge(x, y):
+        for k, v in y.items():
+            if k in x and isinstance(x[k], dict):
+                x[k] = merge(x[k], v)
+            elif v is not None:
+                if k in x and x[k] != v:
+                    print("Overwriting {}={} to {}={}".format(k, x[k], k, v))
+                x[k] = v
+        return x
+
+    if not len(dicts) > 1:
+        raise ValueError("recursive_merge_dicts requires at least two dicts to merge.")
+    
+    x = dicts[0]
+    for y in dicts[1:]:
+        x = merge(x, y)
     return x

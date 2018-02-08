@@ -1,6 +1,6 @@
 import numpy as np
 
-from classifier import Classifier
+from .classifier import Classifier
 
 class MajorityVoter(Classifier):
     """Simple Classifier that makes the majority vote given an AnnotationMatrix."""
