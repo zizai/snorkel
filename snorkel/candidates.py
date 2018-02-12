@@ -285,3 +285,80 @@ class PretaggedCandidateExtractorUDF(UDF):
 
             # Add Candidate to session
             yield self.candidate_class(**candidate_args)
+
+
+class SignatureCandidateExtractor(UDFRunner):
+    """UDFRunner for SignatureCandidateExtractorUDF"""
+    def __init__(self, candidate_class):
+        super(SignatureCandidateExtractor, self).__init__(
+            SignatureCandidateExtractorUDF, 
+            candidate_class=candidate_class)
+
+    def apply(self, documents, signatures, split=0, **kwargs):
+        signatures_by_doc = defaultdict(list)
+        for signature in signatures:
+            signatures_by_doc[signature[0]].append(signature)
+
+        xs = []
+        for doc in documents:
+            signatures = signatures_by_doc.get(doc, [])
+            xs.append((doc, signatures))
+        super(SignatureCandidateExtractor, self).apply(xs, split=split, **kwargs)
+
+    def clear(self, session, split, **kwargs):
+        session.query(Candidate).filter(Candidate.split == split).delete()
+
+
+class SignatureCandidateExtractorUDF(UDF):
+    """
+    An extractor for Candidates with known source Document and character offsets.
+    """
+    def __init__(self, 
+            candidate_class, 
+            **kwargs):
+        self.candidate_class = candidate_class
+        super(SignatureCandidateExtractorUDF, self).__init__(**kwargs)
+
+    def apply(self, x, clear, split, check_for_existing=True, **kwargs):
+        """Extract Candidates from the given document using signatures (character offsets)"""
+        doc, signatures = x
+        # Identify char_start, char_end for sentences
+        sentences, sent_starts = sorted([(s.abs_char_offsets[0], s) for s in doc.sentences])
+
+        for signature in signatures:
+            args = []
+            for span in zip(signature[1], signature[2]):
+                char_start, char_end = span
+                # Identify corresponding sentence
+                # We make the assumption that all candidates belong to a single
+                # sentence (the first one that they overlap with if there are
+                # multiple)
+                # HACK: we can do something much faster than linear search here
+                i = 0
+                while i < len(sent_starts) and char_start < sent_starts[i+1]:
+                    i += 1
+                if i >= len(sent_starts) or char_end > sent_starts[i + 1]:
+                    raise Exception("Candidate signature extends past the end of a sentence. Investigate, Watson!")
+                sentence = sentences[i]
+
+                # Insert / load temporary span
+                ts = TemporarySpan(char_start=char_start, char_end=char_end, sentence=sentence)
+                ts.load_id_or_insert(self.session)
+                args.append(ts)
+
+            # Assemble candidate arguments
+            candidate_args = {'split' : split}
+            for i, arg_name in enumerate(self.candidate_class.__argnames__):
+                candidate_args[arg_name + '_id'] = args[i].id
+
+            # Checking for existence
+            if check_for_existing:
+                q = select([self.candidate_class.id])
+                for key, value in iteritems(candidate_args):
+                    q = q.where(getattr(self.candidate_class, key) == value)
+                candidate_id = self.session.execute(q).first()
+                if candidate_id is not None:
+                    continue
+
+            # Add Candidate to session
+            yield self.candidate_class(**candidate_args)
