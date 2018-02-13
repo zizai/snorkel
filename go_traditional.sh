@@ -44,6 +44,7 @@ python -u snorkel/contrib/pipelines/run.py \
     --supervision traditional \
     --max_train $MAX_TRAIN \
     --disc_model_search_space 40 \
+    --disc_model_class lstm \
     --verbose --no_plots |& tee -a $LOGFILE &
 
 sleep 3
