@@ -63,7 +63,7 @@ global_config = {
         # 'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
     },
     'gen_params_default': {
-        'step_size': 0.001
+        'step_size': 0.001,
     	'decay'    : 0.95,
         'epochs'   : 50,
         'reg_param': 0.1,
