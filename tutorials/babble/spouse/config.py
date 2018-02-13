@@ -13,10 +13,10 @@ config = {
         'lf_propensity'         : True,
     },
     'gen_params_default': {
-        'decay'    : 0.99,
-        'epochs'   : 50,
+        'step_size': 0.001,
         'reg_param': 0.5,
-        'step_size': 1e-4,
+        'decay'    : 0.95,
+        'epochs'   : 50,
         # used iff class_prior = True
         'init_class_prior' : -1.15, # (9%)
         # Used iff lf_prior = True
