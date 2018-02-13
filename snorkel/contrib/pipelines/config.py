@@ -94,8 +94,11 @@ global_config = {
     },
     'disc_params_range': {
         'lr'        : [1e-2, 1e-3, 1e-4],
-        'dim'       : [64, 128],
-        'dropout'   : [0.1, 0.25, 0.5],
+        # 'dim'       : [32, 64, 128],
+        'batch_size': [32, 64, 128],
+        'dropout'   : [0, 0.25, 0.5],
+        # 'n_epochs'  : [10, 20, 50],
+        'rebalance' : [False, 0.25, 0.5],
     },
     'disc_params_default': {
         'l1_penalty': 1.0,
