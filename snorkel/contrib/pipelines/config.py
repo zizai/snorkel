@@ -48,7 +48,7 @@ global_config = {
     'traditional_split': 0, # Which split has the candidates/labels to use for trad. sup.
     
     ## generative
-    'gen_model_search_space': 10,
+    'gen_model_search_space': 1,
     'gen_f_beta': 1.0,
     'gen_init_params': {
 		'class_prior'           : False,
@@ -58,11 +58,12 @@ global_config = {
         'seed'                  : None,
     },
     'gen_params_range': {
-        'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
-        'decay'         : [0.9, 0.95, 0.99],
-        'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
+        # 'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
+        # 'decay'         : [0.9, 0.95, 0.99],
+        # 'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
     },
     'gen_params_default': {
+        'step_size': 0.001
     	'decay'    : 0.95,
         'epochs'   : 50,
         'reg_param': 0.1,
@@ -86,7 +87,7 @@ global_config = {
 
     ### CLASSIFY ###
     'disc_model_class': 'lstm',
-    'disc_model_search_space': 10,
+    'disc_model_search_space': 1,
 	'disc_init_params': {
         'n_threads': 16,
         'seed'     : 123,

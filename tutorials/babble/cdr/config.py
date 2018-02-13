@@ -15,12 +15,15 @@ config = {
         'seed'                  : 123,
     },
     'gen_params_range': {
-        'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
-        'decay'         : [0.9, 0.95, 0.99],
-        'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5, 0.75],
-        'epochs'        : [10, 25, 50, 100],
+        # 'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
+        # 'decay'         : [0.9, 0.95, 0.99],
+        # 'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5, 0.75],
+        # 'epochs'        : [10, 25, 50, 100],
     },
     'gen_params_default': {
+        'step_size' : 0.01,
+        'reg_param' : 0.1,
+        'decay'     : 0.95,
         # Used iff lf_prior = True
         'LF_acc_prior_weight_default' : 0.5, # [0, 0.5, 1.0, 1.5] = (50%, 62%, 73%, 82%)
         # Used iff class_prior = True
