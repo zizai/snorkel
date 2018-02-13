@@ -64,10 +64,10 @@ config = {
         'print_freq': 5,
     },    
     'disc_params_range': {
-        'lr'        : [1e-2, 1e-3, 1e-4],
-        'rebalance' : [0.25, 0.5, False],
-        'n_epochs'  : [25, 50, 100],
-        'batch_size': [16, 32, 64],
+        # 'lr'        : [1e-2, 1e-3, 1e-4],
+        # 'rebalance' : [0.25, 0.5, False],
+        # 'n_epochs'  : [25, 50, 100],
+        # 'batch_size': [16, 32, 64],
     },
     'disc_eval_batch_size': None,
 }
