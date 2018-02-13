@@ -1,7 +1,6 @@
 DOMAIN=$1
 EXP=$2
-PROJECT="qalf"
-RELATION="org_top_members_employees"
+PROJECT="babble"
 
 DATE=`date +"%m_%d_%y"`
 TIME=`date +"%H_%M_%S"`
@@ -16,14 +15,13 @@ echo ""
 echo "<TEST:>"
 echo ""
 
-for MAX_TRAIN in 500 1000 2000 4000 7000
+for MAX_TRAIN in 30 60 300 1000 3000 10000 15000
 do
-for ITER in 1 2 3
-do
+ITER=1
 
 RUN="${PROJECT}_${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
 
-BASE_DB="${PROJECT}_${DOMAIN}_${RELATION}"
+BASE_DB="${PROJECT}_${DOMAIN}_featurized_tocopy"
 DB_NAME=$RUN
 cp $BASE_DB.db $DB_NAME.db
 echo "Copying db: $BASE_DB.db"
@@ -39,17 +37,16 @@ echo "Saving log to '$LOGFILE'"
 python -u snorkel/contrib/pipelines/run.py \
     --domain $DOMAIN \
     --project $PROJECT \
-    --relation $RELATION \
     --db_name $DB_NAME \
     --reports_dir $REPORTS_SUBDIR \
     --start_at 7 \
     --end_at 10 \
     --supervision traditional \
     --max_train $MAX_TRAIN \
-    --disc_model_search_space 3 \
+    --disc_model_search_space 40 \
     --verbose --no_plots |& tee -a $LOGFILE &
 
 sleep 3
 
 done
-done
+
