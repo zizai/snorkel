@@ -55,13 +55,12 @@ global_config = {
         'lf_prior'              : False, 
         'lf_propensity'         : True,
         'lf_class_propensity'   : False,
-        'seed'                  : 123,
+        'seed'                  : None,
     },
     'gen_params_range': {
         'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
         'decay'         : [0.9, 0.95, 0.99],
         'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
-        'epochs'        : [25, 50, 75],
     },
     'gen_params_default': {
     	'decay'    : 0.95,
