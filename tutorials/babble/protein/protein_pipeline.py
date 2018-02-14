@@ -49,14 +49,14 @@ class ProteinPipeline(BabblePipeline):
 
         train_sents, dev_sents, test_sents = set(), set(), set()
         docs = self.session.query(Document).order_by(Document.name).all()
+        random.shuffle(docs)
         for i, doc in enumerate(docs):
-            for s in doc.sentences:
+            sents = doc.sentences
+            random.shuffle(sents)
+            for s in sents:
                 if doc.name in train_ids:
-                    # HACK
-                    if self.config['BL50_test']:
-                        if random.random() < 0.5:
-                            continue
-                    # HACK
+                    if len(train_sents) > self.config['max_train']:
+                        continue
                     train_sents.add(s)
                 elif doc.name in dev_ids:
                     dev_sents.add(s)
