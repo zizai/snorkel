@@ -56,10 +56,11 @@ config = {
         'seed'     : 123,
     },
     'disc_params_default': {
-        'lr':         0.01,
+        'lr':         0.001,
+        'dropout':    0.5,
         'n_epochs':   20,
         'dim':        50,
-        'rebalance':  0.25,
+        'rebalance':  0,
         'batch_size': 128,
         'print_freq': 5,
     },    
