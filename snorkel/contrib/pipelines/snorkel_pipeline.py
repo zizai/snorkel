@@ -381,7 +381,8 @@ class SnorkelPipeline(object):
             
             elif self.config['supervision'] == 'jt':
                 # Pull in the explanations
-                self.collect()
+                if not hasattr(self, 'explanations'):
+                    self.collect()
 
                 train = [exp.candidate for exp in self.explanations]
                 dev = self.session.query(self.candidate_class).filter(self.candidate_class.split == DEV).all()
