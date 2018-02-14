@@ -7,7 +7,7 @@ import csv
 import cPickle
 import bz2
 from pprint import pprint
-from scipy.sparse import coo_matrix, vstack
+from scipy.sparse import vstack
 
 # Snorkel
 from snorkel.models import Document, Sentence, candidate_subclass
@@ -19,7 +19,7 @@ from snorkel.annotations import (FeatureAnnotator, LabelAnnotator, save_marginal
     load_marginals, load_feature_matrix, load_label_matrix, load_gold_labels)
 from snorkel.learning import GenerativeModel, MajorityVoter
 from snorkel.learning.structure import DependencySelector
-from snorkel.learning import reRNN, SparseLogisticRegression
+from snorkel.learning import reRNN, SparseLogisticRegression, LogisticRegression
 from snorkel.utils import PrintTimer, ProgressBar
 
 # Pipelines
@@ -375,6 +375,9 @@ class SnorkelPipeline(object):
                 Y_train[Y_train == -1] = 0
 
                 X_train, Y_train = self.traditional_supervision(X_train, Y_train)
+                
+                X_dev = load_feature_matrix(self.session, split=DEV)
+                X_test = load_feature_matrix(self.session, split=TEST)
             
             elif self.config['supervision'] == 'jt':
                 # Pull in the explanations
@@ -411,8 +414,8 @@ class SnorkelPipeline(object):
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
                     else load_marginals(self.session, split=TRAIN))
 
-            X_dev = load_feature_matrix(self.session, split=DEV)
-            X_test = load_feature_matrix(self.session, split=TEST)
+                X_dev = load_feature_matrix(self.session, split=DEV)
+                X_test = load_feature_matrix(self.session, split=TEST)
 
         else:
             raise NotImplementedError
@@ -561,7 +564,6 @@ def candidates_to_features(candidates, Ls):
         else:
             X = vstack((X, features))
     # All features are indicators ({0,1})
-    X = abs(X.todense())
     return X
 
 def candidates_to_labels(candidates, L_golds):
