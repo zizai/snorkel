@@ -7,7 +7,7 @@ import csv
 import cPickle
 import bz2
 from pprint import pprint
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, vstack
 
 # Snorkel
 from snorkel.models import Document, Sentence, candidate_subclass
@@ -151,6 +151,9 @@ class SnorkelPipeline(object):
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...skipping 'supervise' stage.")
             return                
+        elif self.config['supervision'] == 'jt':
+            print("In 'jt' supervision mode...skipping 'supervise' stage.")
+            return                
 
         if self.L_train is None:
             L_train = load_label_matrix(self.session, split=TRAIN)
@@ -219,7 +222,7 @@ class SnorkelPipeline(object):
                     ds = DependencySelector()
                     np.random.seed(self.config['seed'])
                     deps = ds.select(L_train, threshold=config['deps_thresh'])
-                    if args.verbose > 0:
+                    if self.config['verbose'] > 0:
                         print("Selected {0} dependencies.".format(len(deps)))
 
                 else:
@@ -372,6 +375,37 @@ class SnorkelPipeline(object):
                 Y_train[Y_train == -1] = 0
 
                 X_train, Y_train = self.traditional_supervision(X_train, Y_train)
+            
+            elif self.config['supervision'] == 'jt':
+                # Pull in the explanations
+                self.collect()
+
+                train = [exp.candidate for exp in self.explanations]
+                dev = self.session.query(self.candidate_class).filter(self.candidate_class.split == DEV).all()
+                test = self.session.query(self.candidate_class).filter(self.candidate_class.split == TEST).all()
+                
+                Ls = []
+                Ls.append(load_label_matrix(self.session, split=TRAIN))
+                Ls.append(load_label_matrix(self.session, split=DEV))
+                Ls.append(load_label_matrix(self.session, split=TEST))
+
+                X_train = candidates_to_features(train, Ls)
+                X_dev   = candidates_to_features(dev, Ls)
+                X_test  = candidates_to_features(test, Ls)
+
+                print("JT X_train shape: {}".format(X_train.shape))
+                print("JT X_dev shape: {}".format(X_dev.shape))
+                print("JT X_test shape: {}".format(X_test.shape))
+
+                L_golds = []
+                L_golds.append(load_gold_labels(self.session, annotator_name='gold', split=TRAIN))
+                L_golds.append(load_gold_labels(self.session, annotator_name='gold', split=DEV))
+                L_golds.append(load_gold_labels(self.session, annotator_name='gold', split=TEST))
+
+                y_train = np.array([exp.label for exp in pipe.explanations])
+                y_dev   = candidates_to_labels(dev, L_golds)
+                y_test  = candidates_to_labels(test, L_golds)
+
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
@@ -379,6 +413,7 @@ class SnorkelPipeline(object):
 
             X_dev = load_feature_matrix(self.session, split=DEV)
             X_test = load_feature_matrix(self.session, split=TEST)
+
         else:
             raise NotImplementedError
 
@@ -515,3 +550,29 @@ class SnorkelPipeline(object):
             (lf1, lf2, d) = dep
             print('{:16}: ({}, {})'.format(d, lf1, lf2))
 
+def candidates_to_features(candidates, Ls):
+    """For use with JT comparision"""
+    for i, c in enumerate(candidates):
+        L = Ls[c.split]
+        row_idx = L.get_row_index(c)
+        features = L[row_idx,:]
+        if i == 0:
+            X = features
+        else:
+            X = vstack((X, features))
+    # All features are indicators ({0,1})
+    X = abs(X.todense())
+    return X
+
+def candidates_to_labels(candidates, L_golds):
+    """For use with JT comparison"""
+    labels = []
+    for i, c in enumerate(candidates):
+        L_gold = L_golds[c.split]
+        row_idx = L_gold.get_row_index(c)
+        label = L_gold[row_idx,0]
+        if label == -1:
+            label = 0
+        labels.append(label)
+    y = np.array(labels)
+    return y
