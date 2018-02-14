@@ -40,10 +40,11 @@ python -u snorkel/contrib/pipelines/run.py \
     --reports_dir $REPORTS_SUBDIR \
     --start_at 7 \
     --end_at 10 \
-    --supervision generative \
+    --supervision jt \
+    --gold_explanations True \
     --gen_model_search_space 1 \
     --disc_model_search_space 30 \
-    --disc_model_class lstm \
+    --disc_model_class logreg \
     --verbose --no_plots |& tee -a $LOGFILE &
 
 done
