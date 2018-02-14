@@ -60,7 +60,7 @@ if __name__ == '__main__':
     argparser.add_argument('--BL50_test', type=str2bool)
 
     # Supervision args
-    SUPERVISION = ['traditional', 'majority', 'generative']
+    SUPERVISION = ['traditional', 'majority', 'generative', 'jt']
     argparser.add_argument('--supervision', type=str, choices=SUPERVISION)
     argparser.add_argument('--max_train', type=int)
     argparser.add_argument('--learn_deps', type=str2bool)
