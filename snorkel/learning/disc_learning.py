@@ -159,7 +159,10 @@ class TFNoiseAwareModel(Classifier):
         # Make sure marginals are in correct default format
         Y_train = reshape_marginals(Y_train)
         if Y_dev is not None:
-            Y_dev_array = Y_dev.toarray().flatten()
+            if isinstance(Y_dev, np.ndarray):
+                Y_dev_array = Y_dev.copy()
+            else: 
+                Y_dev_array = Y_dev.toarray().flatten()
             if not np.all(Y_dev_array >= 0):
                 Y_dev_array = (Y_dev_array + 1) / 2.0
 
