@@ -7,7 +7,7 @@ parameters = ["max_train"]
 
 date_str = sys.argv[1] # e.g., '02_13_18'                                                        
 exp_name = sys.argv[2] # e.g., 'cdr_finaltradit0'
-include_all = True if sys.argv[3].lower().startswith('t)') else False # e.g., True
+include_all = True if sys.argv[3].lower().startswith('t') else False # e.g., True
 
 report_subdir = os.path.join(os.environ['SNORKELHOME'], 'reports', date_str)
 reports = []
