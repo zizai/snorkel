@@ -29,7 +29,7 @@ for report in reports:
     if include_all:
         results[tuple(settings)].append((p, r, f1))
     else:
-        results[tuple(settings)].append(f1)
+        results[tuple(settings)].append((f1,))
 
 for settings, scores_list in sorted(results.items()):
     for param, val in zip(parameters, settings):
