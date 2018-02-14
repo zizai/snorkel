@@ -80,6 +80,7 @@ if __name__ == '__main__':
     argparser.add_argument('--disc_params_default:lr', type=float)
     argparser.add_argument('--disc_params_default:rebalance', type=float)
     argparser.add_argument('--disc_params_default:dropout', type=float)
+    argparser.add_argument('--disc_params_default:l2_penalty', type=float)
     
     argparser.add_argument('--disc_params_range:batch_size', type=int, action='append')
     argparser.add_argument('--disc_params_range:n_epochs', type=int, action='append')
