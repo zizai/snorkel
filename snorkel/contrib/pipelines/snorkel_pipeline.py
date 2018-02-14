@@ -129,8 +129,8 @@ class SnorkelPipeline(object):
         raise NotImplementedError
 
 
-    def label(self, labeler, split):
-        if split == TRAIN:
+    def label(self, labeler, split, clear=False):
+        if split == TRAIN or clear:
             L = labeler.apply(split=split, parallelism=self.config['parallelism'])
         else:
             L = labeler.apply_existing(split=split, parallelism=self.config['parallelism'])

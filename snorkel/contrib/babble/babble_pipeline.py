@@ -129,13 +129,13 @@ class BabblePipeline(SnorkelPipeline):
         if split == 2 or split is None:
             self.L_test  = babbler.get_label_matrix(split=2)
 
-    def label(self, config=None, split=None):
+    def label(self, config=None, split=None, clear=True):
         if config:
             self.config = config
         if self.config['supervision'] == 'traditional':
             print("In 'traditional' supervision mode...skipping 'label' stage.")
             return
-        self.labeler = LabelAnnotator(lfs=self.lfs)  
+        self.labeler = LabelAnnotator(lfs=self.lfs)
         splits = [split] if split is not None else self.config['splits']
         for split in splits:
             num_candidates = self.session.query(self.candidate_class).filter(self.candidate_class.split == split).count()
@@ -147,7 +147,9 @@ class BabblePipeline(SnorkelPipeline):
                 #     L = self.babbler.label_matrix
                 #     print("Reloaded label matrix from babbler for split {}.".format(split))
                 # else:
-                L = SnorkelPipeline.label(self, self.labeler, split)
+                L = SnorkelPipeline.label(self, self.labeler, split, clear=clear)
+                if clear:
+                    clear = False
                 num_candidates, num_labels = L.shape
                 print("Labeled split {}: ({},{}) sparse (nnz = {})\n".format(split, num_candidates, num_labels, L.nnz))
                 if self.config['display_accuracies'] and split == DEV:
