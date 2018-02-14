@@ -402,9 +402,9 @@ class SnorkelPipeline(object):
                 L_golds.append(load_gold_labels(self.session, annotator_name='gold', split=DEV))
                 L_golds.append(load_gold_labels(self.session, annotator_name='gold', split=TEST))
 
-                y_train = np.array([exp.label for exp in self.explanations])
-                y_dev   = candidates_to_labels(dev, L_golds)
-                y_test  = candidates_to_labels(test, L_golds)
+                Y_train = np.array([exp.label for exp in self.explanations])
+                Y_dev   = candidates_to_labels(dev, L_golds)
+                Y_test  = candidates_to_labels(test, L_golds)
 
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
