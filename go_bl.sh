@@ -20,7 +20,7 @@ do
 
 RUN="${PROJECT}_${DOMAIN}_${EXP}_${TIME}_${MAX_TRAIN}_${ITER}"
 
-BASE_DB="${PROJECT}_${DOMAIN}_featurized_tocopy"
+BASE_DB="${PROJECT}_${DOMAIN}_labeled_tocopy"
 DB_NAME=$RUN
 cp $BASE_DB.db $DB_NAME.db
 echo "Copying db: $BASE_DB.db"
@@ -38,13 +38,14 @@ python -u snorkel/contrib/pipelines/run.py \
     --project $PROJECT \
     --db_name $DB_NAME \
     --reports_dir $REPORTS_SUBDIR \
-    --start_at 5 \
-    --end_at 8 \
+    --start_at 7 \
+    --end_at 10 \
     --supervision generative \
-    --gen_model_search_space 30 \
-    --disc_model_search_space 1 \
+    --gen_model_search_space 1 \
+    --disc_model_search_space 30 \
     --disc_model_class lstm \
     --verbose --no_plots |& tee -a $LOGFILE &
 
 done
+
 
