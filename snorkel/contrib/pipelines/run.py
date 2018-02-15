@@ -62,6 +62,7 @@ if __name__ == '__main__':
     SUPERVISION = ['traditional', 'majority', 'generative', 'jt']
     argparser.add_argument('--supervision', type=str, choices=SUPERVISION)
     argparser.add_argument('--max_train', type=int)
+    argparser.add_argument('--train_fraction', type=float)
     argparser.add_argument('--learn_deps', type=str2bool)
     argparser.add_argument('--deps_thresh', type=float)
     ## model args
