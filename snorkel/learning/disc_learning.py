@@ -241,10 +241,10 @@ class TFNoiseAwareModel(Classifier):
                         self.name[:10], t, time() - st, epoch_loss)
 
                 if X_dev is not None:
-                    feed_dict = self._construct_feed_dict(
-                        X_dev, Y_dev_array, lr=lr, **kwargs)
-                    dev_loss = self.session.run(self.loss, feed_dict=feed_dict)
-                    msg += '\tDev Loss={0:.3f}'.format(dev_loss)
+                    # feed_dict = self._construct_feed_dict(
+                    #     X_dev, Y_dev_array, lr=lr, **kwargs)
+                    # dev_loss = self.session.run(self.loss, feed_dict=feed_dict)
+                    # msg += '\tDev Loss={0:.3f}'.format(dev_loss)
 
                     scores = self.score(X_dev, Y_dev, batch_size=batch_size)
                     score = scores if self.cardinality > 2 else scores[-1]
