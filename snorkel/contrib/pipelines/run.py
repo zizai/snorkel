@@ -65,6 +65,7 @@ if __name__ == '__main__':
     argparser.add_argument('--train_fraction', type=float)
     argparser.add_argument('--learn_deps', type=str2bool)
     argparser.add_argument('--deps_thresh', type=float)
+    argparser.add_argument('--gen_f_beta', type=float)
     ## model args
     argparser.add_argument('--gen_init_params:class_prior', type=str2bool)
     argparser.add_argument('--gen_init_params:lf_prior', type=str2bool)
