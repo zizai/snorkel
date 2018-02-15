@@ -79,18 +79,19 @@ class CdrPipeline(BabblePipeline):
             load_external_labels(self.session, self.candidate_class, 
                                  split=split, annotator='gold')
         
+            L_gold = load_gold_labels(self.session, annotator_name='gold', split=split)
+            candidates = self.session.query(self.candidate_class).filter(
+                self.candidate_class.split == split).all()
+            total = len(candidates)
+            positive = float(sum(L_gold.todense() == 1))
+            # print("Positive % (no pruning): {:.1f}%\n".format(positive/total * 100))
+
             ### SPECIAL: Trim candidate set to meet desired positive pct
             # Process is deterministic to ensure repeatable results
             SEED = 123
             TARGET_PCT = 0.20
             positives = []
     
-            candidates = self.session.query(self.candidate_class).filter(
-                self.candidate_class.split == split).all()
-
-            L_gold = load_gold_labels(self.session, annotator_name='gold', split=split)
-            total = len(candidates)
-            positive = float(sum(L_gold.todense() == 1))
             print("Positive % before pruning: {:.1f}%\n".format(positive/total * 100))
             
             for c in candidates:
@@ -108,6 +109,7 @@ class CdrPipeline(BabblePipeline):
             L_gold = load_gold_labels(self.session, annotator_name='gold', split=split)
             positive = float(sum(L_gold.todense() == 1))
             print("Positive % after pruning: {:.1f}%\n".format(positive/total * 100))
+            ### END SPECIAL
 
             self.session.commit()
 
