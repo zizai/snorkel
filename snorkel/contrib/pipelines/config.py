@@ -19,6 +19,7 @@ global_config = {
 
     ### PARSE ###
     'max_docs': None,
+    'train_fraction': 1,
 
     ### EXTRACT ###
 

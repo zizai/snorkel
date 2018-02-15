@@ -51,7 +51,6 @@ class SpousePipeline(BabblePipeline):
 
         print("Separating sentences into splits.")
         sents = self.session.query(Sentence).all()
-        random.shuffle(sents)
         train_sents = []
         dev_sents = []
         test_sents = []
@@ -59,7 +58,7 @@ class SpousePipeline(BabblePipeline):
             if not too_many_people(sent):
                 doc_name = sent.get_parent().name
                 if doc_name in split_assignments[0]:
-                    if len(train_sents) > self.config['max_train']:
+                    if random.random() > self.config['train_fraction']:
                         continue
                     train_sents.append(sent)
                 elif doc_name in split_assignments[1]:
