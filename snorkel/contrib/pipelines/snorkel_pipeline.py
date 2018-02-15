@@ -493,7 +493,7 @@ class SnorkelPipeline(object):
         else:
             assert(X.shape[0] == total_size)
 
-        if train_size is None:
+        if not train_size:
             print("No value found for max_train. Using all available gold labels.")
             train_size = total_size
         elif total_size < train_size:
