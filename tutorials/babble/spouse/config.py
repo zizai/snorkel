@@ -54,12 +54,14 @@ config = {
         'seed'     : 123,
     },
     'disc_params_default': {
+        'rebalance':  0.25,
         'lr':         0.001,
+        'batch_size': 32,
+        'l1_penalty': 0,
+        'l2_penalty': 1,
         'dropout':    0.5,
-        'n_epochs':   20,
         'dim':        50,
-        'rebalance':  0,
-        'batch_size': 128,
+        'n_epochs':   20,
         'print_freq': 5,
     },    
     'disc_params_range': {
