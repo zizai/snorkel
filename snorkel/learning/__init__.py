@@ -10,4 +10,4 @@ from .gen_learning import (
     GenerativeModel,
     GenerativeModelWeights,
 )
-from majority_vote import MajorityVoter
+from majority_vote import MajorityVoter, SoftMajorityVoter

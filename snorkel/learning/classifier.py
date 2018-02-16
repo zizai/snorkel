@@ -111,7 +111,7 @@ class Classifier(object):
         ] if not self.representation else X_test
 
         # Initialize and return scorer
-        s = scorer(test_candidates, Y_test, gold_candidate_set)          
+        s = scorer(test_candidates, Y_test, gold_candidate_set)
         return s.score(test_marginals, train_marginals=None, b=b,
             display=display, set_unlabeled_as_neg=set_unlabeled_as_neg)
 

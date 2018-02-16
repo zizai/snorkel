@@ -208,6 +208,7 @@ class MentionScorer(Scorer):
                 print("\nCalibration plot:")
                 calibration_plots(train_marginals, test_marginals,
                     np.asarray(test_label_array))
+        
         return tp, fp, tn, fn
 
     def _score_categorical(self, test_marginals, train_marginals=None,

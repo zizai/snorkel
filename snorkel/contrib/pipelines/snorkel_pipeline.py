@@ -17,7 +17,7 @@ from snorkel.candidates import Ngrams, CandidateExtractor
 from snorkel.matchers import PersonMatcher
 from snorkel.annotations import (FeatureAnnotator, LabelAnnotator, save_marginals, 
     load_marginals, load_feature_matrix, load_label_matrix, load_gold_labels)
-from snorkel.learning import GenerativeModel, MajorityVoter
+from snorkel.learning import GenerativeModel, MajorityVoter, SoftMajorityVoter
 from snorkel.learning.structure import DependencySelector
 from snorkel.learning import reRNN, SparseLogisticRegression, LogisticRegression
 from snorkel.utils import PrintTimer, ProgressBar
@@ -202,17 +202,26 @@ class SnorkelPipeline(object):
                 print("Positive Fraction: {:.1f}%\n".format(positive/total * 100))
             #assert L_gold_test.nonzero()[0].shape[0] > 0
 
-        if self.config['supervision'] == 'majority':
-            gen_model = MajorityVoter()
+        if 'majority' in self.config['supervision']:
+            if self.config['supervision'] == 'majority':
+                gen_model = MajorityVoter()
+            elif self.config['supervision'] == 'soft_majority':
+                gen_model = SoftMajorityVoter()
+            else:
+                raise Exception("Unrecognized majority vote variant: {}".format(
+                    self.config['supervision']))
+
             train_marginals = gen_model.marginals(L_train)
 
             if self.config['verbose']:
-                print("Simple QA score (1 question) on dev set:")
-                L_dev = L_dev[:,0]
-                tp, fp, tn, fn = gen_model.error_analysis(self.session, L_dev, L_gold_dev, display=True)
+                # print("Simple QA score (1 question) on dev set:")
+                # L_dev = L_dev[:,0]
+                # tp, fp, tn, fn = gen_model.error_analysis(
+                #     self.session, L_dev, L_gold_dev, display=True)
 
                 print("Gen. model score on dev set:")
-                tp, fp, tn, fn = gen_model.error_analysis(self.session, L_dev, L_gold_dev, display=True)
+                tp, fp, tn, fn = gen_model.error_analysis(
+                    self.session, L_dev, L_gold_dev, display=True)
 
         elif self.config['supervision'] == 'generative':
 
