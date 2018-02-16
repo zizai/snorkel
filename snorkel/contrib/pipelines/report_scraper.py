@@ -18,9 +18,10 @@ def main(args):
     results = defaultdict(list)
     for report in reports:
         data = json.load(open(report))
-        f1 = data["scores"]["F1 Score"]["Disc"]
-        r = data["scores"]["Recall"]["Disc"]
-        p = data["scores"]["Precision"]["Disc"]
+        model = args['model'].capitalize()
+        f1 = data["scores"]["F1 Score"][model]
+        r = data["scores"]["Recall"][model]
+        p = data["scores"]["Precision"][model]
         settings = []
         for parameter in params:
             settings.append(data["config"][parameter])
@@ -44,6 +45,7 @@ if __name__ == '__main__':
     argparser.add_argument('--date', type=str, default='02_15_18')
     argparser.add_argument('--f1', action='store_true')
     argparser.add_argument('--params', type=str, default='max_train')
+    argparser.add_argument('--model', type=str, default='disc')
     # TODO: allow them to specify multiple param values
     args = vars(argparser.parse_args())
     main(args)
