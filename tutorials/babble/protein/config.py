@@ -15,7 +15,7 @@ config = {
         'init_class_prior' : -1.39, # (20%, based on dev balance)
         # logit = ln(p/(1-p)), p = exp(logit)/(1 + exp(logit))
     },
-    'disc_params_default': {
+    'disc_params_default': { # optimal tradit logreg settings
         'rebalance':  0,
         'lr':         0.01,
         'batch_size': 32,

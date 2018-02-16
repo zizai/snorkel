@@ -39,7 +39,7 @@ config = {
         'n_threads': 16,
         'seed'     : 123,
     },
-    'disc_params_default': {
+    'disc_params_default': { # optimal tradit logreg settings
         'rebalance':  0.5,
         'lr':         0.001,
         'batch_size': 32,
