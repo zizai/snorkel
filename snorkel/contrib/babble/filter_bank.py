@@ -1,4 +1,4 @@
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, defaultdict
 import numpy as np
 
 from scipy.sparse import csr_matrix
@@ -18,6 +18,7 @@ class FilterBank(object):
         self.consistency_filter = ConsistencyFilter(self.candidate_class)
         self.uniform_filter = UniformSignatureFilter()
         self.dup_signature_filter = DuplicateSignatureFilter()
+        self.lowest_coverage_filter = LowestCoverageFilter()
         self.label_matrix = None
 
     def apply(self, parses, explanations, parallelism=1):
@@ -50,6 +51,11 @@ class FilterBank(object):
         filtered_parses[self.dup_signature_filter.name()] = rejected
         if not parses: return parses, filtered_parses, None
 
+        # Apply coverage filter
+        parses, rejected, label_matrix = self.lowest_coverage_filter.filter(parses, label_matrix)
+        filtered_parses[self.lowest_coverage_filter.name()] = rejected
+        if not parses: return parses, filtered_parses, None
+
         return parses, filtered_parses, label_matrix
 
     def label(self, parses):
@@ -74,6 +80,7 @@ class FilterBank(object):
         self.consistency_filter.commit(idxs)
         self.uniform_filter.commit(idxs)
         self.dup_signature_filter.commit(idxs)
+        self.lowest_coverage_filter.commit(idxs)
 
 
 class Filter(object):
@@ -274,6 +281,45 @@ class DuplicateSignatureFilter(Filter):
              if i in idxs:
                  self.seen_signatures[sig] =  parse
         self.temp_seen_signatures= OrderedDict()
+
+
+class LowestCoverageFilter(Filter):
+    """Filters out all but one parse that have the same labeling signature."""
+
+    def filter(self, parses, label_matrix):
+        """
+        :param parses: ...
+        :param label_matrix: a label_matrix corresponding to only the remaining 
+            parses from this batch.
+        """
+        parses = self.validate(parses)
+        if not parses: return [], [], label_matrix
+        if not isinstance(label_matrix, csr_matrix):
+            raise Exception("Method filter() requires a label_matrix of type "
+                "scipy.sparse.csr_matrix.")    
+
+        parses_by_exp = defaultdict(list)
+        label_counts = np.ravel(np.sum(abs(label_matrix), axis=0))
+        for i, parse in enumerate(parses):
+            num_labeled = label_counts[i]
+            parses_by_exp[parse.explanation.name].append((i, parse, num_labeled))
+        
+        good_parses = []
+        good_idxs = []
+        bad_parses = []
+        for _, parse_tuples in parses_by_exp.items():
+            sorted_parse_tuples = sorted(parse_tuples, key=lambda x: x[2])
+            good_idx, good_parse, _ = sorted_parse_tuples[0]
+            good_idxs.append(good_idx)
+            good_parses.append(good_parse)
+            for (bad_idx, bad_parse, _) in sorted_parse_tuples[1:]:
+                bad_parses.append(FilteredParse(bad_parse, good_parse.semantics))
+        
+        label_matrix = label_matrix[:, good_idxs]
+
+        print("{} parse(s) remain ({} parse(s) removed by {}).".format(
+            len(good_parses), len(bad_parses), self.name()))    
+        return good_parses, bad_parses, label_matrix
 
 
 def extract_exp_name(lf):
