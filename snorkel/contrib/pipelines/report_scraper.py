@@ -5,6 +5,8 @@ import os
 import sys
 
 def main(args):
+    params = [args['params']]
+
     report_subdir = os.path.join(os.environ['SNORKELHOME'], 'reports', args['date'])
     reports = []
     for root, dirs, files in os.walk(report_subdir):
@@ -41,7 +43,8 @@ if __name__ == '__main__':
     argparser.add_argument('--exp', type=str)
     argparser.add_argument('--date', type=str, default='02_15_18')
     argparser.add_argument('--f1', action='store_true')
-    argparser.add_argument('--params', type=str, nargs='*', default='max_train')
+    argparser.add_argument('--param', type=str, default='max_train')
+    # TODO: allow them to specify multiple param values
     args = vars(argparser.parse_args())
     main(args)
 
