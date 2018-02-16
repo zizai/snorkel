@@ -59,7 +59,7 @@ if __name__ == '__main__':
     argparser.add_argument('--apply_filters', type=str2bool)
 
     # Supervision args
-    SUPERVISION = ['traditional', 'majority', 'generative', 'jt']
+    SUPERVISION = ['traditional', 'majority', 'soft_majority', 'generative', 'jt']
     argparser.add_argument('--supervision', type=str, choices=SUPERVISION)
     argparser.add_argument('--max_train', type=int)
     argparser.add_argument('--train_fraction', type=float)
