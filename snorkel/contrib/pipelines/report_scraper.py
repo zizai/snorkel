@@ -5,7 +5,7 @@ import os
 import sys
 
 def main(args):
-    params = [args['params']]
+    params = [args['param']]
 
     report_subdir = os.path.join(os.environ['SNORKELHOME'], 'reports', args['date'])
     reports = []
