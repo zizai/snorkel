@@ -27,15 +27,29 @@ class ProteinPipeline(BabblePipeline):
               file_path=(DATA_ROOT + 'abstracts_razor_utf8.txt'), 
               clear=True,
               config=None):
-        if 'subset' in file_path:
-            print("WARNING: you are currently using a subset of the data.")
-        doc_preprocessor = TSVDocPreprocessor(file_path, 
-                                              max_docs=self.config['max_docs'])
+        # if 'subset' in file_path:
+        #     print("WARNING: you are currently using a subset of the data.")
+        # doc_preprocessor = TSVDocPreprocessor(file_path, 
+        #                                       max_docs=self.config['max_docs'])
         pk_lookup_tagger = ProteinKinaseLookupTagger()
         corpus_parser = CorpusParser(fn=pk_lookup_tagger.tag)
-        corpus_parser.apply(list(doc_preprocessor), 
-                            parallelism=self.config['parallelism'], 
-                            clear=clear)
+        # corpus_parser.apply(list(doc_preprocessor), 
+        #                     parallelism=self.config['parallelism'], 
+        #                     clear=clear)
+        
+        if self.config['verbose']:
+            print("Documents: {}".format(self.session.query(Document).count()))
+            print("Sentences: {}".format(self.session.query(Sentence).count()))
+
+        if self.config['max_extra_docs']:
+            print("Beginning to parse {} extra documents.".format(self.config['max_extra_docs']))
+            extra_docs = DATA_ROOT + 'extra_10k_abstracts.txt'
+            doc_preprocessor2 = TSVDocPreprocessor(extra_docs, 
+                                                max_docs=self.config['max_extra_docs'])
+            corpus_parser.apply(list(doc_preprocessor2), 
+                        parallelism=self.config['parallelism'], 
+                        clear=False)
+        
         if self.config['verbose']:
             print("Documents: {}".format(self.session.query(Document).count()))
             print("Sentences: {}".format(self.session.query(Sentence).count()))
@@ -49,19 +63,24 @@ class ProteinPipeline(BabblePipeline):
 
         train_sents, dev_sents, test_sents = set(), set(), set()
         docs = self.session.query(Document).order_by(Document.name).all()
+
+        num_extra_docs = 0
         for i, doc in enumerate(docs):
+            if doc.name not in train_ids:
+                num_extra_docs += 1
+
             for s in doc.sentences:
-                if doc.name in train_ids:
-                    if random.random() > self.config['train_fraction']:
-                        continue
-                    train_sents.add(s)
-                elif doc.name in dev_ids:
+                if doc.name in dev_ids:
                     dev_sents.add(s)
                 elif doc.name in test_ids:
                     test_sents.add(s)
                 else:
-                    print("Warning: ID <{0}> not found in any id set. Adding to dev...".format(doc.name))
-                    dev_sents.add(s)
+                    if (self.config['train_fraction'] != 1
+                        and random.random() > self.config['train_fraction']):
+                        continue
+                    train_sents.add(s)
+
+        print("Extracted candidates from {} 'extra' sentences".format(num_extra_docs))
 
         candidate_extractor = PretaggedCandidateExtractor(self.candidate_class,
                                                           ['protein', 'kinase'])

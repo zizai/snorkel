@@ -70,19 +70,15 @@ class GeniaTagger(object):
         return parts
 
 class ProteinKinaseLookupTagger (object):
-
     # default dict is unique list of all mouse and human genes
     # these represent proteins in the given text
-    def __init__(self, fname='data/combined-protein-names.pkl'):
+    def __init__(self, 
+        fname='data/combined-protein-names.pkl', kinase_fname='data/all-kinases.pkl'):
         cwd = os.environ['SNORKELHOME'] + '/tutorials/babble/protein/'
-        with open('{}{}'.format(cwd,fname), 'rb') as f:
+        with open('{}{}'.format(cwd, fname), 'rb') as f:
             self.protein_set = load(f)
-            self.kinase_set = set([ 'pink1',
-                           'lrrk2',
-                           'jnk1',
-                           'leucine-rich repeat kinase 2',
-                           'leucine rich repeat kinase 2',
-                           'pten-induced putative kinase 1' ])
+        with open('{}{}'.format(cwd, kinase_fname), 'rb') as kinase_f:
+            self.kinase_set = load(kinase_f)
 
     def tag(self, parts):
         blacklist = set(['was','impact'])
