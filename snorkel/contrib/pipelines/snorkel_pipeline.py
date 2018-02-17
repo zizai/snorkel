@@ -388,8 +388,6 @@ class SnorkelPipeline(object):
                 
                 X_train = load_feature_matrix(self.session, 
                                               split=self.config['traditional_split'])
-                if self.config['max_train']:
-                    X_train = X_train[self.selected, :]
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
 
@@ -435,6 +433,8 @@ class SnorkelPipeline(object):
 
             else:
                 X_train = load_feature_matrix(self.session, split=TRAIN)
+                if self.config['max_train']:
+                    X_train = X_train[self.selected, :]
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
                     else load_marginals(self.session, split=TRAIN))
 
