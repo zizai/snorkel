@@ -165,9 +165,9 @@ class SnorkelPipeline(object):
             print("Trimming L_train to max_train={}".format(self.config['max_train']))
             print("L_gold_train numbers will be approximate")
             num_train_candidates = L_train.shape[0]
-            selected = np.random.choice(
+            self.selected = np.random.choice(
                 num_train_candidates, self.config['max_train'], replace=False)
-            L_train = L_train[selected,:]
+            L_train = L_train[self.selected,:]
 
         if self.config['verbose']:
             print("Using L_train: {0}".format(L_train.__repr__()))
@@ -388,6 +388,8 @@ class SnorkelPipeline(object):
                 
                 X_train = load_feature_matrix(self.session, 
                                               split=self.config['traditional_split'])
+                if self.config['max_train']:
+                    X_train = X_train[self.selected, :]
                 L_gold = load_gold_labels(self.session, annotator_name='gold', 
                                           split=self.config['traditional_split'])
 
