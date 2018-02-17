@@ -52,6 +52,16 @@ if __name__ == '__main__':
     argparser.add_argument('--start_at', type=int)
     argparser.add_argument('--end_at', type=int)
 
+    # Scaling args
+    argparser.add_argument('--max_docs', type=int,
+        help="""[Deprecated] Maximum documents to parse;
+        NOTE: This will also filter dev and test docs. 
+        See --training_docs to limit just training docs.""")
+    argparser.add_argument('--max_extra_docs', type=int)
+    argparser.add_argument('--debug', action='store_true',
+        help="""Reduces max_docs, grid search sizes, and num_epochs""")        
+
+
     # Babble args
     argparser.add_argument('--lf_source', type=str)
     argparser.add_argument('--max_explanations', type=int)
@@ -92,14 +102,6 @@ if __name__ == '__main__':
     argparser.add_argument('--seed', type=int)
     argparser.add_argument('--gen_model_search_space', type=int)
     argparser.add_argument('--disc_model_search_space', type=int)
-
-    # Scaling args
-    argparser.add_argument('--max_docs', type=int,
-        help="""[Deprecated] Maximum documents to parse;
-        NOTE: This will also filter dev and test docs. 
-        See --training_docs to limit just training docs.""")
-    argparser.add_argument('--debug', action='store_true',
-        help="""Reduces max_docs, grid search sizes, and num_epochs""")        
 
     # Logging
     argparser.add_argument('--reports_dir', type=str)
