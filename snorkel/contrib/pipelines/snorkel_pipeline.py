@@ -161,9 +161,17 @@ class SnorkelPipeline(object):
             L_train = self.L_train
         assert L_train.nnz > 0
 
-        L_gold_train = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
+        if self.config['max_train']:
+            print("Trimming L_train to max_train={}".format(self.config['max_train']))
+            print("L_gold_train numbers will be approximate")
+            num_train_candidates = L_train.shape[0]
+            selected = np.random.choice(
+                num_train_candidates, self.config['max_train'], replace=False)
+            L_train = L_train[selected,:]
+
         if self.config['verbose']:
             print("Using L_train: {0}".format(L_train.__repr__()))
+            L_gold_train = load_gold_labels(self.session, annotator_name='gold', split=TRAIN)
             print("Using L_gold_train: {0}".format(L_gold_train.__repr__()))
             total = L_gold_train.shape[0]
             positive = float(sum(L_gold_train.todense() == 1))
@@ -357,7 +365,11 @@ class SnorkelPipeline(object):
 
                 X_train, Y_train = self.traditional_supervision(candidates, Y_train)
             else:
-                X_train = self.get_candidates(TRAIN)
+                if self.config['max_train']:
+                    X_train = [self.L_train.get_candidates(self.session, i) 
+                        for i in range(self.L_train.shape[0])]
+                else:
+                    X_train = self.get_candidates(TRAIN)
                 Y_train = (self.train_marginals if getattr(self, 'train_marginals', None) is not None 
                     else load_marginals(self.session, split=0))  
 
