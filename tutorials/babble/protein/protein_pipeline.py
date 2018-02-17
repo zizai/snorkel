@@ -27,15 +27,15 @@ class ProteinPipeline(BabblePipeline):
               file_path=(DATA_ROOT + 'abstracts_razor_utf8.txt'), 
               clear=True,
               config=None):
-        # if 'subset' in file_path:
-        #     print("WARNING: you are currently using a subset of the data.")
-        # doc_preprocessor = TSVDocPreprocessor(file_path, 
-        #                                       max_docs=self.config['max_docs'])
+        if 'subset' in file_path:
+            print("WARNING: you are currently using a subset of the data.")
+        doc_preprocessor = TSVDocPreprocessor(file_path, 
+                                              max_docs=self.config['max_docs'])
         pk_lookup_tagger = ProteinKinaseLookupTagger()
         corpus_parser = CorpusParser(fn=pk_lookup_tagger.tag)
-        # corpus_parser.apply(list(doc_preprocessor), 
-        #                     parallelism=self.config['parallelism'], 
-        #                     clear=clear)
+        corpus_parser.apply(list(doc_preprocessor), 
+                            parallelism=self.config['parallelism'], 
+                            clear=clear)
         
         if self.config['verbose']:
             print("Documents: {}".format(self.session.query(Document).count()))
