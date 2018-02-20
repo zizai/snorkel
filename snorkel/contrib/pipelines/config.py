@@ -47,6 +47,7 @@ global_config = {
 
     ## traditional
     'max_train': None,  # Number of ground truthed training candidates
+    'max_dev': None,
     'traditional_split': 0, # Which split has the candidates/labels to use for trad. sup.
     
     ## generative
@@ -65,10 +66,10 @@ global_config = {
         'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
     },
     'gen_params_default': {
-        'step_size': 0.001,
+        'step_size': 0.01,
+        'reg_param': 0.25,
+        'epochs'   : 500,
     	'decay'    : 0.95,
-        'epochs'   : 50,
-        'reg_param': 0.1,
         # used iff class_prior = True
         'init_class_prior' : 0, # logit = ln(p/(1-p)), p = exp(logit)/(1 + exp(logit))
         # Used iff lf_prior = True

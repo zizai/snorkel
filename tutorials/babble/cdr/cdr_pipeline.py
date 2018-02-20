@@ -9,7 +9,7 @@ from snorkel.annotations import load_gold_labels
 from snorkel.candidates import Ngrams, PretaggedCandidateExtractor
 from snorkel.matchers import PersonMatcher
 from snorkel.models import Document, Sentence, StableLabel
-from snorkel.parser import CorpusParser, XMLMultiDocPreprocessor
+from snorkel.parser import CorpusParser, XMLMultiDocPreprocessor, TSVDocPreprocessor
 from snorkel.parser.spacy_parser import Spacy
 
 from snorkel.contrib.pipelines.snorkel_pipeline import TRAIN, DEV, TEST
@@ -42,6 +42,24 @@ class CdrPipeline(BabblePipeline):
                     count=doc_preprocessor.max_docs, 
                     parallelism=self.config['parallelism'], 
                     clear=clear)
+
+        # TEMP: This section is for adding extra pubmed abstracts
+        if self.config['verbose']:
+            print("Documents: {}".format(self.session.query(Document).count()))
+            print("Sentences: {}".format(self.session.query(Sentence).count()))
+
+        if self.config['max_extra_docs']:
+            print("Beginning to parse {} extra documents.".format(self.config['max_extra_docs']))
+            pubmed_path = DATA_ROOT + 'query_pubmed.10k.txt'
+            doc_preprocessor2 = TSVDocPreprocessor(pubmed_path, max_docs=None)
+
+            corpus_parser = CorpusParser(parser=Spacy(), fn=tagger_one.tag)
+            corpus_parser.apply(list(doc_preprocessor2), 
+                        count=doc_preprocessor2.max_docs, 
+                        parallelism=self.config['parallelism'], 
+                        clear=False)
+        # TEMP
+
         if self.config['verbose']:
             print("Documents: {}".format(self.session.query(Document).count()))
             print("Sentences: {}".format(self.session.query(Sentence).count()))
@@ -53,18 +71,25 @@ class CdrPipeline(BabblePipeline):
 
         train_sents, dev_sents, test_sents = set(), set(), set()
         docs = self.session.query(Document).order_by(Document.name).all()
+
+        num_extra_docs = 0
         for i, doc in enumerate(docs):
+            if doc.name not in train_ids:
+                num_extra_docs += 1
+                
             for s in doc.sentences:
-                if doc.name in train_ids:
-                    if random.random() > self.config['train_fraction']:
-                        continue
-                    train_sents.add(s)
-                elif doc.name in dev_ids:
+                if doc.name in dev_ids:
                     dev_sents.add(s)
                 elif doc.name in test_ids:
                     test_sents.add(s)
                 else:
-                    raise Exception('ID <{0}> not found in any id set'.format(doc.name))
+                    if (self.config['train_fraction'] != 1
+                        and random.random() > self.config['train_fraction']):
+                        continue
+                    train_sents.add(s)
+                # else:
+                #     raise Exception('ID <{0}> not found in any id set'.format(doc.name))
+        print("Extracted candidates from {} 'extra' documents".format(num_extra_docs))
 
         candidate_extractor = PretaggedCandidateExtractor(self.candidate_class,
                                                           ['Chemical', 'Disease'])
