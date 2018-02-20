@@ -61,9 +61,9 @@ global_config = {
         'seed'                  : None,
     },
     'gen_params_range': {
-        'step_size'     : [1e-2, 1e-3, 1e-4, 1e-5],
-        'decay'         : [0.9, 0.95, 0.99],
-        'reg_param'     : [0.0, 0.01, 0.1, 0.25, 0.5],
+        'step_size'     : [0.01, 0.05, 0.1, 0.25],
+        'reg_param'     : [0.0, 0.1, 0.25, 0.5, 1.0],
+        # 'decay'         : [0.9, 0.95, 0.99],
     },
     'gen_params_default': {
         'step_size': 0.01,

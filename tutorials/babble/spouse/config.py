@@ -11,13 +11,13 @@ config = {
         'lf_propensity'         : True,
     },
     'gen_params_default': {
-        'step_size': 0.001,
-        'reg_param': 0.5,
-        'decay'    : 0.95,
+        'step_size': 0.01,
+        'reg_param': 0.25,
+        # 'decay'    : 0.95,
         # used iff class_prior = True
-        'init_class_prior' : -1.15, # (9%)
+        # 'init_class_prior' : -1.15, # (9%)
         # Used iff lf_prior = True
-        'LF_acc_prior_weight_default' : 0.5, # [0, 0.5, 1.0, 1.5] = (50%, 62%, 73%, 82%)
+        # 'LF_acc_prior_weight_default' : 0.5, # [0, 0.5, 1.0, 1.5] = (50%, 62%, 73%, 82%)
         # logit = ln(p/(1-p)), p = exp(logit)/(1 + exp(logit))
     },
 
