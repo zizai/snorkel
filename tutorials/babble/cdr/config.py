@@ -23,6 +23,7 @@ config = {
     'gen_params_default': {
         'step_size' : 0.01,
         'reg_param' : 0.5,
+        'epochs': 0,
         # 'decay'     : 0.95,
         # Used iff lf_prior = True
         # 'LF_acc_prior_weight_default' : 0.5, # [0, 0.5, 1.0, 1.5] = (50%, 62%, 73%, 82%)
@@ -40,11 +41,11 @@ config = {
         'seed'     : 123,
     },
     'disc_params_default': { # optimal tradit logreg settings
-        'rebalance':  0.25,
+        'rebalance':  0,
         'lr':         0.01,
         'batch_size': 32,
         'l1_penalty': 0,
-        'l2_penalty': 1,
+        'l2_penalty': 10,
         'dropout':    0.5,
         'dim':        50,
         'n_epochs':   20,

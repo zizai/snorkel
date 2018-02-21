@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # Parse command-line args
     argparser = argparse.ArgumentParser(description="Record scraper.")
     argparser.add_argument('--exp', type=str)
-    argparser.add_argument('--date', type=str, default='02_16_18')
+    argparser.add_argument('--date', type=str, default='02_20_18')
     argparser.add_argument('--f1', action='store_true')
     argparser.add_argument('--params', type=str, default='max_train')
     argparser.add_argument('--model', type=str, default='disc')
