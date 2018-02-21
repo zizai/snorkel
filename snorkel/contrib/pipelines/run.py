@@ -81,6 +81,9 @@ if __name__ == '__main__':
     argparser.add_argument('--gen_init_params:lf_prior', type=str2bool)
     argparser.add_argument('--gen_init_params:lf_propensity', type=str2bool)
     argparser.add_argument('--gen_init_params:lf_class_propensity', type=str2bool)
+
+    argparser.add_argument('--gen_params_default:step_size', type=float)
+    argparser.add_argument('--gen_params_default:reg_param', type=float)
     ## hyperparameters
 
     # Classify args
