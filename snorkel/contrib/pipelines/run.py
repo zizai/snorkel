@@ -84,6 +84,7 @@ if __name__ == '__main__':
 
     argparser.add_argument('--gen_params_default:step_size', type=float)
     argparser.add_argument('--gen_params_default:reg_param', type=float)
+    argparser.add_argument('--gen_params_default:epochs', type=float)
     ## hyperparameters
 
     # Classify args
