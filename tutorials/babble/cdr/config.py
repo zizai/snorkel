@@ -40,8 +40,8 @@ config = {
         'seed'     : 123,
     },
     'disc_params_default': { # optimal tradit logreg settings
-        'rebalance':  0.5,
-        'lr':         0.001,
+        'rebalance':  0.25,
+        'lr':         0.01,
         'batch_size': 32,
         'l1_penalty': 0,
         'l2_penalty': 1,
