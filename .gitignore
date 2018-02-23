@@ -48,11 +48,9 @@ tutorials/intro/data/gold_labels.tsv
 tutorials/tables/data/hardware/
 
 tutorials/babble/protein/geniatagger*
+tutorials/babble/protein/data/*
 tutorials/babble/cdr/data/*
 tutorials/babble/spouse/data/*.tsv
-
-tutorials/babble/protein/genia*
-tutorials/babble/cdr/data/
 
 tutorials/qalf/spouse/data/
 tutorials/qalf/tacred/binary_task/data/
