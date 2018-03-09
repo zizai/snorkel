@@ -41,21 +41,21 @@ def get_content_feats(candidates):
         if len(args) == 1:
             span = args[0]
             if span.sentence.is_lingual():
-                get_tdl_feats = compile_entity_feature_generator()
+                # get_tdl_feats = compile_entity_feature_generator()
                 sent = get_as_dict(span.get_parent())
-                xmltree = corenlp_to_xmltree(sent)
+                # xmltree = corenlp_to_xmltree(sent)
                 sidxs = list(range(span.get_word_start(), span.get_word_end() + 1))
                 if len(sidxs) > 0:
                     # Add DDLIB entity features
                     for f in get_ddlib_feats(span, sent, sidxs):
                         yield candidate.id, 'DDL_' + f, DEF_VALUE
-                    # Add TreeDLib entity features
-                    if span.stable_id not in unary_tdl_feats:
-                            unary_tdl_feats[span.stable_id] = set()
-                            for f in get_tdl_feats(xmltree.root, sidxs):
-                                unary_tdl_feats[span.stable_id].add(f)
-                    for f in unary_tdl_feats[span.stable_id]:
-                        yield candidate.id, 'TDL_' + f, DEF_VALUE
+                    # # Add TreeDLib entity features
+                    # if span.stable_id not in unary_tdl_feats:
+                    #         unary_tdl_feats[span.stable_id] = set()
+                    #         for f in get_tdl_feats(xmltree.root, sidxs):
+                    #             unary_tdl_feats[span.stable_id].add(f)
+                    # for f in unary_tdl_feats[span.stable_id]:
+                    #     yield candidate.id, 'TDL_' + f, DEF_VALUE
             else:
                 for f in get_word_feats(span):
                     yield candidate.id, 'BASIC_' + f, DEF_VALUE
@@ -67,7 +67,7 @@ def get_content_feats(candidates):
                 #  get_tdl_feats = compile_relation_feature_generator()
                 sent1 = get_as_dict(span1.sentence)
                 sent2 = get_as_dict(span2.sentence)
-                xmltree = corenlp_to_xmltree(get_as_dict(span1.sentence))
+                # xmltree = corenlp_to_xmltree(get_as_dict(span1.sentence))
                 s1_idxs = list(range(span1.get_word_start(), span1.get_word_end() + 1))
                 s2_idxs = list(range(span2.get_word_start(), span2.get_word_end() + 1))
                 if len(s1_idxs) > 0 and len(s2_idxs) > 0:
